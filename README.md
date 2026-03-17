@@ -4,7 +4,7 @@ O Datacron é um sistema web profissional desenvolvido para administradoras de c
 
 ## 🚀 Funcionalidades Principais
 
--   **Monitoramento de E-mail**: Agente de IA que identifica faturas recebidas em `datacroncompany@gmail.com`.
+-   **Monitoramento de E-mail**: Agente de IA que identifica faturas recebidas em um determinado e-mail.
 -   **Desbloqueio de PDF**: Regras automáticas de senha baseadas no CNPJ do condomínio.
 -   **Extração de Dados**: Captura automática de valor, vencimento, consumo e código de barras.
 -   **Análise Inteligente**: Alertas de variação de custo (ex: +35% da média) e detecção de anomalias.
