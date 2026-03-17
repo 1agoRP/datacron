@@ -6,8 +6,9 @@ import { usePathname } from 'next/navigation';
 import {
   BarChart3, Building2, Zap, Mail, FileText,
   AlertCircle, Download, ChevronLeft, ChevronRight,
-  Search, Plus, Bell, Layers, BarChart2, Settings
+  Search, Layers, BarChart2, Settings, LogOut
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import '@/styles/app.css';
 
 const nav = [
@@ -32,6 +33,7 @@ interface ShellProps {
 export default function Shell({ children, showSearch = false, searchTerm = '', onSearchChange }: ShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
   return (
     <div className="dc-app">
@@ -65,13 +67,24 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
 
         {/* Footer */}
         <div className="dc-sidebar-footer">
-          <div className="dc-user-info">
-            <div className="dc-user-avatar">IP</div>
+          <div className="dc-user-info" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: collapsed ? 0 : '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="dc-user-avatar">{user?.nome ? user.nome.substring(0,2).toUpperCase() : 'IP'}</div>
+              {!collapsed && (
+                <div className="dc-user-text">
+                  <div className="dc-user-name">{user?.nome || 'Usuário'}</div>
+                  <div className="dc-user-role">Administrador</div>
+                </div>
+              )}
+            </div>
             {!collapsed && (
-              <div className="dc-user-text">
-                <div className="dc-user-name">Iago Prado</div>
-                <div className="dc-user-role">Administrador</div>
-              </div>
+              <button 
+                onClick={logout}
+                style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                title="Sair do sistema"
+              >
+                <LogOut size={16} />
+              </button>
             )}
           </div>
           <button
