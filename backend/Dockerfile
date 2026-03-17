@@ -21,4 +21,5 @@ RUN mkdir -p pdfs_storage
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# Usamos um shell script ou passamos como argumento do bash para poder usar a variável de ambiente $PORT fornecida pelo Render
+CMD bash -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"
