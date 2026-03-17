@@ -9,9 +9,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Python dependencies
+# Python dependencie
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Usamos o 'uv', um instalador hiper rápido, para derrubar o tempo de deploy de 15min para poucos segundos
+RUN pip install --no-cache-dir uv && \
+    uv pip install --system --no-cache -r requirements.txt
 
 # App code
 COPY . .
