@@ -1,0 +1,5 @@
+backend/**
+.venv/**
+requirements.txt
+README.md
+*.db

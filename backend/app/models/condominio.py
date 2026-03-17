@@ -1,0 +1,54 @@
+import uuid
+from datetime import datetime
+from typing import Optional, TYPE_CHECKING
+
+from sqlalchemy import String, DateTime, Integer, func
+from sqlalchemy import String, DateTime, Integer, func, Uuid as UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.concessionaria import Concessionaria
+    from app.models.fatura import Fatura
+    from app.models.alerta import Alerta
+
+
+class Condominio(Base):
+    __tablename__ = "condominios"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    nome: Mapped[str] = mapped_column(String(300), nullable=False, index=True)
+    numero: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    endereco: Mapped[str] = mapped_column(String(500), nullable=False)
+    cnpj: Mapped[str] = mapped_column(String(18), unique=True, nullable=False, index=True)
+    sindico: Mapped[str] = mapped_column(String(200), nullable=False)
+    cpf_sindico: Mapped[Optional[str]] = mapped_column(String(14), nullable=True)
+    ativo: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    concessionarias: Mapped[list["Concessionaria"]] = relationship(
+        "Concessionaria", back_populates="condominio", cascade="all, delete-orphan"
+    )
+    faturas: Mapped[list["Fatura"]] = relationship(
+        "Fatura", back_populates="condominio"
+    )
+    alertas: Mapped[list["Alerta"]] = relationship(
+        "Alerta", back_populates="condominio"
+    )
+
+    @property
+    def cnpj_digits(self) -> str:
+        """Returns only the numeric digits of the CNPJ."""
+        return "".join(filter(str.isdigit, self.cnpj))
+
+    def __repr__(self) -> str:
+        return f"<Condominio {self.numero} – {self.nome}>"
