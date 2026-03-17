@@ -20,8 +20,8 @@ import '@/styles/landing.css';
 
 export default function LandingPage() {
   const [isLoginView, setIsLoginView] = useState(false);
-  const [email, setEmail] = useState('iago@propstarter.com.br');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   

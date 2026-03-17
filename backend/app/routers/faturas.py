@@ -212,61 +212,159 @@ async def download_relatorio_analitico(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Endpoint que gera e retorna um PDF de relatório analítico do NotebookLM sobre a base."""
-    from reportlab.lib.pagesizes import letter
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
+    """Gera um PDF contendo uma apresentação analítica e dinâmica dos dados atuais."""
     import io
+    from sqlalchemy.sql import func
+    from datetime import datetime
+    from reportlab.lib.pagesizes import landscape, letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    
+    # 1. Obter todos os dados do BD até aquele momento
+    stmt = select(Fatura).options(
+        selectinload(Fatura.condominio),
+        selectinload(Fatura.concessionaria)
+    )
+    result = await db.execute(stmt)
+    faturas = result.scalars().all()
+    
+    if not faturas:
+        raise HTTPException(status_code=404, detail="Não há faturas para compilar no relatório.")
+        
+    total_faturas = len(faturas)
+    valor_total = sum(f.valor for f in faturas if f.valor)
+    valor_medio = valor_total / total_faturas
+    
+    # Estatísticas por condomínio
+    condos = {}
+    concessionarias = {}
+    status_counts = {"pendente": 0, "processada": 0, "erro": 0, "revisao": 0}
+    
+    # Dias médios até vencimento (aproximado, avaliando apenas boletos que possuem data)
+    hoje = datetime.now().date()
+    soma_dias_vencimento = 0
+    faturas_com_vencimento = 0
+    
+    for f in faturas:
+        if f.status in status_counts:
+            status_counts[f.status] += 1
+            
+        c_nome = f.condominio.nome if f.condominio else "Desconhecido"
+        if c_nome not in condos:
+            condos[c_nome] = {"count": 0, "valor": 0}
+        condos[c_nome]["count"] += 1
+        condos[c_nome]["valor"] += (f.valor or 0)
+        
+        conc_nome = f.concessionaria.tipo if f.concessionaria else "Outra"
+        if conc_nome not in concessionarias:
+            concessionarias[conc_nome] = {"count": 0, "valor": 0}
+        concessionarias[conc_nome]["count"] += 1
+        concessionarias[conc_nome]["valor"] += (f.valor or 0)
+        
+        if f.vencimento:
+            delta = (f.vencimento - hoje).days
+            soma_dias_vencimento += delta
+            faturas_com_vencimento += 1
+            
+    vencimento_medio_dias = (soma_dias_vencimento / faturas_com_vencimento) if faturas_com_vencimento > 0 else 0
 
+    # 2. Construir PDF Apresentação
     output = io.BytesIO()
-    doc = SimpleDocTemplate(output, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
+    doc = SimpleDocTemplate(output, pagesize=landscape(letter), rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(name="TitleStyle", parent=styles['Heading1'], fontSize=22, textColor=colors.HexColor("#1e3a8a"), alignment=1, spaceAfter=20)
+    sub_style = ParagraphStyle(name="SubStyle", parent=styles['Heading2'], fontSize=16, textColor=colors.HexColor("#334155"), spaceAfter=15, spaceBefore=20)
+    normal_style = ParagraphStyle(name="NormalStyle", parent=styles['Normal'], fontSize=12, textColor=colors.black, spaceAfter=10, leading=16)
+    
     Story = []
+    
+    # Título
+    Story.append(Paragraph(f"<b>Apresentação Analítica: Performance e Gestão de Contas (Até {hoje.strftime('%d/%m/%Y')})</b>", title_style))
+    Story.append(Paragraph("Este documento consolida em tempo real todas as informações de leitura óptica das faturas geradas pela automação Datacron.", normal_style))
+    
+    # KPIs Globais
+    Story.append(Paragraph("<b>1. Resumo Global de Faturamento</b>", sub_style))
+    summary_data = [
+        ["Total de Contas Recebidas", "Valor Total Mapeado", "Ticket Médio por Conta", "Dias Médios Vencimento"],
+        [f"{total_faturas}", f"R$ {valor_total:,.2f}", f"R$ {valor_medio:,.2f}", f"{vencimento_medio_dias:.0f} dias"],
+        ["Status Processadas", "Status Pendentes", "Status Erro OCR", "Status Revisão"],
+        [f"{status_counts['processada']}", f"{status_counts['pendente']}", f"{status_counts['erro']}", f"{status_counts['revisao']}"]
+    ]
+    t_summary = Table(summary_data, colWidths=[180]*4)
+    t_summary.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#f1f5f9")),
+        ('BACKGROUND', (0,2), (-1,2), colors.HexColor("#f1f5f9")),
+        ('TEXTCOLOR', (0,0), (-1,-1), colors.HexColor("#0f172a")),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTNAME', (0,2), (-1,2), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 11),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 12),
+        ('INNERGRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
+        ('BOX', (0,0), (-1,-1), 0.25, colors.lightgrey),
+    ]))
+    Story.append(t_summary)
+    
+    # Participação por Condomínio
+    Story.append(Paragraph("<b>2. Distribuição e Volumes por Condomínio</b>", sub_style))
+    Story.append(Paragraph("Abaixo é possível verificar a carga de contas segmentada por condomínio (% do portfólio) e seu ticket correspondente.", normal_style))
+    
+    condo_data = [["Condomínio", "Volume de Contas", "Participação (%)", "Gasto Total Mapeado"]]
+    for c_nome, dados in sorted(condos.items(), key=lambda x: x[1]['count'], reverse=True):
+        perc = (dados['count'] / total_faturas) * 100
+        condo_data.append([
+            c_nome,
+            str(dados['count']),
+            f"{perc:.1f}%",
+            f"R$ {dados['valor']:,.2f}"
+        ])
+        
+    t_condos = Table(condo_data, colWidths=[250, 150, 150, 150])
+    t_condos.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#2563eb")),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('ALIGN', (0,1), (0,-1), 'LEFT'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('INNERGRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#2563eb")),
+    ]))
+    Story.append(t_condos)
+    
+    # Concessionárias
+    Story.append(Paragraph("<b>3. Impacto de Centros de Custos (Concessionárias)</b>", sub_style))
+    conc_data = [["Distribuidora/Serviço", "Nº de Faturas Capturadas", "Impacto Financeiro"]]
+    for conc_nome, dados in sorted(concessionarias.items(), key=lambda x: x[1]['valor'], reverse=True):
+        conc_data.append([
+            conc_nome,
+            str(dados['count']),
+            f"R$ {dados['valor']:,.2f}"
+        ])
+    
+    t_conc = Table(conc_data, colWidths=[300, 200, 200])
+    t_conc.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#0f172a")),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('INNERGRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
+        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#0f172a")),
+    ]))
+    Story.append(t_conc)
+    
+    # Disclaimer
+    Story.append(Spacer(1, 40))
+    Story.append(Paragraph("<i>* Relatório gerado dinamicamente via Datacron Business Intelligence - Compilação Real-time do Banco de Dados. Substitui a necessidade do agente externo (NotebookLM) que apresenta falhas de autenticação de cookies na nuvem. *</i>", ParagraphStyle(name="Italic", fontSize=10, textColor=colors.gray, alignment=1)))
 
-    text = """<font size=14><b>RELATÓRIO EXECUTIVO: ANÁLISE DE PORTFÓLIO DE CONDOMÍNIOS E CUSTOS OPERACIONAIS</b></font><br/>
-<br/>
-<b>1. Visão Geral do Portfólio (Escopo de Gestão)</b><br/>
-A base de dados atual demonstra a gestão de um portfólio complexo composto por diversos condomínios localizados, em sua esmagadora maioria, na cidade de São Paulo (abrangendo bairros como Perdizes, Jardim América, Vila Mariana, Brooklin, Itaim Bibi, entre outros). O banco de dados exige o controle individualizado do CNPJ de cada edifício, atrelado aos dados de seus respectivos síndicos e representantes legais.<br/>
-<br/>
-<b>2. Composição dos Centros de Custo (Concessionárias)</b><br/>
-A operação financeira lida com uma esteira de pagamentos fragmentada em múltiplas provedoras de serviços de uso contínuo e essencial:<br/>
-• Fornecimento de Energia: ENEL.<br/>
-• Saneamento e Água: SABESP.<br/>
-• Gás Encanado: COMGÁS.<br/>
-• Telecomunicações e Conectividade: VIVO, CLARO, NET e TIM.<br/>
-<br/>
-<b>3. Principais Desafios Operacionais e Financeiros Inferidos (Foco Estratégico)</b><br/>
-Através da auditoria analítica dos dados apresentados, destacam-se os seguintes gargalos e desafios críticos que demandam atenção imediata da Diretoria:<br/>
-<br/>
-<i>A. Risco Financeiro em Despesas Críticas (High-Ticket)</i><br/>
-O portfólio possui faturas de consumo básico com valores altíssimos, o que exige um provisionamento de caixa rigoroso por parte de cada condomínio e monitoramento para evitar cortes de serviço. Destacam-se as seguintes anomalias e altos custos:<br/>
-• SABESP: Contas que atingem o patamar de R$ 29.001,00 no Condomínio Blanc Campo Belo e R$ 24.871,00 no Condomínio Belas Artes.<br/>
-• COMGÁS: Picos de faturamento chegando a R$ 29.001,00 também no Condomínio Belas Artes.<br/>
-• ENEL: Despesas de até R$ 25.500,00 em regiões específicas.<br/>
-• Desafio para a Diretoria: A falta de auditoria de consumo pode esconder vazamentos ou ineficiências energéticas. O não pagamento de uma única fatura neste patamar compromete seriamente a governança corporativa.<br/>
-<br/>
-<i>B. Alta Complexidade no Faturamento e Fragmentação de Medidores</i><br/>
-A análise revela uma extrema pulverização de contas dentro de um mesmo cliente (condomínio), dificultando a consolidação financeira.<br/>
-• Múltiplas instalações: Condomínios como o Fit Jardim Botânico I, possuem rateios separados na ENEL para "ADM TOR 1" (R$ 2.300,00), "ADM TOR 2" (R$ 1.900,00), além de medidores exclusivos para bombas.<br/>
-• Desmembramento por blocos: Medições divididas em vários blocos diferentes, totalizando altas montas fragmentadas.<br/>
-• Desafio para a Diretoria: Há uma ampla variação nas datas de vencimento. Controlar esse volume massivo de linhas de pagamento manualmente eleva drasticamente o risco de erros humanos e multas.<br/>
-<br/>
-<i>C. Controle de Contratos Menores e Telecomunicações</i><br/>
-Observa-se a gestão de pequenas contas de telefonia atreladas a funções específicas (ex: Zelador, Sala de Ginástica, Eventos).<br/>
-• Desafio para a Diretoria: É necessário estabelecer uma governança rígida para evitar o pagamento de linhas ociosas ou redundância na contratação de pacotes de telecomunicações corporativas.<br/>
-<br/>
-<b>Conclusão e Parecer Estratégico</b><br/>
-Através de inteligência processada no banco de dados, o principal desafio elencado é a integração, auditoria contínua e automação de pagamentos. A estrutura é altamente vulnerável a falhas de controle devido à quantidade de CNPJs, medidores fragmentados e faturas de alto impacto. A Diretoria deve focar na centralização inteligente dessas métricas pelo Datacron para mitigar riscos operacionais de alta gravidade.<br/>
-<br/>
-<i>* Relatório processado por IA (Notebook LM / Gemini Engine) - Datacron Analytics System *</i>
-"""
-    p = Paragraph(text, styles["Normal"])
-    Story.append(p)
     doc.build(Story)
     output.seek(0)
     
     return StreamingResponse(
         output,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=relatorio_analitico_ia.pdf"},
+        headers={"Content-Disposition": "attachment; filename=relatorio_analitico_apresentacao.pdf"},
     )
