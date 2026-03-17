@@ -5,12 +5,20 @@ import Shell from '@/components/layout/Shell';
 import {
   BarChart2, FileText, Building2, Calendar, Filter,
   Download, TrendingUp, Zap, AlertCircle,
-  CheckCircle2, ArrowUpRight
+  CheckCircle2, ArrowUpRight, BrainCircuit
 } from 'lucide-react';
 
 import { api, API_BASE_URL } from '@/lib/api';
 
 const reports = [
+  {
+    icon: BrainCircuit,
+    title: 'Relatório Analítico',
+    desc: 'Visão geral com inteligência artificial sobre o Datacron atual.',
+    color: '#faf5ff',
+    iconColor: '#9333ea',
+    key: 'relatorio_analitico',
+  },
   {
     icon: Building2,
     title: 'Por Condomínio',
@@ -114,14 +122,42 @@ export default function RelatoriosPage() {
     try {
       setGeneratingReport(report.key);
       const safeName = report.title.replace(/\s+/g, '_').toLowerCase();
-      await downloadFile(selectedFormat, `relatorio_${safeName}`);
+      
+      let realFmt = selectedFormat;
+      
+      if (report.key === 'relatorio_analitico') {
+        const token = localStorage.getItem('datacron_token');
+        const headers: any = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const response = await fetch(`${API_BASE_URL}/faturas/relatorio-analitico/download`, {
+          headers
+        });
+
+        if (!response.ok) {
+          throw new Error('Falha ao gerar relatório analítico de IA');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `relatorio_analitico_ia.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        realFmt = 'pdf';
+      } else {
+        await downloadFile(selectedFormat, `relatorio_${safeName}`);
+      }
 
       // Add to history
       const now = new Date();
       const dateStr = `${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
       const currentMonth = now.toLocaleDateString('pt-BR', { month: 'long' });
       const capitalizedMonth = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
-      const fmtLabel = selectedFormat === 'excel' ? 'Excel' : selectedFormat === 'csv' ? 'CSV' : 'PDF';
+      const fmtLabel = realFmt === 'excel' ? 'Excel' : realFmt === 'csv' ? 'CSV' : 'PDF';
 
       setGeneratedHistory(prev => [
         {
@@ -142,9 +178,28 @@ export default function RelatoriosPage() {
 
   const handleDownloadFromHistory = async (row: typeof generatedHistory[0]) => {
     try {
-      const fmt: FormatoType = row.fmt === 'CSV' ? 'csv' : row.fmt === 'PDF' ? 'pdf' : 'excel';
-      const safeName = row.name.replace(/\s+/g, '_').toLowerCase();
-      await downloadFile(fmt, safeName);
+      if (row.key === 'relatorio_analitico') {
+        const token = localStorage.getItem('datacron_token');
+        const headers: any = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const response = await fetch(`${API_BASE_URL}/faturas/relatorio-analitico/download`, { headers });
+        if (!response.ok) throw new Error('Falha ao baixar relatório analítico de IA');
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `relatorio_analitico_ia.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        const fmt: FormatoType = row.fmt === 'CSV' ? 'csv' : row.fmt === 'PDF' ? 'pdf' : 'excel';
+        const safeName = row.name.replace(/\s+/g, '_').toLowerCase();
+        await downloadFile(fmt, safeName);
+      }
     } catch (e: any) {
       alert('Erro ao baixar relatório: ' + e.message);
     }

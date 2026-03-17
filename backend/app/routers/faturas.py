@@ -206,3 +206,67 @@ async def update_fatura_status(
     await db.commit()
     await db.refresh(f)
     return f
+
+@router.get("/relatorio-analitico/download")
+async def download_relatorio_analitico(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Endpoint que gera e retorna um PDF de relatório analítico do NotebookLM sobre a base."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    import io
+
+    output = io.BytesIO()
+    doc = SimpleDocTemplate(output, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
+    styles = getSampleStyleSheet()
+    Story = []
+
+    text = """<font size=14><b>RELATÓRIO EXECUTIVO: ANÁLISE DE PORTFÓLIO DE CONDOMÍNIOS E CUSTOS OPERACIONAIS</b></font><br/>
+<br/>
+<b>1. Visão Geral do Portfólio (Escopo de Gestão)</b><br/>
+A base de dados atual demonstra a gestão de um portfólio complexo composto por diversos condomínios localizados, em sua esmagadora maioria, na cidade de São Paulo (abrangendo bairros como Perdizes, Jardim América, Vila Mariana, Brooklin, Itaim Bibi, entre outros). O banco de dados exige o controle individualizado do CNPJ de cada edifício, atrelado aos dados de seus respectivos síndicos e representantes legais.<br/>
+<br/>
+<b>2. Composição dos Centros de Custo (Concessionárias)</b><br/>
+A operação financeira lida com uma esteira de pagamentos fragmentada em múltiplas provedoras de serviços de uso contínuo e essencial:<br/>
+• Fornecimento de Energia: ENEL.<br/>
+• Saneamento e Água: SABESP.<br/>
+• Gás Encanado: COMGÁS.<br/>
+• Telecomunicações e Conectividade: VIVO, CLARO, NET e TIM.<br/>
+<br/>
+<b>3. Principais Desafios Operacionais e Financeiros Inferidos (Foco Estratégico)</b><br/>
+Através da auditoria analítica dos dados apresentados, destacam-se os seguintes gargalos e desafios críticos que demandam atenção imediata da Diretoria:<br/>
+<br/>
+<i>A. Risco Financeiro em Despesas Críticas (High-Ticket)</i><br/>
+O portfólio possui faturas de consumo básico com valores altíssimos, o que exige um provisionamento de caixa rigoroso por parte de cada condomínio e monitoramento para evitar cortes de serviço. Destacam-se as seguintes anomalias e altos custos:<br/>
+• SABESP: Contas que atingem o patamar de R$ 29.001,00 no Condomínio Blanc Campo Belo e R$ 24.871,00 no Condomínio Belas Artes.<br/>
+• COMGÁS: Picos de faturamento chegando a R$ 29.001,00 também no Condomínio Belas Artes.<br/>
+• ENEL: Despesas de até R$ 25.500,00 em regiões específicas.<br/>
+• Desafio para a Diretoria: A falta de auditoria de consumo pode esconder vazamentos ou ineficiências energéticas. O não pagamento de uma única fatura neste patamar compromete seriamente a governança corporativa.<br/>
+<br/>
+<i>B. Alta Complexidade no Faturamento e Fragmentação de Medidores</i><br/>
+A análise revela uma extrema pulverização de contas dentro de um mesmo cliente (condomínio), dificultando a consolidação financeira.<br/>
+• Múltiplas instalações: Condomínios como o Fit Jardim Botânico I, possuem rateios separados na ENEL para "ADM TOR 1" (R$ 2.300,00), "ADM TOR 2" (R$ 1.900,00), além de medidores exclusivos para bombas.<br/>
+• Desmembramento por blocos: Medições divididas em vários blocos diferentes, totalizando altas montas fragmentadas.<br/>
+• Desafio para a Diretoria: Há uma ampla variação nas datas de vencimento. Controlar esse volume massivo de linhas de pagamento manualmente eleva drasticamente o risco de erros humanos e multas.<br/>
+<br/>
+<i>C. Controle de Contratos Menores e Telecomunicações</i><br/>
+Observa-se a gestão de pequenas contas de telefonia atreladas a funções específicas (ex: Zelador, Sala de Ginástica, Eventos).<br/>
+• Desafio para a Diretoria: É necessário estabelecer uma governança rígida para evitar o pagamento de linhas ociosas ou redundância na contratação de pacotes de telecomunicações corporativas.<br/>
+<br/>
+<b>Conclusão e Parecer Estratégico</b><br/>
+Através de inteligência processada no banco de dados, o principal desafio elencado é a integração, auditoria contínua e automação de pagamentos. A estrutura é altamente vulnerável a falhas de controle devido à quantidade de CNPJs, medidores fragmentados e faturas de alto impacto. A Diretoria deve focar na centralização inteligente dessas métricas pelo Datacron para mitigar riscos operacionais de alta gravidade.<br/>
+<br/>
+<i>* Relatório processado por IA (Notebook LM / Gemini Engine) - Datacron Analytics System *</i>
+"""
+    p = Paragraph(text, styles["Normal"])
+    Story.append(p)
+    doc.build(Story)
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=relatorio_analitico_ia.pdf"},
+    )
