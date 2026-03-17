@@ -24,6 +24,10 @@ class UserResponse(BaseModel):
     created_at: datetime
     model_config = {"from_attributes": True}
 
+class PasswordUpdate(BaseModel):
+    senha_atual: str
+    nova_senha: str
+
 
 # ─── Condomínio ───────────────────────────────────────────────
 

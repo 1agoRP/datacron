@@ -10,7 +10,7 @@ from app.dependencies import (
     create_access_token, get_current_user,
 )
 from app.models.user import User
-from app.schemas import LoginRequest, TokenResponse, UserResponse
+from app.schemas import LoginRequest, TokenResponse, UserResponse, PasswordUpdate
 from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
@@ -44,6 +44,26 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 async def get_me(current_user: User = Depends(get_current_user)):
     """Returns the currently authenticated user's data."""
     return current_user
+
+
+@router.post("/update-password")
+async def update_password(
+    body: PasswordUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Updates the user's password."""
+    if not verify_password(body.senha_atual, current_user.senha_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Senha atual incorreta",
+        )
+    
+    current_user.senha_hash = hash_password(body.nova_senha)
+    db.add(current_user)
+    await db.commit()
+    
+    return {"message": "Senha atualizada com sucesso"}
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)

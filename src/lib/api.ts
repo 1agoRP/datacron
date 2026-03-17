@@ -72,6 +72,13 @@ class ApiClient {
     window.location.href = '/';
   }
 
+  async updatePassword(data: { senha_atual: string; nova_senha: string }) {
+    return this.request('/auth/update-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getMe() {
     return this.request('/auth/me');
   }

@@ -5,6 +5,7 @@ import Shell from '@/components/layout/Shell';
 import {
   User, Shield, Bell, Globe, Database, Mail, Smartphone, ArrowRight, Check, Key, Link as LinkIcon, LogOut, Trash2, Copy, Plus, Activity, RefreshCw
 } from 'lucide-react';
+import { api } from '@/lib/api';
 
 const navItems = [
   { icon: User,       label: 'Perfil & Conta' },
@@ -25,6 +26,37 @@ export default function ConfiguracoesPage() {
     email: 'iago@datacron.com.br',
     cargo: 'Administrador Global'
   });
+
+  const [pwForm, setPwForm] = useState({
+    senhaAtual: '',
+    novaSenha: '',
+    confirmaSenha: ''
+  });
+  const [isUpdatingPw, setIsUpdatingPw] = useState(false);
+
+  const handleUpdatePassword = async () => {
+    if (!pwForm.senhaAtual || !pwForm.novaSenha || !pwForm.confirmaSenha) {
+      alert('Preencha todos os campos da senha.');
+      return;
+    }
+    if (pwForm.novaSenha !== pwForm.confirmaSenha) {
+      alert('As senhas não coincidem!');
+      return;
+    }
+    try {
+      setIsUpdatingPw(true);
+      await api.updatePassword({
+        senha_atual: pwForm.senhaAtual,
+        nova_senha: pwForm.novaSenha
+      });
+      alert('Senha atualizada com sucesso!');
+      setPwForm({ senhaAtual: '', novaSenha: '', confirmaSenha: '' });
+    } catch (e: any) {
+      alert(e.message || 'Falha ao atualizar a senha');
+    } finally {
+      setIsUpdatingPw(false);
+    }
+  };
 
   const handleSaveProfile = () => {
     setIsSaving(true);
@@ -144,19 +176,42 @@ export default function ConfiguracoesPage() {
               <div className="dc-form-grid-1" style={{ maxWidth: 400 }}>
                 <div className="dc-form-group">
                   <label className="dc-form-label">Senha Atual</label>
-                  <input className="dc-form-input" type="password" placeholder="Digite sua senha atual" />
+                  <input 
+                    className="dc-form-input" 
+                    type="password" 
+                    placeholder="Digite sua senha atual"
+                    value={pwForm.senhaAtual}
+                    onChange={e => setPwForm({ ...pwForm, senhaAtual: e.target.value })}
+                  />
                 </div>
                 <div className="dc-form-group">
                   <label className="dc-form-label">Nova Senha</label>
-                  <input className="dc-form-input" type="password" placeholder="Mínimo 8 caracteres" />
+                  <input 
+                    className="dc-form-input" 
+                    type="password" 
+                    placeholder="Mínimo 8 caracteres"
+                    value={pwForm.novaSenha}
+                    onChange={e => setPwForm({ ...pwForm, novaSenha: e.target.value })}
+                  />
                 </div>
                 <div className="dc-form-group">
                   <label className="dc-form-label">Confirmar Nova Senha</label>
-                  <input className="dc-form-input" type="password" />
+                  <input 
+                    className="dc-form-input" 
+                    type="password"
+                    value={pwForm.confirmaSenha}
+                    onChange={e => setPwForm({ ...pwForm, confirmaSenha: e.target.value })}
+                  />
                 </div>
               </div>
               <div style={{ marginTop: 24 }}>
-                <button className="dc-btn dc-btn-primary" onClick={() => alert('Senha atualizada com sucesso.')}>Atualizar Senha</button>
+                <button 
+                  className="dc-btn dc-btn-primary" 
+                  disabled={isUpdatingPw}
+                  onClick={handleUpdatePassword}
+                >
+                  {isUpdatingPw ? 'Atualizando...' : 'Atualizar Senha'}
+                </button>
               </div>
             </div>
 
