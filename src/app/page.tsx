@@ -2,10 +2,10 @@
 
 import { useState, FormEvent } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
-import { 
-  ArrowRight, 
-  Layers, 
-  Mail, 
+import {
+  ArrowRight,
+  Layers,
+  Mail,
   Database,
   ShieldCheck,
   Zap,
@@ -16,7 +16,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import '@/styles/globals.css';
-import '@/styles/landing.css'; 
+import '@/styles/landing.css';
 
 export default function LandingPage() {
   const [isLoginView, setIsLoginView] = useState(false);
@@ -24,7 +24,7 @@ export default function LandingPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const { login } = useAuth();
   const router = useRouter();
 
@@ -62,7 +62,7 @@ export default function LandingPage() {
     <div className="landing-root">
       <div className="landing-grid"></div>
       <div className="landing-bg"></div>
-      
+
       <div className="landing-content">
         {/* Navbar */}
         <nav className="landing-nav">
@@ -88,15 +88,15 @@ export default function LandingPage() {
                 Plataforma RPA V2.0 Lançada
               </div>
             </motion.div>
-            
+
             <motion.h1 variants={fadeUp} className="hero-title">
-              A inteligência artificial que fatura por <span className="hero-title-gradient">você.</span>
+              A inteligência artificial que recebe, controla organiza por <span className="hero-title-gradient">você.</span>
             </motion.h1>
-            
+
             <motion.p variants={fadeUp} className="hero-subtitle">
               Datacron é o exército invisível da sua administradora. Monitoramos e extraímos senhas, concessionárias e valores em milissegundos, com precisão absoluta. O fim das planilhas manuais.
             </motion.p>
-            
+
             <motion.div variants={fadeUp} className="hero-actions">
               <button className="cta-pri" onClick={() => setIsLoginView(true)}>
                 Acessar Sistema <ArrowRight size={20} />
@@ -137,7 +137,7 @@ export default function LandingPage() {
               <div className="bento-icon">
                 <Mail size={24} />
               </div>
-              <h3 className="bento-title">Carteiro Autônomo (Varredura de Gmail)</h3>
+              <h3 className="bento-title">Carteiro Autônomo (Varredura de Email)</h3>
               <p className="bento-desc" style={{ maxWidth: '80%' }}>
                 Não perca tempo abrindo e-mails. Nosso Worker de background varre contas configuradas a cada 5 minutos, captura faturas em PDF conectadas a palavras-chave (Enel, Comgás, Sabesp) e encaminha para pipeline de OCR.
               </p>
@@ -209,14 +209,14 @@ export default function LandingPage() {
       {/* Modern Login Modal */}
       <AnimatePresence>
         {isLoginView && (
-          <motion.div 
+          <motion.div
             className="modern-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setIsLoginView(false)}
           >
-            <motion.div 
+            <motion.div
               className="login-popup"
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -242,10 +242,10 @@ export default function LandingPage() {
                     {error}
                   </div>
                 )}
-                
+
                 <div>
-                  <input 
-                    type="email" 
+                  <input
+                    type="email"
                     className="login-input"
                     placeholder="E-mail Operacional (iago@...)"
                     value={email}
@@ -253,10 +253,10 @@ export default function LandingPage() {
                     required
                   />
                 </div>
-                
+
                 <div>
-                  <input 
-                    type="password" 
+                  <input
+                    type="password"
                     className="login-input"
                     placeholder="••••••••"
                     value={password}
@@ -264,7 +264,7 @@ export default function LandingPage() {
                     required
                   />
                 </div>
-                
+
                 <button type="submit" className="login-btn" disabled={isLoading}>
                   {isLoading ? 'Autenticando...' : 'Autenticar'}
                 </button>

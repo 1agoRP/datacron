@@ -57,7 +57,7 @@ export default function ImportacoesPage() {
       setLoading(true);
       await api.confirmImport({
         tipo: baseType,
-        rows: previewData.rows.filter((r: any) => r.action !== 'IGNORAR')
+        rows: previewData.rows.filter((r: any) => r.acao !== 'IGNORAR' && r.acao !== 'ERRO')
       });
       alert('Importação concluída com sucesso!');
       window.location.href = baseType === 'condominios' ? '/condominios' : '/concessionarias';

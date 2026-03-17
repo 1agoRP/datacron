@@ -244,17 +244,26 @@ class ApiClient {
 
   // Importações
   async previewImport(formData: FormData) {
-    return fetch(`${API_BASE_URL}/importacoes/preview`, {
+    const res = await fetch(`${API_BASE_URL}/importacoes/preview`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${this.getToken()}`
         },
         body: formData
-    }).then(r => r.json());
+    });
+    const data = await res.json();
+    if (!res.ok) {
+        let msg = 'Erro ao processar arquivo';
+        if (data.detail) {
+            msg = Array.isArray(data.detail) ? data.detail.map((d: any) => d.msg).join(', ') : data.detail;
+        }
+        throw new Error(msg);
+    }
+    return data;
   }
 
   async confirmImport(data: any) {
-    return this.request('/importacoes/confirm', {
+    return this.request('/importacoes/confirmar', {
         method: 'POST',
         body: JSON.stringify(data)
     });

@@ -1,7 +1,7 @@
 import io
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Query
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Query, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,7 @@ from app.dependencies import get_current_user
 from app.models.user import User
 from app.models.condominio import Condominio
 from app.models.concessionaria import Concessionaria
-from app.schemas import ImportPreviewResponse, ImportPreviewRow, ImportConfirmResponse
+from app.schemas import ImportPreviewResponse, ImportPreviewRow, ImportConfirmResponse, ImportConfirmRequest
 
 router = APIRouter(prefix="/importacoes", tags=["Importações"])
 
@@ -81,7 +81,7 @@ async def download_template(
 
 @router.post("/preview", response_model=ImportPreviewResponse)
 async def preview_import(
-    tipo: Literal["condominios", "concessionarias"] = Query(...),
+    tipo: Literal["condominios", "concessionarias"] = Form(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -173,25 +173,20 @@ async def preview_import(
 
 @router.post("/confirmar", response_model=ImportConfirmResponse)
 async def confirm_import(
-    tipo: Literal["condominios", "concessionarias"] = Query(...),
-    file: UploadFile = File(...),
+    payload: ImportConfirmRequest,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
     """
     Commits the import to the database.
-    Runs the same validation as /preview, then persists the data.
+    Re-runs the DB validation logic based on the passed JSON payload rows.
     """
-    content = await file.read()
-    if not file.filename:
-        raise HTTPException(status_code=422, detail="Arquivo sem nome")
-
-    rows = _parse_excel_or_csv(content, file.filename)
     sucesso = erros = 0
 
-    for raw in rows:
+    for row_obj in payload.rows:
+        raw = row_obj.dados
         try:
-            if tipo == "condominios":
+            if payload.tipo == "condominios":
                 numero  = str(raw.get("nº_cond.", "") or "").strip()
                 nome    = str(raw.get("nome", "") or "").strip()
                 cnpj    = str(raw.get("cnpj", "") or "").strip()

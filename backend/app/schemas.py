@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, date
-from typing import Optional, Any
+from typing import Optional, Any, Literal
 
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
@@ -208,3 +208,7 @@ class ImportConfirmResponse(BaseModel):
     sucesso: int
     erros: int
     mensagem: str
+
+class ImportConfirmRequest(BaseModel):
+    tipo: Literal["condominios", "concessionarias"]
+    rows: list[ImportPreviewRow]
