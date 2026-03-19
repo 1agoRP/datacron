@@ -52,6 +52,8 @@ async def list_faturas(
 async def export_faturas(
     referencia: Optional[str] = None,
     condominio_id: Optional[uuid.UUID] = None,
+    data_inicio: Optional[str] = None,
+    data_fim: Optional[str] = None,
     formato: str = Query("excel", pattern="^(excel|csv|pdf)$"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
@@ -59,6 +61,7 @@ async def export_faturas(
     """Exports faturas as Excel, CSV or PDF."""
     import openpyxl
     import csv
+    from datetime import datetime as dt
 
     stmt = select(Fatura).options(
         selectinload(Fatura.condominio),
@@ -68,6 +71,18 @@ async def export_faturas(
         stmt = stmt.where(Fatura.condominio_id == condominio_id)
     if referencia:
         stmt = stmt.where(Fatura.referencia == referencia)
+    if data_inicio:
+        try:
+            inicio = dt.strptime(data_inicio, "%Y-%m-%d")
+            stmt = stmt.where(Fatura.created_at >= inicio)
+        except ValueError:
+            pass
+    if data_fim:
+        try:
+            fim = dt.strptime(data_fim, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+            stmt = stmt.where(Fatura.created_at <= fim)
+        except ValueError:
+            pass
 
     result = await db.execute(stmt.order_by(Fatura.created_at.desc()))
     faturas = result.scalars().all()

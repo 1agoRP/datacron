@@ -35,47 +35,34 @@ async def download_template(
     tipo: Literal["condominios", "concessionarias"],
     _: User = Depends(get_current_user),
 ):
-    """Returns a pre-formatted Excel template for the specified import type."""
-    import openpyxl
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
+    """Returns a pre-formatted CSV template for the specified import type."""
+    import csv as csv_mod
 
     if tipo == "condominios":
-        ws.title = "Condomínios"
         headers = ["Nº Cond.", "Nome", "Endereço", "CNPJ", "Síndico(a)", "CPF Síndico"]
         sample = [["0006", "Residencial Exemplo", "Av. Paulista, 100", "12.345.678/0001-90", "João Silva", "123.456.789-00"]]
     else:
-        ws.title = "Concessionárias"
         headers = ["Nº Cond.", "Tipo", "Instalação", "E-mail Esperado", "Regra Senha", "Senha Manual", "Dia Vencimento", "Valor Médio"]
         sample = [
             ["0006", "Enel", "69858373", "fatura@enel.com.br", "5_primeiros_cnpj", "", "10", "1500.00"],
             ["0006", "Sabesp", "12345678", "fatura@sabesp.com.br", "manual", "MINHASENHA123", "15", "800.00"],
         ]
 
-    # Style headers
-    from openpyxl.styles import Font, PatternFill
-    header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
-    ws.append(headers)
-    for cell in ws[1]:
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = header_fill
-
-    for row in sample:
-        ws.append(row)
-
-    # Auto-width
-    for col in ws.columns:
-        max_len = max(len(str(cell.value or "")) for cell in col)
-        ws.column_dimensions[col[0].column_letter].width = max_len + 4
-
     output = io.BytesIO()
-    wb.save(output)
+    # Write BOM for Excel UTF-8 compatibility
+    output.write(b'\xef\xbb\xbf')
+    wrapper = io.TextIOWrapper(output, encoding='utf-8', newline='')
+    writer = csv_mod.writer(wrapper, delimiter=';')
+    writer.writerow(headers)
+    for row in sample:
+        writer.writerow(row)
+    wrapper.detach()
     output.seek(0)
+
     return StreamingResponse(
         output,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=template_{tipo}.xlsx"},
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename=template_{tipo}.csv"},
     )
 
 

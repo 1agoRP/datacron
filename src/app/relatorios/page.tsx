@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
   BarChart2, FileText, Building2, Calendar, Filter,
@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 
 import { api, API_BASE_URL } from '@/lib/api';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const reports = [
   {
@@ -72,22 +74,43 @@ const reports = [
 type FormatoType = 'excel' | 'csv' | 'pdf';
 
 export default function RelatoriosPage() {
-  const [selectedFormat, setSelectedFormat] = useState<FormatoType>('excel');
+  const [selectedFormat, setSelectedFormat] = useState<FormatoType>('pdf');
   const [loading, setLoading] = useState(false);
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
-  const [generatedHistory, setGeneratedHistory] = useState([
-    { name: 'Relatório Março – Condomínios', date: '10/03/2026 09:20', user: 'Iago Prado', fmt: 'Excel', key: 'por_condominio' },
-    { name: 'Variação de Valor – Fevereiro', date: '05/03/2026 14:00', user: 'Iago Prado', fmt: 'PDF', key: 'variacao_de_valor' },
-    { name: 'Contas Pendentes – Fevereiro', date: '01/03/2026 10:30', user: 'Iago Prado', fmt: 'CSV', key: 'contas_pendentes' },
-  ]);
+  const [generatedHistory, setGeneratedHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  // Date range filters
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+
+  // Fetch real history from DB on mount
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setLoadingHistory(true);
+        const data = await api.getReportHistory();
+        setGeneratedHistory(data);
+      } catch (err) {
+        console.error('Erro ao carregar histórico:', err);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+    fetchHistory();
+  }, []);
 
   const downloadFile = async (formato: FormatoType, downloadName: string) => {
     const token = localStorage.getItem('datacron_token');
-    const backendFormat = formato;
     const headers: any = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${API_BASE_URL}/faturas/exportar?formato=${backendFormat}`, {
+    const params = new URLSearchParams();
+    params.set('formato', formato);
+    if (dataInicio) params.set('data_inicio', dataInicio);
+    if (dataFim) params.set('data_fim', dataFim);
+
+    const response = await fetch(`${API_BASE_URL}/faturas/exportar?${params.toString()}`, {
       headers
     });
 
@@ -111,6 +134,17 @@ export default function RelatoriosPage() {
     try {
       setLoading(true);
       await downloadFile(selectedFormat, 'faturas_exportadas');
+
+      // Register in history
+      const fmtLabel = selectedFormat === 'excel' ? 'Excel' : selectedFormat === 'csv' ? 'CSV' : 'PDF';
+      await api.registerReport({
+        nome: `Exportação Geral – ${fmtLabel}`,
+        tipo_relatorio: 'exportacao_geral',
+        formato: selectedFormat,
+      });
+      // Refresh history
+      const updated = await api.getReportHistory();
+      setGeneratedHistory(updated);
     } catch (e: any) {
       alert(e.message);
     } finally {
@@ -121,7 +155,6 @@ export default function RelatoriosPage() {
   const handleGenerateReport = async (report: typeof reports[0]) => {
     try {
       setGeneratingReport(report.key);
-      const safeName = report.title.replace(/\s+/g, '_').toLowerCase();
       
       let realFmt = selectedFormat;
       
@@ -149,26 +182,25 @@ export default function RelatoriosPage() {
         document.body.removeChild(a);
         realFmt = 'pdf';
       } else {
+        const safeName = report.title.replace(/\s+/g, '_').toLowerCase();
         await downloadFile(selectedFormat, `relatorio_${safeName}`);
       }
 
-      // Add to history
+      // Register in real history
+      const fmtLabel = realFmt === 'excel' ? 'excel' : realFmt === 'csv' ? 'csv' : 'pdf';
       const now = new Date();
-      const dateStr = `${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
       const currentMonth = now.toLocaleDateString('pt-BR', { month: 'long' });
       const capitalizedMonth = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
-      const fmtLabel = realFmt === 'excel' ? 'Excel' : realFmt === 'csv' ? 'CSV' : 'PDF';
 
-      setGeneratedHistory(prev => [
-        {
-          name: `${report.title} – ${capitalizedMonth}`,
-          date: dateStr,
-          user: 'Iago Prado',
-          fmt: fmtLabel,
-          key: report.key,
-        },
-        ...prev,
-      ]);
+      await api.registerReport({
+        nome: `${report.title} – ${capitalizedMonth}`,
+        tipo_relatorio: report.key,
+        formato: fmtLabel,
+      });
+
+      // Refresh history
+      const updated = await api.getReportHistory();
+      setGeneratedHistory(updated);
     } catch (e: any) {
       alert('Erro ao gerar relatório: ' + e.message);
     } finally {
@@ -176,9 +208,9 @@ export default function RelatoriosPage() {
     }
   };
 
-  const handleDownloadFromHistory = async (row: typeof generatedHistory[0]) => {
+  const handleDownloadFromHistory = async (row: any) => {
     try {
-      if (row.key === 'relatorio_analitico') {
+      if (row.tipo_relatorio === 'relatorio_analitico') {
         const token = localStorage.getItem('datacron_token');
         const headers: any = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -196,8 +228,8 @@ export default function RelatoriosPage() {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
       } else {
-        const fmt: FormatoType = row.fmt === 'CSV' ? 'csv' : row.fmt === 'PDF' ? 'pdf' : 'excel';
-        const safeName = row.name.replace(/\s+/g, '_').toLowerCase();
+        const fmt: FormatoType = row.formato === 'csv' ? 'csv' : row.formato === 'pdf' ? 'pdf' : 'excel';
+        const safeName = row.nome.replace(/\s+/g, '_').toLowerCase();
         await downloadFile(fmt, safeName);
       }
     } catch (e: any) {
@@ -206,8 +238,8 @@ export default function RelatoriosPage() {
   };
 
   const formatLabels: Record<string, FormatoType> = {
-    'Excel': 'excel',
     'PDF': 'pdf',
+    'Excel': 'excel',
     'CSV': 'csv',
   };
 
@@ -252,18 +284,50 @@ export default function RelatoriosPage() {
         </div>
       </div>
 
-      {/* Quick filter */}
+      {/* Date range filter */}
       <div className="dc-filter-bar" style={{ marginBottom: 24 }}>
-        <div className="dc-filter-search">
-          <Filter style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', width: 16, height: 16 }} />
-          <input placeholder="Filtrar por condomínio ou período..." style={{ paddingLeft: 38 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+          <Calendar size={16} style={{ color: '#94a3b8', flexShrink: 0 }} />
+          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>Período:</span>
+          <input
+            type="date"
+            value={dataInicio}
+            onChange={e => setDataInicio(e.target.value)}
+            placeholder="Data inicial"
+            style={{
+              padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8,
+              fontSize: '0.85rem', fontFamily: 'inherit', color: '#0f172a',
+              background: '#fff', flex: 1, maxWidth: 180,
+            }}
+          />
+          <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>até</span>
+          <input
+            type="date"
+            value={dataFim}
+            onChange={e => setDataFim(e.target.value)}
+            placeholder="Data final"
+            style={{
+              padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8,
+              fontSize: '0.85rem', fontFamily: 'inherit', color: '#0f172a',
+              background: '#fff', flex: 1, maxWidth: 180,
+            }}
+          />
+          {(dataInicio || dataFim) && (
+            <button
+              className="dc-btn dc-btn-secondary"
+              style={{ height: 36, padding: '0 12px', fontSize: '0.78rem' }}
+              onClick={() => { setDataInicio(''); setDataFim(''); }}
+            >
+              Limpar
+            </button>
+          )}
         </div>
         <div style={{ 
           height: 40, padding: '0 14px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 8,
           background: '#f1f5f9', borderRadius: 10, fontWeight: 600, color: '#475569'
         }}>
           <span style={{ 
-            background: selectedFormat === 'excel' ? '#16a34a' : selectedFormat === 'csv' ? '#ea580c' : '#dc2626',
+            background: selectedFormat === 'pdf' ? '#dc2626' : selectedFormat === 'csv' ? '#ea580c' : '#16a34a',
             color: '#fff', padding: '2px 8px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800 
           }}>
             {selectedFormat.toUpperCase()}
@@ -307,26 +371,19 @@ export default function RelatoriosPage() {
                     </>
                   )}
                 </button>
-                <button
-                  className="dc-btn dc-btn-secondary"
-                  style={{ height: 38, padding: '0 12px', fontSize: '0.82rem' }}
-                  onClick={() => handleGenerateReport(r)}
-                  disabled={isGenerating}
-                  title="Gerar e abrir em nova aba"
-                >
-                  <ArrowUpRight size={14} />
-                </button>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Summary section */}
+      {/* Summary section — REAL history from DB */}
       <div className="dc-card dc-card-p" style={{ marginTop: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <span className="dc-card-title">Histórico de Relatórios Gerados</span>
-          <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>Últimos 30 dias</span>
+          <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>
+            {generatedHistory.length} registro{generatedHistory.length !== 1 ? 's' : ''}
+          </span>
         </div>
         <table className="dc-table">
           <thead>
@@ -339,21 +396,31 @@ export default function RelatoriosPage() {
             </tr>
           </thead>
           <tbody>
-            {generatedHistory.map((row, i) => (
-              <tr key={i}>
+            {loadingHistory ? (
+              <tr>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '40px' }}>
+                  <div className="dc-loading-spinner" style={{ margin: '0 auto' }} />
+                </td>
+              </tr>
+            ) : generatedHistory.map((row, i) => (
+              <tr key={row.id || i}>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 34, height: 34, borderRadius: 8, background: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <FileText size={16} />
                     </div>
-                    <span className="dc-cell-primary">{row.name}</span>
+                    <span className="dc-cell-primary">{row.nome}</span>
                   </div>
                 </td>
-                <td><span className="dc-cell-secondary">{row.date}</span></td>
-                <td><span className="dc-cell-secondary">{row.user}</span></td>
                 <td>
-                  <span className={`dc-badge ${row.fmt === 'Excel' ? 'dc-badge-green' : row.fmt === 'CSV' ? 'dc-badge-amber' : 'dc-badge-red'}`}>
-                    {row.fmt}
+                  <span className="dc-cell-secondary">
+                    {row.created_at ? format(new Date(row.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
+                  </span>
+                </td>
+                <td><span className="dc-cell-secondary">{row.usuario || 'Operador'}</span></td>
+                <td>
+                  <span className={`dc-badge ${row.formato === 'excel' ? 'dc-badge-green' : row.formato === 'csv' ? 'dc-badge-amber' : 'dc-badge-red'}`}>
+                    {(row.formato || 'pdf').toUpperCase()}
                   </span>
                 </td>
                 <td>
@@ -369,10 +436,10 @@ export default function RelatoriosPage() {
                 </td>
               </tr>
             ))}
-            {generatedHistory.length === 0 && (
+            {!loadingHistory && generatedHistory.length === 0 && (
               <tr>
                 <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                  Nenhum relatório gerado ainda.
+                  Nenhum relatório gerado ainda. Gere seu primeiro relatório acima.
                 </td>
               </tr>
             )}

@@ -99,6 +99,7 @@ class ConcessionariaResponse(BaseModel):
     instalacao: str
     email_esperado: Optional[str] = None
     regra_senha: str
+    senha_manual: Optional[str] = None
     dia_vencimento: int
     valor_medio: float
     ativo: bool
@@ -212,3 +213,21 @@ class ImportConfirmResponse(BaseModel):
 class ImportConfirmRequest(BaseModel):
     tipo: Literal["condominios", "concessionarias"]
     rows: list[ImportPreviewRow]
+
+
+# ─── Relatórios Gerados ───────────────────────────────────────
+
+class RelatorioGeradoCreate(BaseModel):
+    nome: str
+    tipo_relatorio: str  # relatorio_analitico | por_condominio | por_concessionaria | ...
+    formato: str  # pdf | excel | csv
+    usuario: str = "Operador"
+
+class RelatorioGeradoResponse(BaseModel):
+    id: uuid.UUID
+    nome: str
+    tipo_relatorio: str
+    formato: str
+    usuario: str
+    created_at: datetime
+    model_config = {"from_attributes": True}

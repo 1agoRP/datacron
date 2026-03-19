@@ -89,10 +89,11 @@ async def resolve_alerta(
 
 def _send_resolution_email(recipient: str, original_subject: str):
     """
-    Sends a standard reply email informing that the concessionária
+    Sends a professional HTML reply email informing that the concessionária
     was not found in the system and needs review.
     """
     import base64
+    import re
     from email.mime.text import MIMEText
     from app.services.email_monitor import get_gmail_service
 
@@ -100,20 +101,87 @@ def _send_resolution_email(recipient: str, original_subject: str):
     if not service:
         raise Exception("Gmail service not available")
 
-    body_text = (
-        f"Prezado(a),\n\n"
-        f"Informamos que o e-mail recebido com o assunto \"{original_subject}\" "
-        f"não foi identificado como uma concessionária cadastrada em nosso sistema.\n\n"
-        f"Será necessária uma revisão para verificar se esta concessionária deve ser "
-        f"cadastrada ou não no sistema Datacron.\n\n"
-        f"Caso tenha dúvidas, entre em contato com a administração.\n\n"
-        f"Atenciosamente,\n"
-        f"Sistema Datacron - Gestão de Faturas"
-    )
+    # Detect dealership type from subject for better subject line
+    subj_upper = original_subject.upper()
+    if "ENEL" in subj_upper or "ELETROPAULO" in subj_upper:
+        tipo_label = "Enel"
+        codigo_label = "Instalação"
+    elif "SABESP" in subj_upper:
+        tipo_label = "Sabesp"
+        codigo_label = "Fornecimento"
+    elif "COMGÁS" in subj_upper or "COMGAS" in subj_upper:
+        tipo_label = "Comgas"
+        codigo_label = "Código de Usuário"
+    else:
+        tipo_label = "Concessionária"
+        codigo_label = "Código"
 
-    message = MIMEText(body_text, "plain", "utf-8")
+    # Extract code from subject if available
+    code_match = re.search(r"(\d{6,})", original_subject)
+    code = code_match.group(1) if code_match else "N/D"
+
+    subject = f"{tipo_label} – {codigo_label} {code} – não reconhecida no cadastro"
+
+    body_html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"></head>
+<body style="font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background-color: #f1f5f9;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+    
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1e40af, #2563eb); padding: 28px 32px; text-align: center;">
+      <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">⚡ Datacron</h1>
+      <p style="color: #93c5fd; margin: 6px 0 0; font-size: 13px; font-weight: 600;">Sistema de Gestão de Faturas</p>
+    </div>
+
+    <!-- Body -->
+    <div style="padding: 32px;">
+      <h2 style="color: #0f172a; font-size: 18px; font-weight: 800; margin: 0 0 16px;">
+        ⚠️ Concessionária Não Identificada
+      </h2>
+      
+      <p style="color: #475569; font-size: 14px; line-height: 1.7; margin: 0 0 20px;">
+        Prezado(a), informamos que o e-mail recebido <strong>não foi identificado</strong> como uma concessionária cadastrada em nosso sistema Datacron.
+      </p>
+
+      <!-- Info Table -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 24px;">
+        <div style="padding: 14px 18px; border-bottom: 1px solid #e2e8f0; display: flex;">
+          <span style="color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; min-width: 120px;">Remetente</span>
+          <span style="color: #0f172a; font-size: 14px; font-weight: 600;">{recipient}</span>
+        </div>
+        <div style="padding: 14px 18px; border-bottom: 1px solid #e2e8f0; display: flex;">
+          <span style="color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; min-width: 120px;">Assunto Original</span>
+          <span style="color: #0f172a; font-size: 14px; font-weight: 600;">{original_subject}</span>
+        </div>
+        <div style="padding: 14px 18px; display: flex;">
+          <span style="color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; min-width: 120px;">Tipo Detectado</span>
+          <span style="color: #2563eb; font-size: 14px; font-weight: 700;">{tipo_label} ({codigo_label})</span>
+        </div>
+      </div>
+
+      <p style="color: #475569; font-size: 14px; line-height: 1.7; margin: 0 0 8px;">
+        <strong>Ação necessária:</strong> Será necessária uma revisão para verificar se esta concessionária deve ser cadastrada no sistema.
+      </p>
+      
+      <p style="color: #64748b; font-size: 13px; line-height: 1.6; margin: 0;">
+        Caso tenha dúvidas, entre em contato com a administração.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 32px; text-align: center;">
+      <p style="color: #94a3b8; font-size: 12px; margin: 0; font-weight: 600;">
+        Datacron · Gestão Inteligente de Faturas · E-mail enviado automaticamente
+      </p>
+    </div>
+  </div>
+</body>
+</html>"""
+
+    message = MIMEText(body_html, "html", "utf-8")
     message["To"] = recipient
-    message["Subject"] = f"Re: {original_subject} - Concessionária não cadastrada"
+    message["Subject"] = subject
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
     service.users().messages().send(

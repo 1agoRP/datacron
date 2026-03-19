@@ -5,7 +5,7 @@ import Shell from '@/components/layout/Shell';
 import {
   Mail, Search, Filter, CheckCircle2, AlertCircle,
   ShieldCheck, FileCheck, Activity, Layers, MoreVertical,
-  Download, FileDigit
+  Download, FileDigit, FileText
 } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
@@ -42,10 +42,22 @@ export default function RecebimentosPage() {
     try {
       setScanning(true);
       await api.forceEmailScan();
-      alert('Varredura iniciada com sucesso!');
-      fetchData();
+      alert('Varredura iniciada com sucesso! Os resultados aparecerão nos logs em instantes.');
+      setTimeout(() => fetchData(), 3000);
     } catch (err: any) {
-      alert(err.message);
+      const msg = err.message || 'Erro desconhecido';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        alert(
+          '⚠️ Não foi possível conectar ao servidor.\n\n' +
+          'Possíveis causas:\n' +
+          '• O backend pode estar reiniciando\n' +
+          '• As credenciais do Gmail podem não estar configuradas no servidor\n' +
+          '• Problemas de conexão de rede\n\n' +
+          'Tente novamente em alguns minutos.'
+        );
+      } else {
+        alert('Erro ao iniciar varredura: ' + msg);
+      }
     } finally {
       setScanning(false);
     }
@@ -72,7 +84,7 @@ export default function RecebimentosPage() {
       </div>
 
       {/* Stats */}
-      <div className="dc-stats-grid">
+      <div className="dc-stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
         <div className="dc-stat-card">
           <div className="dc-stat-top">
             <span className="dc-stat-badge" style={{ background: '#f1f5f9', color: '#64748b' }}>Logs</span>
@@ -125,6 +137,50 @@ export default function RecebimentosPage() {
             <div className="dc-stat-label">ERROS DETECTADOS</div>
             <div className="dc-stat-value" style={{ color: logs.filter(l => l.status === 'nao_identificado' || l.status === 'erro').length > 0 ? '#dc2626' : '#0f172a' }}>
               {logs.filter(l => l.status === 'nao_identificado' || l.status === 'erro').length}
+            </div>
+          </div>
+        </div>
+
+        {/* NEW CARDS */}
+        <div className="dc-stat-card">
+          <div className="dc-stat-top">
+            <span className="dc-stat-badge" style={{ background: '#faf5ff', color: '#9333ea' }}>PDFs</span>
+            <div className="dc-stat-icon" style={{ background: '#faf5ff', color: '#9333ea' }}>
+              <FileText size={24} />
+            </div>
+          </div>
+          <div>
+            <div className="dc-stat-label">PDFs EXTRAÍDOS</div>
+            <div className="dc-stat-value">{logs.filter(l => l.fatura_url).length}</div>
+          </div>
+        </div>
+
+        <div className="dc-stat-card">
+          <div className="dc-stat-top">
+            <span className="dc-stat-badge" style={{ background: '#fff7ed', color: '#ea580c' }}>Valor</span>
+            <div className="dc-stat-icon" style={{ background: '#fff7ed', color: '#ea580c' }}>
+              <Activity size={24} />
+            </div>
+          </div>
+          <div>
+            <div className="dc-stat-label">VALOR PROCESSADO</div>
+            <div className="dc-stat-value" style={{ fontSize: '1.5rem' }}>
+              R$ {logs.reduce((sum, l) => sum + (l.fatura_valor || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </div>
+          </div>
+        </div>
+
+        <div className="dc-stat-card">
+          <div className="dc-stat-top">
+            <span className="dc-stat-badge" style={{ background: '#f0fdf4', color: '#16a34a' }}>%</span>
+            <div className="dc-stat-icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
+              <CheckCircle2 size={24} />
+            </div>
+          </div>
+          <div>
+            <div className="dc-stat-label">TAXA DE IDENTIFICAÇÃO</div>
+            <div className="dc-stat-value">
+              {logs.length > 0 ? Math.round((logs.filter(l => l.condominio_nome).length / logs.length) * 100) : 0}%
             </div>
           </div>
         </div>
@@ -183,6 +239,7 @@ export default function RecebimentosPage() {
                   {item.status === 'ok' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
                 </div>
                 <div className="dc-proc-sender-info">
+                  <div className="dc-proc-dest-label" style={{ marginBottom: 2 }}>E-mail</div>
                   <div className="dc-proc-sender-name" title={item.remetente}>{item.remetente}</div>
                   <div className="dc-proc-sender-time" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                     {item.recebido_em ? format(new Date(item.recebido_em), "dd/MM HH:mm") : '—'}
@@ -199,7 +256,7 @@ export default function RecebimentosPage() {
 
             {/* Body column */}
             <div className="dc-proc-body">
-              <div className="dc-proc-dest-label">Destinação</div>
+              <div className="dc-proc-dest-label">Condomínio</div>
               <div className="dc-proc-dest-name">
                 {item.condominio_nome ? (
                   <><Layers size={15} style={{ color: '#2563eb' }} /> {item.condominio_nome}</>
@@ -247,7 +304,14 @@ export default function RecebimentosPage() {
                          const token = localStorage.getItem('datacron_token');
                          fetch(`${API_BASE_URL}${item.fatura_url.replace('/api', '')}`, {
                              headers: { 'Authorization': `Bearer ${token}` }
-                         }).then(resp => resp.blob()).then(blob => {
+                         }).then(resp => {
+                             if (!resp.ok) {
+                               throw new Error(resp.status === 404
+                                 ? 'PDF não encontrado no servidor. O arquivo pode ter sido removido após um redeploy.'
+                                 : `Erro ao baixar: ${resp.status}`);
+                             }
+                             return resp.blob();
+                         }).then(blob => {
                              const url = window.URL.createObjectURL(blob);
                              const a = document.createElement('a');
                              a.href = url;
@@ -256,6 +320,8 @@ export default function RecebimentosPage() {
                              a.click();
                              window.URL.revokeObjectURL(url);
                              a.remove();
+                         }).catch(err => {
+                             alert('❌ ' + (err.message || 'Erro ao baixar fatura'));
                          });
                       }
                       setMenuOpen(null);

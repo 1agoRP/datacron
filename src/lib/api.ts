@@ -51,6 +51,11 @@ class ApiClient {
       throw new Error(msg);
     }
 
+    // Handle 204 No Content (e.g., DELETE endpoints)
+    if (response.status === 204) {
+      return undefined as any;
+    }
+
     return response.json();
   }
 
@@ -214,19 +219,9 @@ class ApiClient {
   }
 
   async deleteAlerta(id: string) {
-    const token = this.getToken();
-    const response = await fetch(`${API_BASE_URL}/alertas/${id}`, {
+    return this.request(`/alertas/${id}`, {
       method: 'DELETE',
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
     });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.detail || 'Erro ao deletar alerta');
-    }
-    // 204 No Content - no body to parse
-    return;
   }
 
   // Email Agent
@@ -235,7 +230,21 @@ class ApiClient {
   }
 
   async forceEmailScan() {
-    return this.request('/emails/forcar-varredura', { method: 'POST' });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+    try {
+      return await this.request('/emails/forcar-varredura', {
+        method: 'POST',
+        signal: controller.signal,
+      });
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        throw new Error('Tempo limite excedido. A varredura pode estar em andamento no servidor.');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   async getAgentStatus() {
@@ -328,6 +337,33 @@ class ApiClient {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  }
+
+  // Report History
+  async getReportHistory() {
+    return this.request<any[]>('/relatorios/historico');
+  }
+
+  async registerReport(data: { nome: string; tipo_relatorio: string; formato: string; usuario?: string }) {
+    return this.request('/relatorios/registrar', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Dashboard
+  async getDashboardContasEsperadas(mes?: string) {
+    const params = mes ? `?mes=${mes}` : '';
+    return this.request<{ total_esperadas: number; recebidas: number; mes: string }>(`/dashboard/contas-esperadas${params}`);
+  }
+
+  async getDashboardChart(meses: number = 6, agrupar: string = 'mes') {
+    return this.request<{ name: string; valor: number }[]>(`/dashboard/chart?meses=${meses}&agrupar=${agrupar}`);
+  }
+
+  // Faturas by condominio (for history)
+  async getFaturasByCondominio(condominioId: string) {
+    return this.request<any[]>(`/faturas?condominio_id=${condominioId}&limit=100`);
   }
 }
 

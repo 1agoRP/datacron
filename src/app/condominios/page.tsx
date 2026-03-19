@@ -1,9 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, LayoutDashboard, Mail, Trash2, Calendar, FileText } from 'lucide-react';
-import { api } from '@/lib/api';
+import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History } from 'lucide-react';
+import { api, API_BASE_URL } from '@/lib/api';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+type SortField = 'nome' | 'numero';
+type SortDir = 'asc' | 'desc';
 
 export default function CondominiosPage() {
   const [condos, setCondos] = useState<any[]>([]);
@@ -20,11 +25,24 @@ export default function CondominiosPage() {
   });
   const [creating, setCreating] = useState(false);
 
+  // Sort
+  const [sortField, setSortField] = useState<SortField>('nome');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterSindico, setFilterSindico] = useState('');
+
   // Modals state
   const [detailsCondo, setDetailsCondo] = useState<any>(null);
   const [editCondo, setEditCondo] = useState<any>(null);
   const [condoConcs, setCondoConcs] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // History modal
+  const [historyConc, setHistoryConc] = useState<any>(null);
+  const [historyFaturas, setHistoryFaturas] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -57,14 +75,46 @@ export default function CondominiosPage() {
     }
   };
 
-  const filtered = condos.filter(c =>
-    c.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.numero.includes(searchTerm) ||
-    c.cnpj.includes(searchTerm)
-  );
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const filtered = useMemo(() => {
+    let result = condos.filter(c =>
+      c.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      c.numero.includes(searchTerm) ||
+      c.cnpj.includes(searchTerm)
+    );
+
+    // Apply síndico filter
+    if (filterSindico.trim()) {
+      result = result.filter(c => (c.sindico || '').toLowerCase().includes(filterSindico.toLowerCase()));
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let valA = a[sortField] || '';
+      let valB = b[sortField] || '';
+      if (sortField === 'numero') {
+        valA = parseInt(valA) || 0;
+        valB = parseInt(valB) || 0;
+        return sortDir === 'asc' ? valA - valB : valB - valA;
+      }
+      const cmp = String(valA).localeCompare(String(valB), 'pt-BR', { sensitivity: 'base' });
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    return result;
+  }, [condos, searchTerm, filterSindico, sortField, sortDir]);
 
   const handleOpenDetails = async (condo: any) => {
     setDetailsCondo(condo);
+    setHistoryConc(null);
     try {
       setLoadingDetails(true);
       const concs = await api.getConcessionarias({ condominio_id: condo.id });
@@ -74,6 +124,47 @@ export default function CondominiosPage() {
     } finally {
       setLoadingDetails(false);
     }
+  };
+
+  const handleOpenHistory = async (conc: any) => {
+    setHistoryConc(conc);
+    try {
+      setLoadingHistory(true);
+      const faturas = await api.getFaturasByCondominio(detailsCondo.id);
+      // Filter faturas for this specific concessionária
+      const concFaturas = faturas.filter((f: any) => f.concessionaria_id === conc.id);
+      setHistoryFaturas(concFaturas);
+    } catch (err) {
+      console.error(err);
+      setHistoryFaturas([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const handleDownloadFatura = (faturaId: string, filename: string) => {
+    const token = localStorage.getItem('datacron_token');
+    fetch(`${API_BASE_URL}/faturas/${faturaId}/pdf`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).then(resp => {
+      if (!resp.ok) {
+        throw new Error(resp.status === 404
+          ? 'PDF não encontrado no servidor.'
+          : `Erro ao baixar: ${resp.status}`);
+      }
+      return resp.blob();
+    }).then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || `fatura_${faturaId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    }).catch(err => {
+      alert('❌ ' + (err.message || 'Erro ao baixar fatura'));
+    });
   };
 
   const handleOpenEdit = (condo: any) => {
@@ -110,6 +201,17 @@ export default function CondominiosPage() {
     }
   };
 
+  const SortIcon = ({ field }: { field: SortField }) => (
+    <ArrowUpDown
+      size={13}
+      style={{ 
+        marginLeft: 4, cursor: 'pointer', 
+        color: sortField === field ? '#2563eb' : '#cbd5e1',
+        transition: 'color 0.15s',
+      }}
+    />
+  );
+
   return (
     <Shell>
       <div className="dc-page-header">
@@ -132,8 +234,12 @@ export default function CondominiosPage() {
             placeholder="Buscar por nome, número ou CNPJ..."
           />
         </div>
-        <button className="dc-btn dc-btn-secondary" style={{ height: 40, padding: '0 16px', fontSize: '0.85rem' }}>
-          <Filter size={15} /> Filtros
+        <button 
+          className={`dc-btn ${showFilters ? 'dc-btn-primary' : 'dc-btn-secondary'}`} 
+          style={{ height: 40, padding: '0 16px', fontSize: '0.85rem' }}
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <Filter size={15} /> Filtros {showFilters ? '✕' : ''}
         </button>
         <div className="dc-filter-divider" />
         <span className="dc-filter-count">
@@ -141,21 +247,53 @@ export default function CondominiosPage() {
         </span>
       </div>
 
+      {/* Expandable filters */}
+      {showFilters && (
+        <div style={{
+          display: 'flex', gap: 16, padding: '14px 20px', marginBottom: 16,
+          background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0',
+          alignItems: 'flex-end', flexWrap: 'wrap',
+        }}>
+          <div className="dc-form-group" style={{ flex: 1, minWidth: 200, margin: 0 }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginBottom: 4 }}>Síndico(a)</label>
+            <input
+              className="dc-form-input"
+              value={filterSindico}
+              onChange={e => setFilterSindico(e.target.value)}
+              placeholder="Filtrar por nome do síndico..."
+              style={{ height: 36 }}
+            />
+          </div>
+          <button
+            className="dc-btn dc-btn-secondary"
+            style={{ height: 36, fontSize: '0.8rem', padding: '0 14px' }}
+            onClick={() => { setFilterSindico(''); }}
+          >
+            Limpar Filtros
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="dc-card">
         <div className="dc-table-wrapper">
           <table className="dc-table">
             <thead>
               <tr>
-                <th>Condomínio</th>
+                <th onClick={() => toggleSort('nome')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  Condomínio <SortIcon field="nome" />
+                </th>
                 <th>Status de Contas</th>
+                <th onClick={() => toggleSort('numero')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  Nº <SortIcon field="numero" />
+                </th>
                 <th>Síndico(a) / CNPJ</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
               ) : filtered.map(condo => {
                 const total = condo.contas_esperadas || 0;
                 const rec = condo.contas_recebidas || 0;
@@ -170,8 +308,6 @@ export default function CondominiosPage() {
                         <div>
                           <div className="dc-cell-primary">{condo.nome}</div>
                           <div className="dc-cell-secondary" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{ fontWeight: 800, color: '#94a3b8' }}>Nº {condo.numero}</span>
-                            <span style={{ margin: '0 4px', color: '#cbd5e1' }}>·</span>
                             <MapPin size={11} style={{ color: '#94a3b8' }} />
                             {condo.endereco}
                           </div>
@@ -190,6 +326,9 @@ export default function CondominiosPage() {
                       </div>
                     </td>
                     <td>
+                      <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.95rem' }}>{condo.numero}</span>
+                    </td>
+                    <td>
                       <div className="dc-cell-primary">{condo.sindico}</div>
                       <div className="dc-cell-secondary">{condo.cnpj}</div>
                     </td>
@@ -204,7 +343,7 @@ export default function CondominiosPage() {
               })}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={4}>
+                  <td colSpan={5}>
                     <div style={{ padding: '60px 24px', textAlign: 'center', color: '#94a3b8' }}>
                       <Building2 size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
                       <div style={{ fontWeight: 700, fontSize: '1rem', color: '#475569' }}>Nenhum condomínio cadastrado</div>
@@ -218,7 +357,7 @@ export default function CondominiosPage() {
         </div>
       </div>
 
-      {/* Simplified Pagination */}
+      {/* Pagination */}
       <div className="dc-pagination">
         <span className="dc-pagination-info">
           Mostrando {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
@@ -321,76 +460,159 @@ export default function CondominiosPage() {
       {/* Modal Detalhes */}
       {detailsCondo && (
         <div className="dc-modal-overlay">
-          <div className="dc-modal-content" style={{ maxWidth: 650 }}>
+          <div className="dc-modal-content" style={{ maxWidth: 700 }}>
             <div className="dc-modal-header">
-              <h2 className="dc-modal-title">Detalhes do Condomínio</h2>
-              <button className="dc-modal-close" onClick={() => setDetailsCondo(null)}><X size={20} /></button>
+              <h2 className="dc-modal-title">
+                {historyConc ? (
+                  <button 
+                    onClick={() => setHistoryConc(null)} 
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit' }}
+                  >
+                    <ChevronLeft size={20} /> Histórico — {historyConc.tipo}
+                  </button>
+                ) : 'Detalhes do Condomínio'}
+              </h2>
+              <button className="dc-modal-close" onClick={() => { setDetailsCondo(null); setHistoryConc(null); }}><X size={20} /></button>
             </div>
-            <div className="dc-modal-body dc-space-y-4">
-              {/* Info Header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                <div className="dc-condo-icon" style={{ width: 48, height: 48 }}>
-                  <Building2 size={24} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{detailsCondo.nome}</h3>
-                  <div style={{ display: 'flex', gap: 12, fontSize: '0.85rem', color: '#64748b', marginTop: 4 }}>
-                    <span>Cód: Nº {detailsCondo.numero}</span>
-                    <span>CNPJ: {detailsCondo.cnpj}</span>
+            <div className="dc-modal-body dc-space-y-4" style={{ maxHeight: 500, overflowY: 'auto' }}>
+              {historyConc ? (
+                /* HISTORY VIEW */
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, background: '#f0f9ff', borderRadius: 10, border: '1px solid #bae6fd' }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 8, background: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem' }}>
+                      {historyConc.tipo[0]}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 800, color: '#0c4a6e' }}>{historyConc.tipo} — {historyConc.instalacao}</div>
+                      <div style={{ fontSize: '0.82rem', color: '#0369a1' }}>{detailsCondo.nome} · Dia {historyConc.dia_vencimento}</div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Specifics */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
-                <div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>SÍNDICO(A) RESPONSÁVEL</div>
-                  <div style={{ fontWeight: 600, color: '#334155' }}>{detailsCondo.sindico}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>ENDEREÇO</div>
-                  <div style={{ fontWeight: 600, color: '#334155' }}>{detailsCondo.endereco}</div>
-                </div>
-              </div>
-
-              {/* Concessionarias List */}
-              <div style={{ marginTop: 24 }}>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Zap size={16} color="#eab308" /> Concessionárias Vinculadas
-                </h4>
-                {loadingDetails ? (
-                   <div style={{ padding: '20px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
-                ) : condoConcs.length === 0 ? (
-                  <div style={{ padding: 24, textAlign: 'center', background: '#f8fafc', borderRadius: 8, fontSize: '0.9rem', color: '#64748b', border: '1px dashed #cbd5e1' }}>
-                    Este condomínio ainda não possui automações vinculadas.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {condoConcs.map(conc => (
-                      <div key={conc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                          <div style={{ width: 38, height: 38, borderRadius: 8, background: conc.tipo === 'Sabesp' ? '#ecfeff' : conc.tipo === 'Enel' ? '#eff6ff' : '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: conc.tipo === 'Sabesp' ? '#0891b2' : conc.tipo === 'Enel' ? '#2563eb' : '#ea580c' }}>
-                            {conc.tipo[0]}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>{conc.tipo}</div>
-                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Instalação: {conc.instalacao}</div>
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <span className="dc-badge dc-badge-green">Ativo</span>
-                          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
-                            <Calendar size={13} /> Vence dia {conc.dia_vencimento}
-                          </div>
-                        </div>
+                  {loadingHistory ? (
+                    <div style={{ padding: 40, textAlign: 'center' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
+                  ) : historyFaturas.length === 0 ? (
+                    <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+                      <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+                      <div style={{ fontWeight: 700 }}>Nenhuma fatura registrada para esta concessionária</div>
+                    </div>
+                  ) : (
+                    <table className="dc-table" style={{ fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr>
+                          <th>Referência</th>
+                          <th>Vencimento</th>
+                          <th>Valor</th>
+                          <th>Status</th>
+                          <th style={{ textAlign: 'right' }}>PDF</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historyFaturas.map(f => (
+                          <tr key={f.id}>
+                            <td><span className="dc-cell-primary">{f.referencia || '—'}</span></td>
+                            <td>{f.vencimento ? format(new Date(f.vencimento), 'dd/MM/yyyy') : '—'}</td>
+                            <td><span className="dc-cell-primary">R$ {(f.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></td>
+                            <td>
+                              <span className={`dc-badge ${f.status === 'processada' ? 'dc-badge-green' : 'dc-badge-amber'}`}>
+                                {(f.status || 'pendente').charAt(0).toUpperCase() + (f.status || 'pendente').slice(1)}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                <button
+                                  className="dc-btn dc-btn-secondary"
+                                  style={{ height: 30, padding: '0 10px', fontSize: '0.75rem', gap: 4 }}
+                                  disabled={!f.pdf_path}
+                                  onClick={() => handleDownloadFatura(f.id, f.pdf_nome_original || `fatura_${f.id}.pdf`)}
+                                >
+                                  <Download size={12} /> Baixar
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </>
+              ) : (
+                /* DETAILS VIEW */
+                <>
+                  {/* Info Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                    <div className="dc-condo-icon" style={{ width: 48, height: 48 }}>
+                      <Building2 size={24} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{detailsCondo.nome}</h3>
+                      <div style={{ display: 'flex', gap: 12, fontSize: '0.85rem', color: '#64748b', marginTop: 4 }}>
+                        <span>Cód: Nº {detailsCondo.numero}</span>
+                        <span>CNPJ: {detailsCondo.cnpj}</span>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  {/* Specifics */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+                    <div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>SÍNDICO(A) RESPONSÁVEL</div>
+                      <div style={{ fontWeight: 600, color: '#334155' }}>{detailsCondo.sindico}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>ENDEREÇO</div>
+                      <div style={{ fontWeight: 600, color: '#334155' }}>{detailsCondo.endereco}</div>
+                    </div>
+                  </div>
+
+                  {/* Concessionarias List */}
+                  <div style={{ marginTop: 24 }}>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Zap size={16} color="#eab308" /> Concessionárias Vinculadas
+                    </h4>
+                    {loadingDetails ? (
+                       <div style={{ padding: '20px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
+                    ) : condoConcs.length === 0 ? (
+                      <div style={{ padding: 24, textAlign: 'center', background: '#f8fafc', borderRadius: 8, fontSize: '0.9rem', color: '#64748b', border: '1px dashed #cbd5e1' }}>
+                        Este condomínio ainda não possui automações vinculadas.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {condoConcs.map(conc => (
+                          <div key={conc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                              <div style={{ width: 38, height: 38, borderRadius: 8, background: conc.tipo === 'Sabesp' ? '#ecfeff' : conc.tipo === 'Enel' ? '#eff6ff' : '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: conc.tipo === 'Sabesp' ? '#0891b2' : conc.tipo === 'Enel' ? '#2563eb' : '#ea580c', fontWeight: 800 }}>
+                                {conc.tipo[0]}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>{conc.tipo}</div>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Instalação: {conc.instalacao}</div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <button
+                                className="dc-btn dc-btn-secondary"
+                                style={{ height: 32, padding: '0 12px', fontSize: '0.78rem', gap: 6 }}
+                                onClick={() => handleOpenHistory(conc)}
+                              >
+                                <History size={13} /> Histórico
+                              </button>
+                              <div style={{ textAlign: 'right' }}>
+                                <span className="dc-badge dc-badge-green">Ativo</span>
+                                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
+                                  <Calendar size={13} /> Dia {conc.dia_vencimento}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
             <div className="dc-modal-footer">
-              <button type="button" className="dc-btn dc-btn-secondary" onClick={() => setDetailsCondo(null)}>Fechar Visualização</button>
+              <button type="button" className="dc-btn dc-btn-secondary" onClick={() => { setDetailsCondo(null); setHistoryConc(null); }}>Fechar Visualização</button>
             </div>
           </div>
         </div>

@@ -73,7 +73,11 @@ export default function FaturasPage() {
     fetch(`${API_BASE_URL}/faturas/${faturaId}/pdf`, {
       headers: { 'Authorization': `Bearer ${token}` }
     }).then(resp => {
-      if (!resp.ok) throw new Error('Falha ao baixar PDF');
+      if (!resp.ok) {
+        throw new Error(resp.status === 404
+          ? 'PDF não encontrado no servidor. O arquivo pode ter sido removido após um redeploy.'
+          : `Erro ao baixar PDF: ${resp.status}`);
+      }
       return resp.blob();
     }).then(blob => {
       const url = window.URL.createObjectURL(blob);
@@ -85,7 +89,7 @@ export default function FaturasPage() {
       window.URL.revokeObjectURL(url);
       a.remove();
     }).catch(err => {
-      console.error(err);
+      alert('❌ ' + (err.message || 'Erro ao baixar fatura'));
     });
   };
 

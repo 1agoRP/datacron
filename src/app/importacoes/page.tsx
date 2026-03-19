@@ -74,7 +74,7 @@ export default function ImportacoesPage() {
         <div>
           <h1 className="dc-page-title">Importação de Dados</h1>
           <p className="dc-page-subtitle">
-            Sincronize sua base do Excel com o Datacron de forma segura e validada.
+            Sincronize sua base CSV com o Datacron de forma segura e validada.
           </p>
         </div>
         <span className="dc-badge dc-badge-slate" style={{ fontSize: '0.8rem', padding: '6px 14px' }}>
@@ -169,7 +169,7 @@ export default function ImportacoesPage() {
                     📋 Baixe o modelo de importação
                   </div>
                   <div style={{ fontSize: '0.84rem', color: '#0369a1', lineHeight: 1.5 }}>
-                    Use o modelo Excel para preencher os dados no formato correto que o sistema reconhece.
+                    Use o modelo CSV para preencher os dados no formato correto que o sistema reconhece.
                     {baseType === 'condominios' 
                       ? ' O modelo inclui colunas: Nº Cond., Nome, Endereço, CNPJ, Síndico(a), CPF Síndico.'
                       : ' O modelo inclui colunas: Nº Cond., Tipo, Instalação, E-mail Esperado, Regra Senha, Senha Manual, Dia Vencimento, Valor Médio.'}
@@ -189,7 +189,7 @@ export default function ImportacoesPage() {
                   </>
                 ) : (
                   <>
-                    <Download size={16} /> Baixar Modelo (.xlsx)
+                    <Download size={16} /> Baixar Modelo (.csv)
                   </>
                 )}
               </button>
@@ -202,10 +202,10 @@ export default function ImportacoesPage() {
             </div>
             <div className="dc-upload-title">{file ? file.name : 'Selecione o arquivo'}</div>
             <div className="dc-upload-subtitle">
-              Formatos aceitos: .xlsx, .xls ou .csv. Use o modelo acima como referência.
+              Formatos aceitos: .csv, .xlsx ou .xls. Recomendado usar CSV para melhor compatibilidade.
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
-              <input type="file" id="import-file" hidden onChange={handleFileChange} accept=".xlsx,.xls,.csv" />
+              <input type="file" id="import-file" hidden onChange={handleFileChange} accept=".csv,.xlsx,.xls" />
               <button className="dc-btn dc-btn-primary" onClick={() => document.getElementById('import-file')?.click()}>
                 Selecionar Arquivo
               </button>

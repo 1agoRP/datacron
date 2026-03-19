@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import engine, Base
-from app.routers import auth, condominios, concessionarias, faturas, alertas, emails, importacoes
+from app.routers import auth, condominios, concessionarias, faturas, alertas, emails, importacoes, relatorios, dashboard
 from app.workers.scheduler import start_scheduler, stop_scheduler
 
 # ─── Logging ────────────────────────────────────────────────
@@ -82,6 +82,8 @@ app.include_router(faturas.router,          prefix=API_PREFIX)
 app.include_router(alertas.router,          prefix=API_PREFIX)
 app.include_router(emails.router,           prefix=API_PREFIX)
 app.include_router(importacoes.router,      prefix=API_PREFIX)
+app.include_router(relatorios.router,       prefix=API_PREFIX)
+app.include_router(dashboard.router,        prefix=API_PREFIX)
 
 
 # ─── Health check ───────────────────────────────────────────

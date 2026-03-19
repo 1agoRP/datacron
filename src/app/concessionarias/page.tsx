@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2 } from 'lucide-react';
+import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2, Search, Filter, Key, Eye, EyeOff } from 'lucide-react';
 import { api } from '@/lib/api';
 
 const COLOR_MAP: Record<string, { bg: string; color: string }> = {
@@ -12,11 +12,45 @@ const COLOR_MAP: Record<string, { bg: string; color: string }> = {
   Outros: { bg: '#f8fafc', color: '#475569' },
 };
 
+/**
+ * Returns the correct nomenclature for the installation code based on the type.
+ * Enel → Instalação, Sabesp → Fornecimento, Comgás → Código de Usuário
+ */
+function getCodigoLabel(tipo: string): string {
+  switch (tipo) {
+    case 'Enel': return 'Instalação';
+    case 'Sabesp': return 'Fornecimento';
+    case 'Comgás': return 'Código de Usuário';
+    default: return 'Código';
+  }
+}
+
+/**
+ * Extracts only digits from a CNPJ string (no dots, dashes, slashes).
+ * Leading zeros are preserved.
+ */
+function cnpjToDigits(cnpj: string): string {
+  return (cnpj || '').replace(/\D/g, '');
+}
+
+/**
+ * Generates a password preview based on the rule and CNPJ digits.
+ */
+function generatePasswordPreview(regra: string, cnpjDigits: string, senhaManual: string): string {
+  if (regra === 'manual') return senhaManual || '(não definida)';
+  if (regra === '5_primeiros_cnpj') return cnpjDigits.slice(0, 5) || '(selecione condomínio)';
+  if (regra === '3_primeiros_cnpj') return cnpjDigits.slice(0, 3) || '(selecione condomínio)';
+  if (regra === 'cnpj_completo') return cnpjDigits || '(selecione condomínio)';
+  return '—';
+}
+
 export default function ConcessionariasPage() {
   const [concs, setConcs] = useState<any[]>([]);
   const [condos, setCondos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('Todas');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const defaultConc = {
     condominio_id: '',
     tipo: 'Enel',
@@ -53,21 +87,40 @@ export default function ConcessionariasPage() {
     fetchData();
   }, []);
 
+  // Get CNPJ digits for the selected condominio
+  const selectedCondoCnpjDigits = useMemo(() => {
+    if (!formConc.condominio_id) return '';
+    const condo = condos.find(c => c.id === formConc.condominio_id);
+    return condo ? cnpjToDigits(condo.cnpj) : '';
+  }, [formConc.condominio_id, condos]);
+
+  // Password preview
+  const passwordPreview = useMemo(() => {
+    return generatePasswordPreview(formConc.regra_senha, selectedCondoCnpjDigits, formConc.senha_manual);
+  }, [formConc.regra_senha, selectedCondoCnpjDigits, formConc.senha_manual]);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setCreating(true);
       const payload: any = { ...formConc };
+
+      // Clean email
       if (!payload.email_esperado || !payload.email_esperado.includes('@')) {
         payload.email_esperado = undefined;
       }
+
+      // Always keep senha_manual if rule is manual; otherwise send undefined to not overwrite
       if (payload.regra_senha !== 'manual') {
         payload.senha_manual = undefined;
       }
       
       if (!payload.valor_medio) payload.valor_medio = 0;
 
+      // Remove fields not in ConcessionariaUpdate schema for editing
       if (editingId) {
+        delete payload.condominio_id;
+        delete payload.instalacao;
         await api.updateConcessionaria(editingId, payload);
       } else {
         await api.createConcessionaria(payload);
@@ -98,6 +151,7 @@ export default function ConcessionariasPage() {
   const handleOpenCreate = () => {
     setFormConc({ ...defaultConc });
     setEditingId(null);
+    setShowPassword(false);
     setIsModalOpen(true);
   };
 
@@ -113,15 +167,29 @@ export default function ConcessionariasPage() {
       valor_medio: conc.valor_medio || 0
     });
     setEditingId(conc.id);
+    setShowPassword(false);
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingId(null);
+    setShowPassword(false);
   };
 
-  const filtered = concs.filter(c => tab === 'Todas' || c.tipo === tab);
+  const filtered = concs.filter(c => {
+    const matchesTab = tab === 'Todas' || c.tipo === tab;
+    if (!matchesTab) return false;
+    if (!searchTerm.trim()) return true;
+    const q = searchTerm.toLowerCase();
+    const condo = condos.find(cd => cd.id === c.condominio_id);
+    return (
+      (condo?.nome || '').toLowerCase().includes(q) ||
+      (condo?.numero || '').includes(q) ||
+      c.instalacao.toLowerCase().includes(q) ||
+      c.tipo.toLowerCase().includes(q)
+    );
+  });
   const tabs = ['Todas', 'Enel', 'Sabesp', 'Comgás', 'Outros'];
 
   return (
@@ -138,94 +206,139 @@ export default function ConcessionariasPage() {
         </button>
       </div>
 
-      <div className="dc-tabs">
-        {tabs.map(t => (
-          <button key={t} className={`dc-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-            {t}
-          </button>
-        ))}
+      {/* Filter bar */}
+      <div className="dc-filter-bar">
+        <div className="dc-filter-search">
+          <Search />
+          <input
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Buscar por condomínio, código ou tipo..."
+          />
+        </div>
+        <div className="dc-tabs" style={{ border: 'none', margin: 0, padding: 0 }}>
+          {tabs.map(t => (
+            <button key={t} className={`dc-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="dc-filter-divider" />
+        <span className="dc-filter-count">
+          {filtered.length} vinculaç{filtered.length !== 1 ? 'ões' : 'ão'}
+        </span>
       </div>
 
-      <div className="dc-conc-grid">
-        {loading ? (
-             <div style={{ padding: '40px' }}><div className="dc-loading-spinner" /></div>
-        ) : filtered.map(conc => {
-          const condo = condos.find(c => c.id === conc.condominio_id);
-          const colors = COLOR_MAP[conc.tipo] ?? COLOR_MAP['Outros'];
-          return (
-            <div key={conc.id} className="dc-conc-card">
-              <div className="dc-conc-card-top">
-                <div
-                  className="dc-conc-type-icon"
-                  style={{ background: colors.bg, color: colors.color }}
-                >
-                  {conc.tipo[0]}
-                </div>
-                <div className="dc-conc-top-right">
-                  <span className="dc-badge dc-badge-green">Ativo</span>
-                  <span className="dc-conc-id">ID: {conc.instalacao}</span>
-                </div>
-              </div>
+      {/* Table (replacing cards) */}
+      <div className="dc-card">
+        <div className="dc-table-wrapper">
+          <table className="dc-table">
+            <thead>
+              <tr>
+                <th>Condomínio</th>
+                <th>Tipo / Código</th>
+                <th>Regra de Senha</th>
+                <th>Vencimento</th>
+                <th>Valor Médio</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
+              ) : filtered.map(conc => {
+                const condo = condos.find(c => c.id === conc.condominio_id);
+                const colors = COLOR_MAP[conc.tipo] ?? COLOR_MAP['Outros'];
+                const codigoLabel = getCodigoLabel(conc.tipo);
+                return (
+                  <tr key={conc.id}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div className="dc-condo-icon" style={{ width: 38, height: 38, flexShrink: 0 }}>
+                          <Building2 size={18} />
+                        </div>
+                        <div>
+                          <div className="dc-cell-primary">{condo?.nome || '—'}</div>
+                          <div className="dc-cell-secondary">Nº {condo?.numero}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div
+                          style={{
+                            width: 32, height: 32, borderRadius: 8,
+                            background: colors.bg, color: colors.color,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontWeight: 800, fontSize: '0.85rem', flexShrink: 0,
+                          }}
+                        >
+                          {conc.tipo[0]}
+                        </div>
+                        <div>
+                          <div className="dc-cell-primary">{conc.tipo}</div>
+                          <div className="dc-cell-secondary">{codigoLabel}: {conc.instalacao}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="dc-cell-primary" style={{ fontSize: '0.82rem' }}>
+                        {conc.regra_senha === 'manual' ? 'Senha Manual' : conc.regra_senha.replace(/_/g, ' ')}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="dc-cell-primary">Dia {conc.dia_vencimento}</div>
+                    </td>
+                    <td>
+                      <div className="dc-cell-primary">R$ {(conc.valor_medio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                    </td>
+                    <td>
+                      <span className="dc-badge dc-badge-green">
+                        <span className="dc-badge-dot" />
+                        Ativo
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          className="dc-btn dc-btn-dark"
+                          style={{ height: 34, padding: '0 14px', fontSize: '0.78rem', gap: 6 }}
+                          onClick={() => handleOpenEdit(conc)}
+                        >
+                          <ShieldCheck size={14} /> Gerenciar Regras
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!loading && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7}>
+                    <div style={{ padding: '60px 24px', textAlign: 'center', color: '#94a3b8' }}>
+                      <Zap size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: '#475569' }}>Nenhuma concessionária encontrada</div>
+                      <div style={{ fontSize: '0.85rem', marginTop: 4 }}>Vincule uma concessionária a um condomínio para começar.</div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-              <div>
-                <div className="dc-conc-title">{condo?.nome || '—'}</div>
-                <div className="dc-conc-subtitle">
-                  <Building2 size={13} />
-                  Nº {condo?.numero} · {conc.tipo}
-                </div>
-              </div>
-
-              <div>
-                <div className="dc-conc-email-row" style={{ marginBottom: 8 }}>
-                  <div className="dc-conc-email-label">
-                    <Mail size={14} /> E-mail esperado
-                  </div>
-                  <div className="dc-conc-email-value">{conc.email_esperado || 'Qualquer'}</div>
-                </div>
-                <div className="dc-conc-email-row" style={{ marginBottom: 8 }}>
-                  <div className="dc-conc-email-label">
-                    <ShieldCheck size={14} /> Regra de Senha
-                  </div>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>
-                    {conc.regra_senha.replace(/_/g, ' ')}
-                  </div>
-                </div>
-
-                <div className="dc-conc-info-grid">
-                  <div className="dc-conc-info-item">
-                    <div className="dc-conc-info-label"><Calendar size={12} /> Vencimento</div>
-                    <div className="dc-conc-info-value">Dia {conc.dia_vencimento}</div>
-                  </div>
-                  <div className="dc-conc-info-item">
-                    <div className="dc-conc-info-label"><Zap size={12} /> Média Mensal</div>
-                    <div className="dc-conc-info-value">R$ {conc.valor_medio.toLocaleString('pt-BR')}</div>
-                  </div>
-                </div>
-              </div>
-
-              <button className="dc-btn dc-btn-dark dc-w-full" style={{ justifyContent: 'center' }} onClick={(e) => { e.stopPropagation(); handleOpenEdit(conc); }}>
-                Gerenciar Regras <ArrowUpRight size={16} />
-              </button>
-            </div>
-          );
-        })}
-
-        {!loading && (
-          <div className="dc-conc-add-card" onClick={handleOpenCreate}>
-            <div className="dc-conc-add-icon">
-              <Plus size={28} />
-            </div>
-            <div style={{ fontWeight: 800, fontSize: '1rem' }}>Vincular Concessionária</div>
-            <div style={{ fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.5 }}>
-              Clique para associar uma nova concessionária a um condomínio
-            </div>
-          </div>
-        )}
+      {/* Pagination */}
+      <div className="dc-pagination">
+        <span className="dc-pagination-info">
+          Mostrando {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
+        </span>
       </div>
 
       {isModalOpen && (
         <div className="dc-modal-overlay">
-          <div className="dc-modal-content" style={{ maxWidth: 500 }}>
+          <div className="dc-modal-content" style={{ maxWidth: 540 }}>
             <div className="dc-modal-header">
               <h2 className="dc-modal-title">{editingId ? 'Gerenciar Regras' : 'Vincular Concessionária'}</h2>
               <button className="dc-modal-close" onClick={handleCloseModal}><X size={20} /></button>
@@ -240,7 +353,7 @@ export default function ConcessionariasPage() {
                     value={formConc.condominio_id} 
                     onChange={e => setFormConc({...formConc, condominio_id: e.target.value})}
                     className="dc-input dc-form-select"
-                    disabled={!!editingId} // Usually shouldn't change condominio after creation
+                    disabled={!!editingId}
                   >
                     <option value="">Selecione um condomínio...</option>
                     {condos.map(c => <option key={c.id} value={c.id}>{c.nome} (Nº {c.numero})</option>)}
@@ -257,8 +370,8 @@ export default function ConcessionariasPage() {
                     </select>
                   </div>
                   <div className="dc-form-group">
-                    <label>Instalação / Matrícula</label>
-                    <input className="dc-form-input" required value={formConc.instalacao} onChange={e => setFormConc({...formConc, instalacao: e.target.value})} placeholder="Ex: 82736412" />
+                    <label>{getCodigoLabel(formConc.tipo)}</label>
+                    <input className="dc-form-input" required value={formConc.instalacao} onChange={e => setFormConc({...formConc, instalacao: e.target.value})} placeholder="Ex: 82736412" disabled={!!editingId} />
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -276,12 +389,56 @@ export default function ConcessionariasPage() {
                     <input className="dc-form-input" type="number" required value={formConc.dia_vencimento} onChange={e => setFormConc({...formConc, dia_vencimento: parseInt(e.target.value)})} placeholder="Ex: 10" />
                   </div>
                 </div>
+
+                {/* Password section */}
                 {formConc.regra_senha === 'manual' && (
                   <div className="dc-form-group">
                     <label>Senha do PDF (Manual)</label>
-                    <input className="dc-form-input" required value={formConc.senha_manual} onChange={e => setFormConc({...formConc, senha_manual: e.target.value})} placeholder="Digite a senha do arquivo" />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        className="dc-form-input"
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={formConc.senha_manual}
+                        onChange={e => setFormConc({...formConc, senha_manual: e.target.value})}
+                        placeholder="Digite a senha do arquivo"
+                        style={{ paddingRight: 40 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                          background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4
+                        }}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                 )}
+
+                {/* Password Preview */}
+                <div style={{
+                  background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10,
+                  padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
+                }}>
+                  <Key size={18} style={{ color: '#0369a1', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>
+                      Senha Gerada (Preview)
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0c4a6e', fontFamily: 'monospace', letterSpacing: '0.15em' }}>
+                      {passwordPreview}
+                    </div>
+                    {formConc.regra_senha !== 'manual' && selectedCondoCnpjDigits && (
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 4 }}>
+                        CNPJ (somente dígitos): {selectedCondoCnpjDigits}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>E-mail do Remetente (Opcional)</label>
