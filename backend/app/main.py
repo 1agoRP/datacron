@@ -33,10 +33,12 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Datacron API starting up...")
 
-    # Create all database tables (for development; use Alembic in production)
+    # Ensure tables exist (safe fallback — Alembic handles actual migrations).
+    # This only creates *missing* tables; it will not modify existing columns.
+    # Run `alembic upgrade head` separately when schema changes are needed.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables ready")
+    logger.info("Database tables verified")
 
     # Start background scheduler
     start_scheduler()

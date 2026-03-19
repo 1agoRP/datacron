@@ -40,3 +40,6 @@ next-env.d.ts
 backend/token.json
 backend/credentials.json
 backend/keys/
+
+# Python
+__pycache__/

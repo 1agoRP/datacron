@@ -90,11 +90,16 @@ class ApiClient {
 
   // Dashboard & Stats
   async getDashboardStats() {
-    // These could be multiple parallel calls or a combined endpoint
+    const [faturas, alertas, countAlertas] = await Promise.all([
+      this.getFaturas({ limit: 5 }),
+      this.getAlertas({ limit: 5 }),
+      this.request<{ nao_lidos: number }>('/alertas/contagem')
+    ]);
+    
     return {
-      faturas: await this.getFaturas({ limit: 5 }),
-      alertas: await this.getAlertas({ limit: 5 }),
-      countAlertas: await this.request<{ nao_lidos: number }>('/alertas/contagem'),
+      faturas,
+      alertas,
+      countAlertas,
     };
   }
 
@@ -294,7 +299,7 @@ class ApiClient {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `template_${tipo}.xlsx`;
+    a.download = `template_${tipo}.csv`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);

@@ -1,8 +1,9 @@
 import uuid
 from typing import Optional
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, extract
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -14,6 +15,11 @@ from app.models.fatura import Fatura
 from app.schemas import CondominioCreate, CondominioUpdate, CondominioResponse
 
 router = APIRouter(prefix="/condominios", tags=["Condomínios"])
+
+
+def _escape_like(value: str) -> str:
+    """Escapes SQL LIKE metacharacters."""
+    return value.replace("%", r"\%").replace("_", r"\_")
 
 
 @router.get("/", response_model=list[CondominioResponse])
@@ -32,29 +38,34 @@ async def list_condominios(
         .where(Condominio.ativo == ativo)
     )
     if search:
+        safe = _escape_like(search)
         stmt = stmt.where(
-            Condominio.nome.ilike(f"%{search}%")
-            | Condominio.numero.ilike(f"%{search}%")
-            | Condominio.cnpj.ilike(f"%{search}%")
+            Condominio.nome.ilike(f"%{safe}%")
+            | Condominio.numero.ilike(f"%{safe}%")
+            | Condominio.cnpj.ilike(f"%{safe}%")
         )
     stmt = stmt.order_by(Condominio.nome).offset(skip).limit(limit)
     result = await db.execute(stmt)
     condominios = result.scalars().all()
 
-    # Attach billing counts
+    # Count faturas received THIS MONTH for all condominios in one query
+    now = datetime.now()
+    fatura_counts_result = await db.execute(
+        select(Fatura.condominio_id, func.count(Fatura.id))
+        .where(
+            extract("year", Fatura.created_at) == now.year,
+            extract("month", Fatura.created_at) == now.month,
+        )
+        .group_by(Fatura.condominio_id)
+    )
+    fatura_counts = dict(fatura_counts_result.all())
+
     responses = []
     for c in condominios:
-        # Count expected
         count_exp = len(c.concessionarias)
-        
-        # In a real app, we'd count current faturas here
-        # For now, let's keep it simple or use a placeholder
-        
         resp = CondominioResponse.model_validate(c)
         resp.contas_esperadas = count_exp
-        # mock received for now
-        resp.contas_recebidas = 0 
-        
+        resp.contas_recebidas = fatura_counts.get(c.id, 0)
         responses.append(resp)
     return responses
 

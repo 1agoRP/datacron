@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import AnyUrl
+from pydantic import AnyUrl, field_validator
 
 
 class Settings(BaseSettings):
@@ -13,9 +13,18 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/datacron"
 
     # ─── Auth ──────────────────────────────────────────────────
-    SECRET_KEY: str = "changeme-in-production"
+    SECRET_KEY: str  # REQUIRED — no default, crashes on startup if missing
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def secret_key_must_be_strong(cls, v: str) -> str:
+        if v in ("changeme-in-production", "", "secret", "changeme"):
+            raise ValueError(
+                "SECRET_KEY inválida. Defina uma chave segura (ex: openssl rand -hex 32)"
+            )
+        return v
 
     # ─── Gmail ────────────────────────────────────────────────
     GMAIL_CREDENTIALS_PATH: str = "./credentials.json"

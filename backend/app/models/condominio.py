@@ -2,7 +2,6 @@ import uuid
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import String, DateTime, Integer, func
 from sqlalchemy import String, DateTime, Integer, func, Uuid as UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

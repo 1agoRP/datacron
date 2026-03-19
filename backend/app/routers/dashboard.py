@@ -5,6 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, extract
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -66,24 +67,23 @@ async def chart_data(
 ):
     """
     Returns chart data for the dashboard, grouped by month, concessionária or condomínio.
-    Supports dynamic month range (6, 12, etc).
+    Uses eager loading to avoid N+1 queries.
     """
     from dateutil.relativedelta import relativedelta
 
     now = datetime.now()
     start_date = now - relativedelta(months=meses)
 
+    # Single query with eager loading — avoids N+1
     stmt = (
         select(Fatura)
+        .options(
+            selectinload(Fatura.concessionaria),
+            selectinload(Fatura.condominio),
+        )
         .where(Fatura.created_at >= start_date)
         .order_by(Fatura.created_at)
     )
-
-    if agrupar in ("concessionaria", "condominio"):
-        if agrupar == "concessionaria":
-            stmt = stmt.join(Concessionaria, Fatura.concessionaria_id == Concessionaria.id)
-        else:
-            stmt = stmt.join(Condominio, Fatura.condominio_id == Condominio.id)
 
     result = await db.execute(stmt)
     faturas = result.scalars().all()
@@ -107,34 +107,19 @@ async def chart_data(
         return [{"name": k, "valor": round(v, 2)} for k, v in buckets.items()]
 
     elif agrupar == "concessionaria":
-        # Group by concessionária type
+        # Group by concessionária type (already eager-loaded)
         buckets: dict[str, float] = {}
         for f in faturas:
-            # Load concessionária to get tipo
-            if f.concessionaria_id:
-                conc_result = await db.execute(
-                    select(Concessionaria).where(Concessionaria.id == f.concessionaria_id)
-                )
-                conc = conc_result.scalar_one_or_none()
-                key = conc.tipo if conc else "Outros"
-            else:
-                key = "Outros"
+            key = f.concessionaria.tipo if f.concessionaria else "Outros"
             buckets[key] = buckets.get(key, 0.0) + float(f.valor or 0)
 
         return [{"name": k, "valor": round(v, 2)} for k, v in buckets.items()]
 
     else:  # condominio
-        # Group by condomínio
+        # Group by condomínio (already eager-loaded)
         buckets: dict[str, float] = {}
         for f in faturas:
-            if f.condominio_id:
-                condo_result = await db.execute(
-                    select(Condominio).where(Condominio.id == f.condominio_id)
-                )
-                condo = condo_result.scalar_one_or_none()
-                key = condo.nome if condo else "Desconhecido"
-            else:
-                key = "Desconhecido"
+            key = f.condominio.nome if f.condominio else "Desconhecido"
             buckets[key] = buckets.get(key, 0.0) + float(f.valor or 0)
 
         sorted_items = sorted(buckets.items(), key=lambda x: x[1], reverse=True)[:15]

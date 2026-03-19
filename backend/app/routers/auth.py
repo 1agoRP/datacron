@@ -1,19 +1,37 @@
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import (
     hash_password, verify_password,
-    create_access_token, get_current_user,
+    create_access_token, get_current_user, require_role,
 )
 from app.models.user import User
 from app.schemas import LoginRequest, TokenResponse, UserResponse, PasswordUpdate
 from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
+
+MIN_PASSWORD_LENGTH = 8
+
+
+class RegisterRequest(BaseModel):
+    nome: str
+    email: EmailStr
+    senha: str
+    role: str = "operador"
+
+
+def _validate_password(senha: str) -> None:
+    if len(senha) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=422,
+            detail=f"A senha deve ter pelo menos {MIN_PASSWORD_LENGTH} caracteres",
+        )
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -53,6 +71,8 @@ async def update_password(
     db: AsyncSession = Depends(get_db),
 ):
     """Updates the user's password."""
+    _validate_password(body.nova_senha)
+
     if not verify_password(body.senha_atual, current_user.senha_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -68,21 +88,22 @@ async def update_password(
 
 @router.post("/register", response_model=UserResponse, status_code=201)
 async def register(
-    nome: str,
-    email: str,
-    senha: str,
+    body: RegisterRequest,
     db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
 ):
-    """Creates a new user (development only, remove in production)."""
-    exists = await db.execute(select(User).where(User.email == email))
+    """Creates a new user. Requires admin authentication."""
+    _validate_password(body.senha)
+
+    exists = await db.execute(select(User).where(User.email == body.email))
     if exists.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="E-mail já cadastrado")
 
     user = User(
-        nome=nome,
-        email=email,
-        senha_hash=hash_password(senha),
-        role="admin",
+        nome=body.nome,
+        email=body.email,
+        senha_hash=hash_password(body.senha),
+        role=body.role,
     )
     db.add(user)
     await db.commit()
