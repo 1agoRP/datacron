@@ -20,12 +20,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       const token = localStorage.getItem('datacron_token');
       if (token) {
+        // Sync cookie so middleware can protect routes (for already-logged-in users)
+        document.cookie = `datacron_token=${token}; path=/; SameSite=Strict; max-age=${60 * 60 * 24}`;
         try {
           const userData = await api.getMe();
           setUser(userData);
         } catch (error) {
           console.error("Auth init error:", error);
           localStorage.removeItem('datacron_token');
+          document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
         }
       }
       setLoading(false);

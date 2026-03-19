@@ -69,11 +69,15 @@ class ApiClient {
       }),
     });
     localStorage.setItem('datacron_token', data.access_token);
+    // Also set cookie so Next.js middleware can protect routes server-side
+    document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Strict; max-age=${60 * 60 * 24}`; // 24h
     return data;
   }
 
   async logout() {
     localStorage.removeItem('datacron_token');
+    // Clear the cookie so middleware stops allowing access
+    document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
     window.location.href = '/';
   }
 
