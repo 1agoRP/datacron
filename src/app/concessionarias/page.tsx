@@ -6,21 +6,25 @@ import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Tra
 import { api } from '@/lib/api';
 
 const COLOR_MAP: Record<string, { bg: string; color: string }> = {
-  Enel:   { bg: '#eff6ff', color: '#2563eb' },
-  Sabesp: { bg: '#ecfeff', color: '#0891b2' },
-  Comgás: { bg: '#fff7ed', color: '#ea580c' },
-  Outros: { bg: '#f8fafc', color: '#475569' },
+  enel:   { bg: '#eff6ff', color: '#2563eb' },
+  sabesp: { bg: '#ecfeff', color: '#0891b2' },
+  'comgás': { bg: '#fff7ed', color: '#ea580c' },
+  outros: { bg: '#f8fafc', color: '#475569' },
 };
+
+function getColors(tipo: string) {
+  return COLOR_MAP[tipo.toLowerCase()] ?? COLOR_MAP['outros'];
+}
 
 /**
  * Returns the correct nomenclature for the installation code based on the type.
  * Enel → Instalação, Sabesp → Fornecimento, Comgás → Código de Usuário
  */
 function getCodigoLabel(tipo: string): string {
-  switch (tipo) {
-    case 'Enel': return 'Instalação';
-    case 'Sabesp': return 'Fornecimento';
-    case 'Comgás': return 'Código de Usuário';
+  switch (tipo.toLowerCase()) {
+    case 'enel': return 'Instalação';
+    case 'sabesp': return 'Fornecimento';
+    case 'comgás': return 'Código de Usuário';
     default: return 'Código';
   }
 }
@@ -178,7 +182,7 @@ export default function ConcessionariasPage() {
   };
 
   const filtered = concs.filter(c => {
-    const matchesTab = tab === 'Todas' || c.tipo === tab;
+    const matchesTab = tab === 'Todas' || c.tipo.toLowerCase() === tab.toLowerCase();
     if (!matchesTab) return false;
     if (!searchTerm.trim()) return true;
     const q = searchTerm.toLowerCase();
@@ -249,7 +253,7 @@ export default function ConcessionariasPage() {
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
               ) : filtered.map(conc => {
                 const condo = condos.find(c => c.id === conc.condominio_id);
-                const colors = COLOR_MAP[conc.tipo] ?? COLOR_MAP['Outros'];
+                const colors = getColors(conc.tipo);
                 const codigoLabel = getCodigoLabel(conc.tipo);
                 return (
                   <tr key={conc.id}>
