@@ -85,7 +85,7 @@ export default function LandingPage() {
             <motion.div variants={fadeUp}>
               <div className="hero-badge">
                 <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#60a5fa', boxShadow: '0 0 10px #60a5fa' }}></span>
-                Plataforma RPA V2.0 Lançada
+                Plataforma RPA
               </div>
             </motion.div>
 

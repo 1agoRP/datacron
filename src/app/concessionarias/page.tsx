@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2, Search, Filter, Key, Eye, EyeOff } from 'lucide-react';
+import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2, Search, Filter, Key, Eye, EyeOff, ArrowUpDown } from 'lucide-react';
 import { api } from '@/lib/api';
 
 const COLOR_MAP: Record<string, { bg: string; color: string }> = {
@@ -55,6 +55,8 @@ export default function ConcessionariasPage() {
   const [tab, setTab] = useState('Todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [sortField, setSortField] = useState<'nome' | 'numero' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const defaultConc = {
     condominio_id: '',
     tipo: 'Enel',
@@ -181,20 +183,65 @@ export default function ConcessionariasPage() {
     setShowPassword(false);
   };
 
-  const filtered = concs.filter(c => {
-    const matchesTab = tab === 'Todas' || c.tipo.toLowerCase() === tab.toLowerCase();
-    if (!matchesTab) return false;
-    if (!searchTerm.trim()) return true;
-    const q = searchTerm.toLowerCase();
-    const condo = condos.find(cd => cd.id === c.condominio_id);
-    return (
-      (condo?.nome || '').toLowerCase().includes(q) ||
-      (condo?.numero || '').includes(q) ||
-      c.instalacao.toLowerCase().includes(q) ||
-      c.tipo.toLowerCase().includes(q)
-    );
-  });
+  const toggleSort = (field: 'nome' | 'numero') => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const filtered = useMemo(() => {
+    let result = concs.filter(c => {
+      const matchesTab = tab === 'Todas' || c.tipo.toLowerCase() === tab.toLowerCase();
+      if (!matchesTab) return false;
+      
+      const condo = condos.find(cd => cd.id === c.condominio_id);
+      
+      if (!searchTerm.trim()) return true;
+      const q = searchTerm.toLowerCase();
+      return (
+        (condo?.nome || '').toLowerCase().includes(q) ||
+        (condo?.numero || '').includes(q) ||
+        c.instalacao.toLowerCase().includes(q) ||
+        c.tipo.toLowerCase().includes(q)
+      );
+    });
+
+    if (sortField) {
+      result.sort((a, b) => {
+        const condoA = condos.find(cd => cd.id === a.condominio_id);
+        const condoB = condos.find(cd => cd.id === b.condominio_id);
+        let valA = condoA ? condoA[sortField] : '';
+        let valB = condoB ? condoB[sortField] : '';
+        
+        if (sortField === 'numero') {
+          valA = parseInt(valA as string) || 0;
+          valB = parseInt(valB as string) || 0;
+          return sortDir === 'asc' ? valA - valB : valB - valA;
+        }
+        
+        const cmp = String(valA).localeCompare(String(valB), 'pt-BR', { sensitivity: 'base' });
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [concs, condos, tab, searchTerm, sortField, sortDir]);
+
   const tabs = ['Todas', 'Enel', 'Sabesp', 'Comgás', 'Outros'];
+
+  const SortIcon = ({ field }: { field: 'nome' | 'numero' }) => (
+    <ArrowUpDown
+      size={13}
+      style={{ 
+        marginLeft: 4, cursor: 'pointer', 
+        color: sortField === field ? '#2563eb' : '#cbd5e1',
+        transition: 'color 0.15s',
+      }}
+    />
+  );
 
   return (
     <Shell>
@@ -239,7 +286,17 @@ export default function ConcessionariasPage() {
           <table className="dc-table">
             <thead>
               <tr>
-                <th>Condomínio</th>
+                <th>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span onClick={() => toggleSort('nome')} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center' }} title="Ordenar por Nome">
+                      Condomínio <SortIcon field="nome" />
+                    </span>
+                    <span style={{ color: '#cbd5e1' }}>|</span>
+                    <span onClick={() => toggleSort('numero')} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center' }} title="Ordenar por Nº">
+                      Nº <SortIcon field="numero" />
+                    </span>
+                  </div>
+                </th>
                 <th>Tipo / Código</th>
                 <th>Regra de Senha</th>
                 <th>Vencimento</th>
