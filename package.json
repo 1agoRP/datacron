@@ -19,6 +19,7 @@
     "react": "rc",
     "react-dom": "rc",
     "recharts": "latest",
+    "swr": "^2.4.1",
     "tailwind-merge": "latest"
   },
   "devDependencies": {

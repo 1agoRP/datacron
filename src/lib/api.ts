@@ -3,6 +3,8 @@
  * Centralized fetch wrapper with support for JWT authentication.
  */
 
+import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData } from '@/types';
+
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 class ApiClient {
@@ -108,12 +110,14 @@ class ApiClient {
   }
 
   // Condominios
-  async getCondominios(params: any = {}) {
-    const query = new URLSearchParams(params).toString();
-    return this.request<any[]>(`/condominios/?${query}`);
+  async getCondominios(params: Record<string, string | number> = {}) {
+    const safeParams: Record<string, string> = {};
+    for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
+    const query = new URLSearchParams(safeParams).toString();
+    return this.request<Condominio[]>(`/condominios/?${query}`);
   }
 
-  async createCondominio(data: any) {
+  async createCondominio(data: Partial<Condominio>) {
     return this.request('/condominios/', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -121,10 +125,10 @@ class ApiClient {
   }
 
   async getCondominio(id: string) {
-    return this.request(`/condominios/${id}`);
+    return this.request<Condominio>(`/condominios/${id}`);
   }
 
-  async updateCondominio(id: string, data: any) {
+  async updateCondominio(id: string, data: Partial<Condominio>) {
     return this.request(`/condominios/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -138,20 +142,22 @@ class ApiClient {
   }
 
   // Concessionarias
-  async getConcessionarias(params: any = {}) {
-    const query = new URLSearchParams(params).toString();
-    return this.request<any[]>(`/concessionarias/?${query}`);
+  async getConcessionarias(params: Record<string, string | number> = {}) {
+    const safeParams: Record<string, string> = {};
+    for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
+    const query = new URLSearchParams(safeParams).toString();
+    return this.request<Concessionaria[]>(`/concessionarias/?${query}`);
   }
 
-  async createConcessionaria(data: any) {
-    return this.request('/concessionarias/', {
+  async createConcessionaria(data: Partial<Concessionaria>) {
+    return this.request<Concessionaria>('/concessionarias/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async updateConcessionaria(id: string, data: any) {
-    return this.request(`/concessionarias/${id}`, {
+  async updateConcessionaria(id: string, data: Partial<Concessionaria>) {
+    return this.request<Concessionaria>(`/concessionarias/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -174,13 +180,15 @@ class ApiClient {
   }
 
   // Faturas
-  async getFaturas(params: any = {}) {
-    const query = new URLSearchParams(params).toString();
-    return this.request<any[]>(`/faturas/?${query}`);
+  async getFaturas(params: Record<string, string | number> = {}) {
+    const safeParams: Record<string, string> = {};
+    for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
+    const query = new URLSearchParams(safeParams).toString();
+    return this.request<Fatura[]>(`/faturas/?${query}`);
   }
 
   async getFatura(id: string) {
-    return this.request(`/faturas/${id}`);
+    return this.request<Fatura>(`/faturas/${id}`);
   }
 
   async exportFaturas(formato: 'excel' | 'csv' = 'excel') {
@@ -209,12 +217,16 @@ class ApiClient {
   }
 
   // Alertas
-  async getAlertas(params: any = {}) {
-    const query = new URLSearchParams(params).toString();
-    return this.request<any[]>(`/alertas/?${query}`);
+  async getAlertas(params: Record<string, string | boolean | number> = {}) {
+    const safeParams: Record<string, string> = {};
+    for (const [k, v] of Object.entries(params)) {
+      safeParams[k] = String(v);
+    }
+    const query = new URLSearchParams(safeParams).toString();
+    return this.request<Alerta[]>(`/alertas/?${query}`);
   }
 
-  async patchAlerta(id: string, data: any) {
+  async patchAlerta(id: string, data: Partial<Alerta>) {
     return this.request(`/alertas/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -280,7 +292,7 @@ class ApiClient {
     return data;
   }
 
-  async confirmImport(data: any) {
+  async confirmImport(data: { tipo: string; rows: any[] }) {
     return this.request('/importacoes/confirmar', {
         method: 'POST',
         body: JSON.stringify(data)
@@ -372,7 +384,7 @@ class ApiClient {
 
   // Faturas by condominio (for history)
   async getFaturasByCondominio(condominioId: string) {
-    return this.request<any[]>(`/faturas?condominio_id=${condominioId}&limit=100`);
+    return this.request<Fatura[]>(`/faturas?condominio_id=${condominioId}&limit=100`);
   }
 }
 

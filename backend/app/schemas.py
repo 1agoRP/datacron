@@ -45,6 +45,21 @@ class CondominioCreate(BaseModel):
         digits = "".join(filter(str.isdigit, v))
         if len(digits) != 14:
             raise ValueError("CNPJ deve ter 14 dígitos")
+        
+        # Validar primeiro e segundo dígitos verificadores
+        for i in range(12, 14):
+            fator = i - 7
+            soma = 0
+            for k in range(i):
+                soma += int(digits[k]) * fator
+                fator -= 1
+                if fator < 2:
+                    fator = 9
+            resultado = 11 - (soma % 11)
+            digito_esperado = 0 if resultado >= 10 else resultado
+            if digito_esperado != int(digits[i]):
+                raise ValueError("CNPJ inválido (dígito verificador incorreto)")
+        
         return v
 
 class CondominioUpdate(BaseModel):

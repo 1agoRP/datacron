@@ -6,7 +6,8 @@ from app.config import settings
 # ─── Engine ──────────────────────────────────────────────────
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=(settings.ENVIRONMENT == "development"),
+    echo=False,  # Set to False to prevent logging every SQL query
+    future=True,
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=5,

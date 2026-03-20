@@ -14,6 +14,8 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import useSWR from 'swr';
+import { DashboardStats, ChartData, Fatura, Alerta } from '@/types';
 
 const MONTH_NAMES: Record<string, string> = {};
 for (let i = 0; i < 12; i++) {
@@ -35,76 +37,54 @@ type ChartGroup = 'mes' | 'concessionaria' | 'condominio';
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Chart controls
   const [chartMonths, setChartMonths] = useState(6);
   const [chartGroup, setChartGroup] = useState<ChartGroup>('mes');
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [chartLoading, setChartLoading] = useState(false);
 
-  // Contas esperadas
-  const [contasEsperadas, setContasEsperadas] = useState<{ total_esperadas: number; recebidas: number } | null>(null);
+  // SWR: Buscando os dados principais consolidados com auto-revalidação
+  const { data: stats, isLoading: loadingStats } = useSWR<DashboardStats>('dashboardStats', async () => {
+    const [condominios, allFaturas, alertas, alertsCount] = await Promise.all([
+      api.getCondominios(),
+      api.getFaturas(),
+      api.getAlertas({ limit: 5, resolvido: false }),
+      api.getAlertas({ resolvido: false }),
+    ]);
+    return {
+      condominiosCount: condominios.length,
+      faturas: allFaturas.slice(0, 5) as Fatura[],
+      alertas: alertas as Alerta[],
+      activeAlerts: alertsCount.length,
+      recebidasHoje: allFaturas.filter((f: any) => {
+        const date = new Date(f.created_at);
+        const today = new Date();
+        return date.toDateString() === today.toDateString();
+      }).length
+    };
+  }, { refreshInterval: 60000 }); // Reloader a cada 1 minuto
+
+  const { data: contasEsperadas } = useSWR('dashboardContas', 
+    () => api.getDashboardContasEsperadas().catch(() => null)
+  );
+
+  const { data: chartData, isLoading: chartLoading } = useSWR<ChartData[]>(
+    ['dashboardChart', chartMonths, chartGroup],
+    () => api.getDashboardChart(chartMonths, chartGroup).catch(() => [])
+  );
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    
-    const fetchData = async () => {
-      try {
-        const [condominios, allFaturas, alertas, alertsCount, contasData, chartResp] = await Promise.all([
-          api.getCondominios(),
-          api.getFaturas(),
-          api.getAlertas({ limit: 5, resolvido: false }),
-          api.getAlertas({ resolvido: false }),
-          api.getDashboardContasEsperadas().catch(() => null),
-          api.getDashboardChart(6, 'mes').catch(() => []),
-        ]);
-
-        const faturas = allFaturas.slice(0, 5);
-
-        setContasEsperadas(contasData);
-        setChartData(chartResp);
-
-        setStats({
-          condominiosCount: condominios.length,
-          faturas,
-          alertas,
-          activeAlerts: alertsCount.length,
-          recebidasHoje: allFaturas.filter((f: any) => {
-            const date = new Date(f.created_at);
-            const today = new Date();
-            return date.toDateString() === today.toDateString();
-          }).length
-        });
-      } catch (error) {
-        console.error("Dashboard fetch error:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
     return () => clearInterval(timer);
   }, []);
 
-  // Reload chart when filters change
-  const handleChartFilterChange = async (months: number, group: ChartGroup) => {
+  // Reload chart when filters change (now handled automatically by SWR keys)
+  const handleChartFilterChange = (months: number, group: ChartGroup) => {
     setChartMonths(months);
     setChartGroup(group);
-    try {
-      setChartLoading(true);
-      const data = await api.getDashboardChart(months, group);
-      setChartData(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setChartLoading(false);
-    }
   };
 
-  if (loading) {
+  if (loadingStats) {
     return (
       <Shell>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
@@ -234,10 +214,10 @@ export default function Dashboard() {
             )}
             <ResponsiveContainer width="100%" height="100%">
               {useBarChart ? (
-                <BarChart data={chartData}>
+                <BarChart data={chartData || []}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} dy={8} interval={0} angle={chartData.length > 8 ? -30 : 0} textAnchor={chartData.length > 8 ? "end" : "middle"} tickFormatter={formatChartLabel} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} dy={8} interval={0} angle={(chartData || []).length > 8 ? -30 : 0} textAnchor={(chartData || []).length > 8 ? "end" : "middle"} tickFormatter={formatChartLabel} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} tickFormatter={(v: any) => `R$${(v / 1000).toFixed(0)}k`} />
                   <Tooltip
                     contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', fontSize: 13 }}
                     formatter={(v: any) => [`R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Total']}
@@ -245,7 +225,7 @@ export default function Dashboard() {
                   <Bar dataKey="valor" fill="#2563eb" radius={[6, 6, 0, 0]} />
                 </BarChart>
               ) : (
-                <AreaChart data={chartData}>
+                <AreaChart data={chartData || []}>
                   <defs>
                     <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#2563eb" stopOpacity={0.12} />
@@ -254,7 +234,7 @@ export default function Dashboard() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dy={8} tickFormatter={formatChartLabel} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} tickFormatter={(v: any) => `R$${(v / 1000).toFixed(0)}k`} />
                   <Tooltip
                     contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', fontSize: 13 }}
                     formatter={(v: any) => [`R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Total']}

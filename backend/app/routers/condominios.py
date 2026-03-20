@@ -12,7 +12,7 @@ from app.dependencies import get_current_user
 from app.models.user import User
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
-from app.schemas import CondominioCreate, CondominioUpdate, CondominioResponse
+from app.schemas import CondominioCreate, CondominioUpdate, CondominioResponse, FaturaResponse
 
 router = APIRouter(prefix="/condominios", tags=["Condomínios"])
 
@@ -147,7 +147,7 @@ async def delete_condominio(
     await db.commit()
 
 
-@router.get("/{id}/faturas", response_model=list)
+@router.get("/{id}/faturas", response_model=list[FaturaResponse])
 async def get_condominio_faturas(
     id: uuid.UUID,
     referencia: Optional[str] = None,
