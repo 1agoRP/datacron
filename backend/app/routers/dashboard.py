@@ -1,9 +1,9 @@
 import uuid
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func, extract
+from sqlalchemy import select, func, extract, cast, String, case, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -13,8 +13,49 @@ from app.models.user import User
 from app.models.condominio import Condominio
 from app.models.concessionaria import Concessionaria
 from app.models.fatura import Fatura
+from app.models.alerta import Alerta
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+
+@router.get("/stats")
+async def dashboard_stats(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """
+    Returns consolidated KPI stats for the dashboard using SQL COUNT.
+    Replaces the anti-pattern of downloading full lists to count in JS/Python.
+    """
+    today = date.today()
+
+    # Run all counts in parallel via a single compound query
+    result = await db.execute(
+        select(
+            func.count(Condominio.id).label("condominios_count"),
+        )
+    )
+    condominios_count = result.scalar_one()
+
+    # Faturas received today
+    result = await db.execute(
+        select(func.count(Fatura.id)).where(
+            func.date(Fatura.created_at) == today
+        )
+    )
+    recebidas_hoje = result.scalar_one()
+
+    # Active (unresolved) alerts count
+    result = await db.execute(
+        select(func.count(Alerta.id)).where(Alerta.resolvido == False)
+    )
+    active_alerts = result.scalar_one()
+
+    return {
+        "condominios_count": condominios_count,
+        "recebidas_hoje": recebidas_hoje,
+        "active_alerts": active_alerts,
+    }
 
 
 @router.get("/contas-esperadas")
@@ -66,61 +107,74 @@ async def chart_data(
     _: User = Depends(get_current_user),
 ):
     """
-    Returns chart data for the dashboard, grouped by month, concessionária or condomínio.
-    Uses eager loading to avoid N+1 queries.
+    Returns chart data using SQL GROUP BY + SUM aggregation.
+    No longer loads all faturas into Python memory.
     """
     from dateutil.relativedelta import relativedelta
 
     now = datetime.now()
     start_date = now - relativedelta(months=meses)
 
-    # Single query with eager loading — avoids N+1
-    stmt = (
-        select(Fatura)
-        .options(
-            selectinload(Fatura.concessionaria),
-            selectinload(Fatura.condominio),
-        )
-        .where(Fatura.created_at >= start_date)
-        .order_by(Fatura.created_at)
-    )
-
-    result = await db.execute(stmt)
-    faturas = result.scalars().all()
-
     if agrupar == "mes":
-        # Group by month
+        # SQL aggregation: GROUP BY year-month, SUM(valor)
+        date_col = func.coalesce(Fatura.vencimento, func.date(Fatura.created_at))
+        stmt = (
+            select(
+                extract("year", date_col).label("yr"),
+                extract("month", date_col).label("mn"),
+                func.sum(Fatura.valor).label("total"),
+            )
+            .where(Fatura.created_at >= start_date)
+            .group_by("yr", "mn")
+            .order_by("yr", "mn")
+        )
+
+        result = await db.execute(stmt)
+        rows = result.all()
+
+        # Build a complete month map to ensure empty months show up
         buckets: dict[str, float] = {}
         for i in range(meses):
             d = now - relativedelta(months=meses - 1 - i)
             key = f"{d.year}-{str(d.month).zfill(2)}"
             buckets[key] = 0.0
 
-        for f in faturas:
-            date = f.vencimento or (f.created_at.date() if f.created_at else None)
-            if not date:
-                continue
-            key = f"{date.year}-{str(date.month).zfill(2)}"
+        for row in rows:
+            key = f"{int(row.yr)}-{str(int(row.mn)).zfill(2)}"
             if key in buckets:
-                buckets[key] += float(f.valor or 0)
+                buckets[key] = round(float(row.total or 0), 2)
 
-        return [{"name": k, "valor": round(v, 2)} for k, v in buckets.items()]
+        return [{"name": k, "valor": v} for k, v in buckets.items()]
 
     elif agrupar == "concessionaria":
-        # Group by concessionária type (already eager-loaded)
-        buckets: dict[str, float] = {}
-        for f in faturas:
-            key = f.concessionaria.tipo if f.concessionaria else "Outros"
-            buckets[key] = buckets.get(key, 0.0) + float(f.valor or 0)
+        # SQL aggregation: GROUP BY concessionaria tipo
+        stmt = (
+            select(
+                func.coalesce(Concessionaria.tipo, "Outros").label("name"),
+                func.sum(Fatura.valor).label("total"),
+            )
+            .join(Concessionaria, Fatura.concessionaria_id == Concessionaria.id, isouter=True)
+            .where(Fatura.created_at >= start_date)
+            .group_by("name")
+            .order_by(func.sum(Fatura.valor).desc())
+        )
 
-        return [{"name": k, "valor": round(v, 2)} for k, v in buckets.items()]
+        result = await db.execute(stmt)
+        return [{"name": row.name, "valor": round(float(row.total or 0), 2)} for row in result.all()]
 
     else:  # condominio
-        # Group by condomínio (already eager-loaded)
-        buckets: dict[str, float] = {}
-        for f in faturas:
-            key = f.condominio.nome if f.condominio else "Desconhecido"
-            buckets[key] = buckets.get(key, 0.0) + float(f.valor or 0)
+        # SQL aggregation: GROUP BY condominio nome, top 15
+        stmt = (
+            select(
+                func.coalesce(Condominio.nome, "Desconhecido").label("name"),
+                func.sum(Fatura.valor).label("total"),
+            )
+            .join(Condominio, Fatura.condominio_id == Condominio.id, isouter=True)
+            .where(Fatura.created_at >= start_date)
+            .group_by("name")
+            .order_by(func.sum(Fatura.valor).desc())
+            .limit(15)
+        )
 
-        sorted_items = sorted(buckets.items(), key=lambda x: x[1], reverse=True)[:15]
-        return [{"name": k, "valor": round(v, 2)} for k, v in sorted_items]
+        result = await db.execute(stmt)
+        return [{"name": row.name, "valor": round(float(row.total or 0), 2)} for row in result.all()]

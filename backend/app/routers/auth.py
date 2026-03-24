@@ -40,7 +40,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == body.email))
     user: User | None = result.scalar_one_or_none()
 
-    if not user or not verify_password(body.senha, user.senha_hash):
+    if not user or not await verify_password(body.senha, user.senha_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha incorretos",
@@ -73,13 +73,13 @@ async def update_password(
     """Updates the user's password."""
     _validate_password(body.nova_senha)
 
-    if not verify_password(body.senha_atual, current_user.senha_hash):
+    if not await verify_password(body.senha_atual, current_user.senha_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Senha atual incorreta",
         )
     
-    current_user.senha_hash = hash_password(body.nova_senha)
+    current_user.senha_hash = await hash_password(body.nova_senha)
     db.add(current_user)
     await db.commit()
     
@@ -102,7 +102,7 @@ async def register(
     user = User(
         nome=body.nome,
         email=body.email,
-        senha_hash=hash_password(body.senha),
+        senha_hash=await hash_password(body.senha),
         role=body.role,
     )
     db.add(user)

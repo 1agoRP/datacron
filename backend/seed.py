@@ -21,7 +21,7 @@ async def seed_data():
         admin = User(
             nome="Administrador Datacron",
             email="admin@datacron.com.br",
-            senha_hash=hash_password("admin123"),
+            senha_hash=await hash_password("admin123"),
             role="admin"
         )
         db.add(admin)

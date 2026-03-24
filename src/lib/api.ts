@@ -373,6 +373,10 @@ class ApiClient {
   }
 
   // Dashboard
+  async getDashboardKpis() {
+    return this.request<{ condominios_count: number; recebidas_hoje: number; active_alerts: number }>('/dashboard/stats');
+  }
+
   async getDashboardContasEsperadas(mes?: string) {
     const params = mes ? `?mes=${mes}` : '';
     return this.request<{ total_esperadas: number; recebidas: number; mes: string }>(`/dashboard/contas-esperadas${params}`);

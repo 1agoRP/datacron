@@ -43,26 +43,21 @@ export default function Dashboard() {
   const [chartMonths, setChartMonths] = useState(6);
   const [chartGroup, setChartGroup] = useState<ChartGroup>('mes');
 
-  // SWR: Buscando os dados principais consolidados com auto-revalidação
+  // SWR: Fetch consolidated stats from dedicated backend endpoint (SQL COUNT)
   const { data: stats, isLoading: loadingStats } = useSWR<DashboardStats>('dashboardStats', async () => {
-    const [condominios, allFaturas, alertas, alertsCount] = await Promise.all([
-      api.getCondominios(),
-      api.getFaturas(),
+    const [kpis, latestFaturas, alertas] = await Promise.all([
+      api.getDashboardKpis(),
+      api.getFaturas({ limit: 5 }),
       api.getAlertas({ limit: 5, resolvido: false }),
-      api.getAlertas({ resolvido: false }),
     ]);
     return {
-      condominiosCount: condominios.length,
-      faturas: allFaturas.slice(0, 5) as Fatura[],
+      condominiosCount: kpis.condominios_count,
+      faturas: latestFaturas as Fatura[],
       alertas: alertas as Alerta[],
-      activeAlerts: alertsCount.length,
-      recebidasHoje: allFaturas.filter((f: any) => {
-        const date = new Date(f.created_at);
-        const today = new Date();
-        return date.toDateString() === today.toDateString();
-      }).length
+      activeAlerts: kpis.active_alerts,
+      recebidasHoje: kpis.recebidas_hoje,
     };
-  }, { refreshInterval: 60000 }); // Reloader a cada 1 minuto
+  }, { revalidateOnFocus: true });
 
   const { data: contasEsperadas } = useSWR('dashboardContas', 
     () => api.getDashboardContasEsperadas().catch(() => null)

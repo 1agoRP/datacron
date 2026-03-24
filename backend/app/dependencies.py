@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import uuid
@@ -18,17 +19,18 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer()
 
 
-def hash_password(password: str) -> str:
-    # Some versions of bcrypt/passlib require bytes on certain platforms
-    return pwd_context.hash(password.encode("utf-8") if isinstance(password, str) else password)
+async def hash_password(password: str) -> str:
+    """Hash password in a threadpool to avoid blocking the async event loop."""
+    loop = asyncio.get_event_loop()
+    encoded = password.encode("utf-8") if isinstance(password, str) else password
+    return await loop.run_in_executor(None, pwd_context.hash, encoded)
 
 
-def verify_password(plain: str, hashed: str) -> bool:
-    # Explicitly encode to bytes to avoid "ValueError: password cannot be a string"
-    return pwd_context.verify(
-        plain.encode("utf-8") if isinstance(plain, str) else plain, 
-        hashed
-    )
+async def verify_password(plain: str, hashed: str) -> bool:
+    """Verify password in a threadpool to avoid blocking the async event loop."""
+    loop = asyncio.get_event_loop()
+    encoded = plain.encode("utf-8") if isinstance(plain, str) else plain
+    return await loop.run_in_executor(None, pwd_context.verify, encoded, hashed)
 
 
 # ─── JWT ─────────────────────────────────────────────────────
