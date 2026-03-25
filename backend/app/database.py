@@ -1,16 +1,20 @@
+import uuid
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
 # ─── Engine ──────────────────────────────────────────────────
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=False,  # Set to False to prevent logging every SQL query
+    echo=False,
     future=True,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=5,
+    poolclass=NullPool,
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_name_func": lambda *args: f"__asyncpg_stmt_{uuid.uuid4().hex}__",
+    },
 )
 
 # ─── Session factory ─────────────────────────────────────────

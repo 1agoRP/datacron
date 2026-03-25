@@ -190,6 +190,8 @@ async def upload_contract_pdf(
     _: User = Depends(get_current_user),
 ):
     """Upload a contract PDF and extract data using AI/heuristics."""
+    if pdf_file.content_type != "application/pdf":
+        raise HTTPException(status_code=415, detail="Apenas arquivos PDF são permitidos")
     pdf_bytes = await pdf_file.read()
     extracted = extract_contract_data(pdf_bytes)
     return {"campos": extracted}
@@ -207,6 +209,9 @@ async def upload_contrato_arquivo(
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Contrato não encontrado")
+
+    if pdf_file.content_type != "application/pdf":
+        raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
 
     pdf_bytes = await pdf_file.read()
     filename = f"contratos/{id}/{pdf_file.filename or 'contrato.pdf'}"

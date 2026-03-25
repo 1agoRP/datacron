@@ -81,6 +81,11 @@ async def preview_import(
     if not file.filename:
         raise HTTPException(status_code=422, detail="Arquivo sem nome")
 
+    # Extra security: basic MIME type / extension validation
+    ALLOWED_EXTENSIONS = (".csv", ".xls", ".xlsx")
+    if not file.filename.lower().endswith(ALLOWED_EXTENSIONS):
+        raise HTTPException(status_code=415, detail="Apenas planilhas (CSV, XLS, XLSX) são permitidas")
+
     rows = _parse_excel_or_csv(content, file.filename)
     preview_rows: list[ImportPreviewRow] = []
     criar = atualizar = ignorar = erros = 0

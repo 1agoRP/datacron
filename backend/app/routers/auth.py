@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ from app.dependencies import (
 from app.models.user import User
 from app.schemas import LoginRequest, TokenResponse, UserResponse, PasswordUpdate
 from app.config import settings
+from app.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -35,7 +36,8 @@ def _validate_password(senha: str) -> None:
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Authenticates the user and returns a JWT access token."""
     result = await db.execute(select(User).where(User.email == body.email))
     user: User | None = result.scalar_one_or_none()

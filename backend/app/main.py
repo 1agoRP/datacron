@@ -8,8 +8,12 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.limiter import limiter
 
 from app.config import settings
 from app.database import engine, Base
@@ -33,12 +37,18 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Datacron API starting up...")
 
+    # Strict CORS Check for Production
+    if settings.ENVIRONMENT.lower() == "production" and "*" in settings.allowed_origins_list:
+        logger.error("VULNERABILIDADE CRÍTICA: CORS aberto '*' em ambiente de produção!")
+        raise RuntimeError("Deploy cancelado por segurança. Defina ALLOWED_ORIGINS corretamente.")
+
     # Ensure tables exist (safe fallback — Alembic handles actual migrations).
-    # This only creates *missing* tables; it will not modify existing columns.
-    # Run `alembic upgrade head` separately when schema changes are needed.
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables verified")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables verified")
+    except Exception as e:
+        logger.warning(f"Could not verify database tables (common with Supabase Transaction poolers): {e}")
 
     # Start background scheduler
     start_scheduler()
@@ -64,6 +74,9 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ─── CORS ───────────────────────────────────────────────────
 app.add_middleware(

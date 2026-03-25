@@ -8,7 +8,10 @@ from app.dependencies import hash_password
 async def seed_data():
     async with engine.begin() as conn:
         # Create tables
-        await conn.run_sync(Base.metadata.create_all)
+        try:
+            await conn.run_sync(Base.metadata.create_all)
+        except Exception as e:
+            print(f"Skipping table creation (typical with Supabase transaction poolers): {e}")
     
     async with AsyncSessionLocal() as db:
         # Check if admin already exists
@@ -26,7 +29,7 @@ async def seed_data():
         )
         db.add(admin)
         await db.commit()
-        print("Admin user created: admin@datacron.com.br / admin123")
+        print("Admin user created successfully.")
 
 if __name__ == "__main__":
     asyncio.run(seed_data())
