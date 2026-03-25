@@ -41,6 +41,7 @@ APScheduler==3.11.0
 # HTTP utils
 httpx==0.28.1
 python-dateutil==2.9.0
+aiofiles==25.1.0
 
 # Logging
 structlog==25.1.0
