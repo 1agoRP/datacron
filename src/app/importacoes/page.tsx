@@ -53,6 +53,7 @@ export default function ImportacoesPage() {
   };
 
   const handleConfirm = async () => {
+    if (!baseType) return;
     try {
       setLoading(true);
       await api.confirmImport({
