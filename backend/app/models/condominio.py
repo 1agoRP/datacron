@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.concessionaria import Concessionaria
     from app.models.fatura import Fatura
     from app.models.alerta import Alerta
+    from app.models.contrato import Contrato
 
 
 class Condominio(Base):
@@ -42,6 +43,9 @@ class Condominio(Base):
     )
     alertas: Mapped[list["Alerta"]] = relationship(
         "Alerta", back_populates="condominio"
+    )
+    contratos: Mapped[list["Contrato"]] = relationship(
+        "Contrato", back_populates="condominio", cascade="all, delete-orphan"
     )
 
     @property

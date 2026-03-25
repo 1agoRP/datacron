@@ -246,3 +246,57 @@ class RelatorioGeradoResponse(BaseModel):
     usuario: str
     created_at: datetime
     model_config = {"from_attributes": True}
+
+
+# ─── Contrato ─────────────────────────────────────────────────
+
+class ContratoCreate(BaseModel):
+    condominio_id: uuid.UUID
+    empresa: str
+    tipo_contrato: str
+    tipo_personalizado: Optional[str] = None
+    data_inicio: date
+    data_fim: Optional[date] = None
+    valor_inicial: float = 0.0
+    valor_atual: float = 0.0
+    data_reajuste: Optional[date] = None
+    indice_reajuste: Optional[str] = None
+    ultimo_reajuste: Optional[date] = None
+    periodicidade: str = "mensal"
+    observacoes: Optional[str] = None
+
+class ContratoUpdate(BaseModel):
+    empresa: Optional[str] = None
+    tipo_contrato: Optional[str] = None
+    tipo_personalizado: Optional[str] = None
+    data_inicio: Optional[date] = None
+    data_fim: Optional[date] = None
+    valor_inicial: Optional[float] = None
+    valor_atual: Optional[float] = None
+    data_reajuste: Optional[date] = None
+    indice_reajuste: Optional[str] = None
+    ultimo_reajuste: Optional[date] = None
+    periodicidade: Optional[str] = None
+    observacoes: Optional[str] = None
+
+class ContratoResponse(BaseModel):
+    id: uuid.UUID
+    condominio_id: uuid.UUID
+    empresa: str
+    tipo_contrato: str
+    tipo_personalizado: Optional[str] = None
+    data_inicio: date
+    data_fim: Optional[date] = None
+    valor_inicial: float
+    valor_atual: float
+    data_reajuste: Optional[date] = None
+    indice_reajuste: Optional[str] = None
+    ultimo_reajuste: Optional[date] = None
+    periodicidade: str
+    arquivo_path: Optional[str] = None
+    observacoes: Optional[str] = None
+    status: str = "ativo"
+    condominio_nome: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}

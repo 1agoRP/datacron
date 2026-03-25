@@ -74,3 +74,25 @@ export interface ChartData {
   name: string;
   valor: number;
 }
+
+export interface Contrato {
+  id: string;
+  condominio_id: string;
+  empresa: string;
+  tipo_contrato: string;
+  tipo_personalizado: string | null;
+  data_inicio: string;
+  data_fim: string | null;
+  valor_inicial: number;
+  valor_atual: number;
+  data_reajuste: string | null;
+  indice_reajuste: string | null;
+  ultimo_reajuste: string | null;
+  periodicidade: string;
+  arquivo_path: string | null;
+  observacoes: string | null;
+  status: string;
+  condominio_nome: string | null;
+  created_at: string;
+  updated_at: string;
+}

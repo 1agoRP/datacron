@@ -5,7 +5,7 @@
 
 import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData } from '@/types';
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 class ApiClient {
   private getToken(): string | null {
@@ -389,6 +389,77 @@ class ApiClient {
   // Faturas by condominio (for history)
   async getFaturasByCondominio(condominioId: string) {
     return this.request<Fatura[]>(`/faturas?condominio_id=${condominioId}&limit=100`);
+  }
+
+  // Contratos
+  async getContratos(params: Record<string, string | number> = {}) {
+    const safeParams: Record<string, string> = {};
+    for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
+    const query = new URLSearchParams(safeParams).toString();
+    return this.request<any[]>(`/contratos/?${query}`);
+  }
+
+  async getContratosStats() {
+    return this.request<{ total: number; ativos: number; a_vencer: number; vencidos: number }>('/contratos/stats');
+  }
+
+  async createContrato(data: any) {
+    return this.request('/contratos/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateContrato(id: string, data: any) {
+    return this.request(`/contratos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteContrato(id: string) {
+    return this.request(`/contratos/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async uploadContratoPdf(formData: FormData) {
+    return fetch(`${API_BASE_URL}/contratos/upload-pdf`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.getToken()}`
+      },
+      body: formData
+    }).then(r => r.json());
+  }
+
+  async uploadContratoArquivo(id: string, formData: FormData) {
+    return fetch(`${API_BASE_URL}/contratos/${id}/arquivo`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.getToken()}`
+      },
+      body: formData
+    }).then(r => r.json());
+  }
+
+  async downloadContratoArquivo(id: string) {
+    const token = this.getToken();
+    const response = await fetch(`${API_BASE_URL}/contratos/${id}/arquivo`, {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    });
+    if (!response.ok) throw new Error('Falha ao baixar arquivo');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `contrato_${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   }
 }
 

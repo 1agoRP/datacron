@@ -1,0 +1,755 @@
+'use client';
+
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import Shell from '@/components/layout/Shell';
+import {
+  Plus, Building2, FileSignature, Calendar, DollarSign, X, Trash2,
+  Search, Filter, Download, Upload, Sparkles, AlertTriangle, CheckCircle2,
+  Clock, Eye, FileText, ArrowUpDown, ChevronDown
+} from 'lucide-react';
+import { api } from '@/lib/api';
+
+const CONTRACT_TYPES = [
+  'Manutenção de Elevadores',
+  'Bombas',
+  'Portaria',
+  'Limpeza',
+  'Segurança',
+  'Outros',
+];
+
+const INDICES = ['IGPM', 'IPCA', 'INCC', 'IGP-DI', 'Outro'];
+const PERIODICIDADES = ['mensal', 'bimestral', 'trimestral', 'semestral', 'anual'];
+
+const STATUS_CONFIG: Record<string, { label: string; class: string; icon: React.ReactNode }> = {
+  ativo: { label: 'Ativo', class: 'dc-badge-green', icon: <CheckCircle2 size={12} /> },
+  a_vencer: { label: 'A Vencer', class: 'dc-badge-amber', icon: <Clock size={12} /> },
+  vencido: { label: 'Vencido', class: 'dc-badge-red', icon: <AlertTriangle size={12} /> },
+};
+
+function formatDate(d: string | null | undefined): string {
+  if (!d) return '—';
+  try {
+    const parts = d.split('-');
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  } catch { return d; }
+}
+
+function formatCurrency(v: number | null | undefined): string {
+  if (v == null) return '—';
+  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+}
+
+export default function ContratosPage() {
+  const [contratos, setContratos] = useState<any[]>([]);
+  const [condos, setCondos] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('Todos');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // IA state
+  const [extracting, setExtracting] = useState(false);
+  const [aiFields, setAiFields] = useState<Record<string, any>>({});
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const defaultForm = {
+    condominio_id: '',
+    empresa: '',
+    tipo_contrato: 'Manutenção de Elevadores',
+    tipo_personalizado: '',
+    data_inicio: '',
+    data_fim: '',
+    valor_inicial: 0,
+    valor_atual: 0,
+    data_reajuste: '',
+    indice_reajuste: '',
+    ultimo_reajuste: '',
+    periodicidade: 'mensal',
+    observacoes: '',
+  };
+  const [form, setForm] = useState<any>({ ...defaultForm });
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [contData, condoData, statsData] = await Promise.all([
+        api.getContratos(),
+        api.getCondominios(),
+        api.getContratosStats(),
+      ]);
+      setContratos(contData);
+      setCondos(condoData);
+      setStats(statsData);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      const payload = { ...form };
+
+      // Clean empty optional fields
+      if (!payload.data_fim) payload.data_fim = null;
+      if (!payload.data_reajuste) payload.data_reajuste = null;
+      if (!payload.indice_reajuste) payload.indice_reajuste = null;
+      if (!payload.ultimo_reajuste) payload.ultimo_reajuste = null;
+      if (!payload.tipo_personalizado) payload.tipo_personalizado = null;
+      if (!payload.observacoes) payload.observacoes = null;
+      if (!payload.valor_inicial) payload.valor_inicial = 0;
+      if (!payload.valor_atual) payload.valor_atual = payload.valor_inicial;
+
+      let savedContrato: any;
+      if (editingId) {
+        delete payload.condominio_id;
+        savedContrato = await api.updateContrato(editingId, payload);
+      } else {
+        savedContrato = await api.createContrato(payload);
+      }
+
+      // Upload PDF if selected
+      if (pdfFile && savedContrato?.id) {
+        const fd = new FormData();
+        fd.append('pdf_file', pdfFile);
+        await api.uploadContratoArquivo(savedContrato.id, fd);
+      }
+
+      handleCloseModal();
+      fetchData();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!editingId) return;
+    if (!confirm('Deseja realmente excluir este contrato? Ação irreversível!')) return;
+    try {
+      await api.deleteContrato(editingId);
+      handleCloseModal();
+      fetchData();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleOpenCreate = () => {
+    setForm({ ...defaultForm });
+    setEditingId(null);
+    setAiFields({});
+    setPdfFile(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (c: any) => {
+    setForm({
+      condominio_id: c.condominio_id,
+      empresa: c.empresa,
+      tipo_contrato: c.tipo_contrato,
+      tipo_personalizado: c.tipo_personalizado || '',
+      data_inicio: c.data_inicio || '',
+      data_fim: c.data_fim || '',
+      valor_inicial: c.valor_inicial || 0,
+      valor_atual: c.valor_atual || 0,
+      data_reajuste: c.data_reajuste || '',
+      indice_reajuste: c.indice_reajuste || '',
+      ultimo_reajuste: c.ultimo_reajuste || '',
+      periodicidade: c.periodicidade || 'mensal',
+      observacoes: c.observacoes || '',
+    });
+    setEditingId(c.id);
+    setAiFields({});
+    setPdfFile(null);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setAiFields({});
+    setPdfFile(null);
+  };
+
+  // IA PDF extraction
+  const handlePdfUpload = async (file: File) => {
+    setPdfFile(file);
+    setExtracting(true);
+    setAiFields({});
+    try {
+      const fd = new FormData();
+      fd.append('pdf_file', file);
+      const result = await api.uploadContratoPdf(fd);
+      if (result?.campos) {
+        const campos = result.campos;
+        const newAiFields: Record<string, any> = {};
+        const updates: any = {};
+
+        for (const [key, meta] of Object.entries(campos) as [string, any][]) {
+          newAiFields[key] = meta;
+          if (meta.valor !== null && meta.valor !== undefined) {
+            updates[key] = meta.valor;
+          }
+        }
+
+        setAiFields(newAiFields);
+        setForm((prev: any) => ({ ...prev, ...updates }));
+      }
+    } catch (err: any) {
+      console.error('AI extraction failed:', err);
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type === 'application/pdf') {
+      handlePdfUpload(file);
+    }
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handlePdfUpload(file);
+  };
+
+  const toggleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const filtered = useMemo(() => {
+    let result = contratos.filter(c => {
+      const matchesTab = tab === 'Todos' || c.tipo_contrato === tab;
+      if (!matchesTab) return false;
+      if (statusFilter && c.status !== statusFilter) return false;
+      if (!searchTerm.trim()) return true;
+      const q = searchTerm.toLowerCase();
+      return (
+        (c.empresa || '').toLowerCase().includes(q) ||
+        (c.tipo_contrato || '').toLowerCase().includes(q) ||
+        (c.condominio_nome || '').toLowerCase().includes(q)
+      );
+    });
+
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        let valA = a[sortField] ?? '';
+        let valB = b[sortField] ?? '';
+        if (sortField === 'valor_atual' || sortField === 'valor_inicial') {
+          return sortDir === 'asc' ? valA - valB : valB - valA;
+        }
+        const cmp = String(valA).localeCompare(String(valB), 'pt-BR', { sensitivity: 'base' });
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [contratos, tab, statusFilter, searchTerm, sortField, sortDir]);
+
+  const tabs = ['Todos', ...CONTRACT_TYPES];
+
+  const isAiField = (field: string) => !!aiFields[field];
+  const getConfidence = (field: string) => aiFields[field]?.confianca;
+
+  const confidenceStyle = (field: string): React.CSSProperties => {
+    if (!isAiField(field)) return {};
+    const conf = getConfidence(field);
+    if (conf === 'alta') return { borderColor: '#22c55e', boxShadow: '0 0 0 2px rgba(34,197,94,0.15)' };
+    if (conf === 'media') return { borderColor: '#f59e0b', boxShadow: '0 0 0 2px rgba(245,158,11,0.15)' };
+    return { borderColor: '#ef4444', boxShadow: '0 0 0 2px rgba(239,68,68,0.15)' };
+  };
+
+  const confidenceBadge = (field: string) => {
+    if (!isAiField(field)) return null;
+    const conf = getConfidence(field);
+    const colors: Record<string, string> = { alta: '#22c55e', media: '#f59e0b', baixa: '#ef4444' };
+    const labels: Record<string, string> = { alta: 'IA: Alta', media: 'IA: Média', baixa: 'IA: Baixa' };
+    return (
+      <span style={{
+        fontSize: '0.65rem', fontWeight: 700, color: colors[conf] || '#94a3b8',
+        display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 6,
+      }}>
+        <Sparkles size={10} /> {labels[conf] || 'IA'}
+      </span>
+    );
+  };
+
+  return (
+    <Shell>
+      <div className="dc-page-header">
+        <div>
+          <h1 className="dc-page-title">Contratos</h1>
+          <p className="dc-page-subtitle">
+            Gerencie contratos recorrentes dos condomínios com leitura inteligente de PDFs.
+          </p>
+        </div>
+        <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
+          <Plus size={16} /> Novo Contrato
+        </button>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="dc-stats-grid">
+        <KpiCard title="Total de Contratos" value={stats?.total ?? 0} color="#eff6ff" iconColor="#2563eb" icon={<FileSignature size={22} />} />
+        <KpiCard title="Ativos" value={stats?.ativos ?? 0} color="#f0fdf4" iconColor="#16a34a" icon={<CheckCircle2 size={22} />} />
+        <KpiCard title="A Vencer" value={stats?.a_vencer ?? 0} color="#fffbeb" iconColor="#d97706" icon={<Clock size={22} />} />
+        <KpiCard title="Vencidos" value={stats?.vencidos ?? 0} color="#fef2f2" iconColor="#dc2626" icon={<AlertTriangle size={22} />} />
+      </div>
+
+      {/* Filter bar */}
+      <div className="dc-filter-bar">
+        <div className="dc-filter-search">
+          <Search />
+          <input
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Buscar por condomínio, empresa ou tipo..."
+          />
+        </div>
+        <div className="dc-tabs" style={{ border: 'none', margin: 0, padding: 0 }}>
+          {tabs.map(t => (
+            <button key={t} className={`dc-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
+              {t}
+            </button>
+          ))}
+        </div>
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          style={{
+            height: 34, padding: '0 12px', borderRadius: 8,
+            border: '1px solid #e2e8f0', background: '#f8fafc',
+            fontSize: '0.82rem', fontWeight: 700, color: '#64748b',
+            fontFamily: 'inherit', cursor: 'pointer',
+          }}
+        >
+          <option value="">Todos os Status</option>
+          <option value="ativo">Ativo</option>
+          <option value="a_vencer">A Vencer</option>
+          <option value="vencido">Vencido</option>
+        </select>
+        <div className="dc-filter-divider" />
+        <span className="dc-filter-count">
+          {filtered.length} contrato{filtered.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* Table */}
+      <div className="dc-card">
+        <div className="dc-table-wrapper">
+          <table className="dc-table">
+            <thead>
+              <tr>
+                <th>
+                  <span onClick={() => toggleSort('condominio_nome')} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center' }}>
+                    Condomínio <ArrowUpDown size={13} style={{ marginLeft: 4, color: sortField === 'condominio_nome' ? '#2563eb' : '#cbd5e1' }} />
+                  </span>
+                </th>
+                <th>Empresa / Tipo</th>
+                <th>Vigência</th>
+                <th>
+                  <span onClick={() => toggleSort('valor_atual')} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center' }}>
+                    Valor Atual <ArrowUpDown size={13} style={{ marginLeft: 4, color: sortField === 'valor_atual' ? '#2563eb' : '#cbd5e1' }} />
+                  </span>
+                </th>
+                <th>Reajuste</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
+              ) : filtered.map(c => {
+                const st = STATUS_CONFIG[c.status] || STATUS_CONFIG['ativo'];
+                return (
+                  <tr key={c.id}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div className="dc-condo-icon" style={{ width: 38, height: 38, flexShrink: 0 }}>
+                          <Building2 size={18} />
+                        </div>
+                        <div>
+                          <div className="dc-cell-primary">{c.condominio_nome || '—'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          background: '#f0f9ff', color: '#0369a1',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 800, fontSize: '0.85rem', flexShrink: 0,
+                        }}>
+                          {c.tipo_contrato[0]}
+                        </div>
+                        <div>
+                          <div className="dc-cell-primary">{c.empresa}</div>
+                          <div className="dc-cell-secondary">{c.tipo_contrato}{c.tipo_personalizado ? ` (${c.tipo_personalizado})` : ''}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="dc-cell-primary" style={{ fontSize: '0.82rem' }}>
+                        {formatDate(c.data_inicio)} → {c.data_fim ? formatDate(c.data_fim) : 'Indeterminado'}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="dc-cell-primary">{formatCurrency(c.valor_atual)}</div>
+                      {c.valor_inicial !== c.valor_atual && (
+                        <div className="dc-cell-secondary">Inicial: {formatCurrency(c.valor_inicial)}</div>
+                      )}
+                    </td>
+                    <td>
+                      <div className="dc-cell-primary" style={{ fontSize: '0.82rem' }}>
+                        {c.indice_reajuste || '—'}
+                      </div>
+                      <div className="dc-cell-secondary">{c.periodicidade}</div>
+                    </td>
+                    <td>
+                      <span className={`dc-badge ${st.class}`}>
+                        <span className="dc-badge-dot" />
+                        {st.label}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                        {c.arquivo_path && (
+                          <button
+                            className="dc-btn dc-btn-ghost"
+                            style={{ height: 34, padding: '0 10px', fontSize: '0.78rem' }}
+                            onClick={() => api.downloadContratoArquivo(c.id)}
+                            title="Baixar contrato"
+                          >
+                            <Download size={14} />
+                          </button>
+                        )}
+                        <button
+                          className="dc-btn dc-btn-dark"
+                          style={{ height: 34, padding: '0 14px', fontSize: '0.78rem', gap: 6 }}
+                          onClick={() => handleOpenEdit(c)}
+                        >
+                          <Eye size={14} /> Gerenciar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!loading && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7}>
+                    <div style={{ padding: '60px 24px', textAlign: 'center', color: '#94a3b8' }}>
+                      <FileSignature size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: '#475569' }}>Nenhum contrato encontrado</div>
+                      <div style={{ fontSize: '0.85rem', marginTop: 4 }}>Cadastre um novo contrato para começar.</div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Pagination info */}
+      <div className="dc-pagination">
+        <span className="dc-pagination-info">
+          Mostrando {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* Modal */}
+      {isModalOpen && (
+        <div className="dc-modal-overlay">
+          <div className="dc-modal-content" style={{ maxWidth: 640 }}>
+            <div className="dc-modal-header">
+              <h2 className="dc-modal-title">{editingId ? 'Editar Contrato' : 'Novo Contrato'}</h2>
+              <button className="dc-modal-close" onClick={handleCloseModal}><X size={20} /></button>
+            </div>
+
+            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              <div className="dc-modal-body dc-space-y-4">
+
+                {/* PDF Upload Zone */}
+                {!editingId && (
+                  <div
+                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      border: `2px dashed ${dragOver ? '#2563eb' : pdfFile ? '#22c55e' : '#e2e8f0'}`,
+                      borderRadius: 12,
+                      padding: '20px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      background: dragOver ? '#eff6ff' : pdfFile ? '#f0fdf4' : '#f8fafc',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleFileSelect}
+                      style={{ display: 'none' }}
+                    />
+                    {extracting ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                        <div className="dc-loading-spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#2563eb' }}>Analisando contrato com IA...</span>
+                      </div>
+                    ) : pdfFile ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                        <FileText size={20} style={{ color: '#22c55e' }} />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#16a34a' }}>{pdfFile.name}</span>
+                        {Object.keys(aiFields).length > 0 && (
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: 8 }}>
+                            — {Object.keys(aiFields).length} campo(s) preenchido(s) automaticamente
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <Upload size={28} style={{ color: '#94a3b8', margin: '0 auto 8px' }} />
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#475569' }}>
+                          <Sparkles size={14} style={{ display: 'inline', marginRight: 6, color: '#2563eb' }} />
+                          Arraste o PDF do contrato ou clique para selecionar
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 4 }}>
+                          A IA irá ler o contrato e preencher os campos automaticamente
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Section: Identificação */}
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginTop: 4 }}>
+                  📌 Identificação
+                </div>
+
+                <div className="dc-form-group">
+                  <label>Condomínio</label>
+                  <select
+                    required
+                    value={form.condominio_id}
+                    onChange={e => setForm({ ...form, condominio_id: e.target.value })}
+                    className="dc-input dc-form-select"
+                    disabled={!!editingId}
+                  >
+                    <option value="">Selecione um condomínio...</option>
+                    {condos.map(c => <option key={c.id} value={c.id}>{c.nome} (Nº {c.numero})</option>)}
+                  </select>
+                </div>
+
+                <div className="dc-form-group">
+                  <label>Empresa Contratada {confidenceBadge('empresa')}</label>
+                  <input
+                    className="dc-form-input"
+                    required
+                    value={form.empresa}
+                    onChange={e => setForm({ ...form, empresa: e.target.value })}
+                    placeholder="Ex: ThyssenKrupp Elevadores"
+                    style={confidenceStyle('empresa')}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="dc-form-group">
+                    <label>Tipo de Contrato {confidenceBadge('tipo_contrato')}</label>
+                    <select
+                      value={form.tipo_contrato}
+                      onChange={e => setForm({ ...form, tipo_contrato: e.target.value })}
+                      className="dc-input dc-form-select"
+                      style={confidenceStyle('tipo_contrato')}
+                    >
+                      {CONTRACT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  {form.tipo_contrato === 'Outros' && (
+                    <div className="dc-form-group">
+                      <label>Especifique o Tipo</label>
+                      <input
+                        className="dc-form-input"
+                        value={form.tipo_personalizado}
+                        onChange={e => setForm({ ...form, tipo_personalizado: e.target.value })}
+                        placeholder="Ex: Jardinagem"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Section: Vigência */}
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginTop: 8 }}>
+                  📅 Vigência
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="dc-form-group">
+                    <label>Data de Início {confidenceBadge('data_inicio')}</label>
+                    <input
+                      className="dc-form-input"
+                      type="date"
+                      required
+                      value={form.data_inicio}
+                      onChange={e => setForm({ ...form, data_inicio: e.target.value })}
+                      style={confidenceStyle('data_inicio')}
+                    />
+                  </div>
+                  <div className="dc-form-group">
+                    <label>Data de Término {confidenceBadge('data_fim')}</label>
+                    <input
+                      className="dc-form-input"
+                      type="date"
+                      value={form.data_fim}
+                      onChange={e => setForm({ ...form, data_fim: e.target.value })}
+                      placeholder="Deixe vazio para indeterminado"
+                      style={confidenceStyle('data_fim')}
+                    />
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>Vazio = indeterminado</span>
+                  </div>
+                </div>
+
+                {/* Section: Financeiro */}
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0', paddingBottom: 6, marginTop: 8 }}>
+                  💰 Financeiro
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="dc-form-group">
+                    <label>Valor Inicial (R$) {confidenceBadge('valor_inicial')}</label>
+                    <input
+                      className="dc-form-input"
+                      type="number"
+                      step="0.01"
+                      required
+                      value={form.valor_inicial}
+                      onChange={e => setForm({ ...form, valor_inicial: parseFloat(e.target.value) || 0 })}
+                      style={confidenceStyle('valor_inicial')}
+                    />
+                  </div>
+                  <div className="dc-form-group">
+                    <label>Valor Atual (R$) {confidenceBadge('valor_atual')}</label>
+                    <input
+                      className="dc-form-input"
+                      type="number"
+                      step="0.01"
+                      value={form.valor_atual}
+                      onChange={e => setForm({ ...form, valor_atual: parseFloat(e.target.value) || 0 })}
+                      style={confidenceStyle('valor_atual')}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                  <div className="dc-form-group">
+                    <label>Índice de Reajuste {confidenceBadge('indice_reajuste')}</label>
+                    <select
+                      value={form.indice_reajuste}
+                      onChange={e => setForm({ ...form, indice_reajuste: e.target.value })}
+                      className="dc-input dc-form-select"
+                      style={confidenceStyle('indice_reajuste')}
+                    >
+                      <option value="">Nenhum</option>
+                      {INDICES.map(i => <option key={i} value={i}>{i}</option>)}
+                    </select>
+                  </div>
+                  <div className="dc-form-group">
+                    <label>Data de Reajuste</label>
+                    <input className="dc-form-input" type="date" value={form.data_reajuste} onChange={e => setForm({ ...form, data_reajuste: e.target.value })} />
+                  </div>
+                  <div className="dc-form-group">
+                    <label>Periodicidade {confidenceBadge('periodicidade')}</label>
+                    <select
+                      value={form.periodicidade}
+                      onChange={e => setForm({ ...form, periodicidade: e.target.value })}
+                      className="dc-input dc-form-select"
+                      style={confidenceStyle('periodicidade')}
+                    >
+                      {PERIODICIDADES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Observações */}
+                <div className="dc-form-group">
+                  <label>Observações</label>
+                  <textarea
+                    className="dc-form-input"
+                    value={form.observacoes}
+                    onChange={e => setForm({ ...form, observacoes: e.target.value })}
+                    placeholder="Notas adicionais sobre o contrato..."
+                    rows={3}
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+              </div>
+
+              <div className="dc-modal-footer" style={{ justifyContent: 'space-between' }}>
+                {editingId ? (
+                  <button type="button" className="dc-btn dc-btn-danger" onClick={handleDelete} style={{ gap: 8 }}>
+                    <Trash2 size={15} /> Excluir
+                  </button>
+                ) : (
+                  <div></div>
+                )}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button type="button" className="dc-btn dc-btn-secondary" onClick={handleCloseModal}>Cancelar</button>
+                  <button type="submit" className="dc-btn dc-btn-primary" disabled={saving} style={{ gap: 10 }}>
+                    {saving && <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} />}
+                    {saving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Cadastrar Contrato'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+function KpiCard({ title, value, color, iconColor, icon }: {
+  title: string; value: number; color: string; iconColor: string; icon: React.ReactNode;
+}) {
+  return (
+    <div className="dc-stat-card">
+      <div className="dc-stat-top">
+        <div className="dc-stat-icon" style={{ background: color, color: iconColor }}>{icon}</div>
+      </div>
+      <div>
+        <div className="dc-stat-label">{title}</div>
+        <div className="dc-stat-value">{value}</div>
+      </div>
+    </div>
+  );
+}
