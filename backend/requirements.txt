@@ -13,6 +13,10 @@ python-jose[cryptography]==3.3.0
 passlib==1.7.4
 bcrypt==4.0.1
 python-multipart==0.0.20
+supabase==2.12.0
+
+pdf2image==1.17.0
+pytesseract==0.3.10
 
 # Settings
 pydantic[email]==2.10.6

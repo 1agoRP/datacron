@@ -213,15 +213,25 @@ async def upload_contrato_arquivo(
     if pdf_file.content_type != "application/pdf":
         raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
 
-    pdf_bytes = await pdf_file.read()
-    filename = f"contratos/{id}/{pdf_file.filename or 'contrato.pdf'}"
-    path = await save_file(pdf_bytes, filename, content_type="application/pdf")
+    import base64
+    from app.models.contract_file import ContractFile
 
-    c.arquivo_path = path
+    pdf_bytes = await pdf_file.read()
+    b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
+
+    cf = ContractFile(
+        contract_id=id,
+        file_name=pdf_file.filename or 'contrato.pdf',
+        file_type="application/pdf",
+        file_base64=b64_data
+    )
+    db.add(cf)
+
+    c.arquivo_path = "base64"
     await db.commit()
     await db.refresh(c)
 
-    return {"arquivo_path": path, "mensagem": "Arquivo salvo com sucesso"}
+    return {"arquivo_path": c.arquivo_path, "mensagem": "Arquivo salvo com sucesso no banco em Base64"}
 
 
 @router.get("/{id}/arquivo")
@@ -231,18 +241,39 @@ async def download_contrato_arquivo(
     _: User = Depends(get_current_user),
 ):
     """Download the contract PDF file."""
+    import io
+    import base64
+    from app.models.contract_file import ContractFile
+
+    # Check for new base64 storage first
+    result_cf = await db.execute(
+        select(ContractFile)
+        .where(ContractFile.contract_id == id)
+        .order_by(ContractFile.created_at.desc())
+        .limit(1)
+    )
+    cf = result_cf.scalar_one_or_none()
+
+    if cf:
+        pdf_bytes = base64.b64decode(cf.file_base64)
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{cf.file_name}"'},
+        )
+
+    # Fallback to old storage
     result = await db.execute(select(Contrato).where(Contrato.id == id))
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Contrato não encontrado")
-    if not c.arquivo_path:
+    if not c.arquivo_path or c.arquivo_path == "base64":
         raise HTTPException(status_code=404, detail="Nenhum arquivo associado a este contrato")
 
     content = await get_file_content(c.arquivo_path)
     if content is None:
         raise HTTPException(status_code=404, detail="Arquivo não encontrado no armazenamento")
 
-    import io
     return StreamingResponse(
         io.BytesIO(content),
         media_type="application/pdf",

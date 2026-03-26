@@ -2,10 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System dependencies needed for pikepdf, pdfplumber
+# System dependencies needed for pikepdf, pdfplumber, pdf2image, pytesseract
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libqpdf-dev \
     poppler-utils \
+    tesseract-ocr \
+    tesseract-ocr-por \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 

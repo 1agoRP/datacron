@@ -9,6 +9,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.condominio import Condominio
+    from app.models.contract_file import ContractFile
 
 
 class Contrato(Base):
@@ -42,6 +43,9 @@ class Contrato(Base):
 
     # Relationships
     condominio: Mapped["Condominio"] = relationship("Condominio", back_populates="contratos")
+    arquivos: Mapped[list["ContractFile"]] = relationship(
+        "ContractFile", back_populates="contrato", cascade="all, delete-orphan"
+    )
 
     @property
     def status(self) -> str:

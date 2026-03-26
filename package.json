@@ -18,6 +18,7 @@
     "next": "canary",
     "react": "rc",
     "react-dom": "rc",
+    "react-select": "^5.10.2",
     "recharts": "latest",
     "swr": "^2.4.1",
     "tailwind-merge": "latest"

@@ -75,11 +75,7 @@ async def run_async_migrations() -> None:
     section = config.get_section(config.config_ini_section, {})
     section["sqlalchemy.url"] = settings.DATABASE_URL
     
-    connectable = async_engine_from_config(
-        section,
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    from app.database import engine as connectable
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

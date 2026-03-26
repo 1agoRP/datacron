@@ -58,8 +58,20 @@ def extract_contract_data(pdf_bytes: bytes) -> dict:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             full_text = ""
             for page in pdf.pages:
-                text = page.extract_text() or ""
-                full_text += text + "\n"
+                text = page.extract_text()
+                if text:
+                    full_text += text + "\n"
+
+            if len(full_text.strip()) < 100:
+                logger.info("Scanned PDF detected. Falling back to OCR extraction.")
+                import pytesseract
+                from pdf2image import convert_from_bytes
+    
+                images = convert_from_bytes(pdf_bytes)
+                full_text = ""
+                for img in images:
+                    text = pytesseract.image_to_string(img, lang="por")
+                    full_text += text + "\n"
 
             text_lower = full_text.lower()
 

@@ -8,6 +8,7 @@ import {
   Clock, Eye, FileText, ArrowUpDown, ChevronDown
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import Select from 'react-select';
 
 const CONTRACT_TYPES = [
   'Manutenção de Elevadores',
@@ -25,6 +26,39 @@ const STATUS_CONFIG: Record<string, { label: string; class: string; icon: React.
   ativo: { label: 'Ativo', class: 'dc-badge-green', icon: <CheckCircle2 size={12} /> },
   a_vencer: { label: 'A Vencer', class: 'dc-badge-amber', icon: <Clock size={12} /> },
   vencido: { label: 'Vencido', class: 'dc-badge-red', icon: <AlertTriangle size={12} /> },
+};
+
+const selectStyles = {
+  control: (base: any, state: any) => ({
+    ...base,
+    background: state.isDisabled ? '#f1f5f9' : '#fff',
+    border: `1px solid ${state.isFocused ? '#2563eb' : '#e2e8f0'}`,
+    borderRadius: '8px',
+    boxShadow: state.isFocused ? '0 0 0 1px #2563eb' : 'none',
+    minHeight: '38px',
+    fontSize: '0.85rem',
+    fontWeight: 500,
+    color: '#0f172a',
+    cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+    '&:hover': { borderColor: state.isFocused ? '#2563eb' : '#cbd5e1' }
+  }),
+  menu: (base: any) => ({
+    ...base,
+    borderRadius: '8px',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    zIndex: 9999,
+    fontSize: '0.85rem'
+  }),
+  option: (base: any, state: any) => ({
+    ...base,
+    backgroundColor: state.isSelected ? '#eff6ff' : state.isFocused ? '#f8fafc' : 'white',
+    color: state.isSelected ? '#1d4ed8' : '#334155',
+    cursor: 'pointer',
+    padding: '8px 12px'
+  }),
+  singleValue: (base: any, state: any) => ({ ...base, color: state.isDisabled ? '#94a3b8' : '#0f172a' }),
+  placeholder: (base: any) => ({ ...base, color: '#94a3b8' }),
+  indicatorSeparator: (base: any) => ({...base, display: 'none'})
 };
 
 function formatDate(d: string | null | undefined): string {
@@ -62,6 +96,7 @@ export default function ContratosPage() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const defaultForm = {
     condominio_id: '',
@@ -339,21 +374,23 @@ export default function ContratosPage() {
             </button>
           ))}
         </div>
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          style={{
-            height: 34, padding: '0 12px', borderRadius: 8,
-            border: '1px solid #e2e8f0', background: '#f8fafc',
-            fontSize: '0.82rem', fontWeight: 700, color: '#64748b',
-            fontFamily: 'inherit', cursor: 'pointer',
-          }}
-        >
-          <option value="">Todos os Status</option>
-          <option value="ativo">Ativo</option>
-          <option value="a_vencer">A Vencer</option>
-          <option value="vencido">Vencido</option>
-        </select>
+        <div style={{ width: 160 }}>
+          <Select
+            value={statusFilter === "" ? { value: "", label: "Todos os Status" } : { value: statusFilter, label: statusFilter === "ativo" ? "Ativo" : statusFilter === "vencido" ? "Vencido" : statusFilter === "a_vencer" ? "A Vencer" : "Todos os Status" }}
+            onChange={(option: any) => setStatusFilter(option?.value || '')}
+            options={[
+              { value: "", label: "Todos os Status" },
+              { value: "ativo", label: "Ativo" },
+              { value: "a_vencer", label: "A Vencer" },
+              { value: "vencido", label: "Vencido" }
+            ]}
+            isSearchable={false}
+            styles={{
+              ...selectStyles,
+              control: (base, state) => ({ ...selectStyles.control(base, state), background: '#f8fafc', height: 34, minHeight: 34, fontSize: '0.82rem', fontWeight: 700, color: '#64748b' })
+            }}
+          />
+        </div>
         <div className="dc-filter-divider" />
         <span className="dc-filter-count">
           {filtered.length} contrato{filtered.length !== 1 ? 's' : ''}
@@ -445,10 +482,19 @@ export default function ContratosPage() {
                           <button
                             className="dc-btn dc-btn-ghost"
                             style={{ height: 34, padding: '0 10px', fontSize: '0.78rem' }}
-                            onClick={() => api.downloadContratoArquivo(c.id)}
-                            title="Baixar contrato"
+                            onClick={async () => {
+                              setDownloadingId(c.id);
+                              try {
+                                await api.downloadContratoArquivo(c.id);
+                              } catch (err: any) {
+                                alert(err.message || 'Erro ao baixar contrato');
+                              } finally {
+                                setDownloadingId(null);
+                              }
+                            }}
+                            title="Baixar Arquivo Anexo do Contrato"
                           >
-                            <Download size={14} />
+                            {downloadingId === c.id ? <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> : <Download size={14} />}
                           </button>
                         )}
                         <button
@@ -559,16 +605,16 @@ export default function ContratosPage() {
 
                 <div className="dc-form-group">
                   <label>Condomínio</label>
-                  <select
-                    required
-                    value={form.condominio_id}
-                    onChange={e => setForm({ ...form, condominio_id: e.target.value })}
-                    className="dc-input dc-form-select"
-                    disabled={!!editingId}
-                  >
-                    <option value="">Selecione um condomínio...</option>
-                    {condos.map(c => <option key={c.id} value={c.id}>{c.nome} (Nº {c.numero})</option>)}
-                  </select>
+                  <Select
+                    options={condos.map(c => ({ value: c.id, label: `${c.nome} (Nº ${c.numero})` }))}
+                    value={form.condominio_id ? { value: form.condominio_id, label: condos.find(c => c.id === form.condominio_id) ? `${condos.find(c => c.id === form.condominio_id)?.nome} (Nº ${condos.find(c => c.id === form.condominio_id)?.numero})` : form.condominio_id } : null}
+                    onChange={(option: any) => setForm({ ...form, condominio_id: option?.value || '' })}
+                    placeholder="Selecione um condomínio..."
+                    isDisabled={!!editingId}
+                    styles={selectStyles}
+                    noOptionsMessage={() => "Nenhum condomínio encontrado"}
+                    isSearchable
+                  />
                 </div>
 
                 <div className="dc-form-group">
@@ -586,14 +632,17 @@ export default function ContratosPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>Tipo de Contrato {confidenceBadge('tipo_contrato')}</label>
-                    <select
-                      value={form.tipo_contrato}
-                      onChange={e => setForm({ ...form, tipo_contrato: e.target.value })}
-                      className="dc-input dc-form-select"
-                      style={confidenceStyle('tipo_contrato')}
-                    >
-                      {CONTRACT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
+                    <Select
+                      options={CONTRACT_TYPES.map(t => ({ value: t, label: t }))}
+                      value={{ value: form.tipo_contrato, label: form.tipo_contrato }}
+                      onChange={(option: any) => setForm({ ...form, tipo_contrato: option?.value || 'Outros' })}
+                      styles={{
+                        ...selectStyles,
+                        control: (base, state) => ({ ...selectStyles.control(base, state), ...confidenceStyle('tipo_contrato') })
+                      }}
+                      isSearchable
+                      noOptionsMessage={() => "Nenhum tipo encontrado"}
+                    />
                   </div>
                   {form.tipo_contrato === 'Outros' && (
                     <div className="dc-form-group">
@@ -673,15 +722,18 @@ export default function ContratosPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>Índice de Reajuste {confidenceBadge('indice_reajuste')}</label>
-                    <select
-                      value={form.indice_reajuste}
-                      onChange={e => setForm({ ...form, indice_reajuste: e.target.value })}
-                      className="dc-input dc-form-select"
-                      style={confidenceStyle('indice_reajuste')}
-                    >
-                      <option value="">Nenhum</option>
-                      {INDICES.map(i => <option key={i} value={i}>{i}</option>)}
-                    </select>
+                    <Select
+                      options={[{value: '', label: 'Nenhum'}, ...INDICES.map(i => ({ value: i, label: i }))]}
+                      value={form.indice_reajuste ? { value: form.indice_reajuste, label: form.indice_reajuste } : { value: '', label: 'Nenhum' }}
+                      onChange={(option: any) => setForm({ ...form, indice_reajuste: option?.value || '' })}
+                      styles={{
+                        ...selectStyles,
+                        control: (base, state) => ({ ...selectStyles.control(base, state), ...confidenceStyle('indice_reajuste') })
+                      }}
+                      isSearchable
+                      placeholder="Selecine..."
+                      noOptionsMessage={() => "Nenhum índice encontrado"}
+                    />
                   </div>
                   <div className="dc-form-group">
                     <label>Data de Reajuste</label>
@@ -689,14 +741,16 @@ export default function ContratosPage() {
                   </div>
                   <div className="dc-form-group">
                     <label>Periodicidade {confidenceBadge('periodicidade')}</label>
-                    <select
-                      value={form.periodicidade}
-                      onChange={e => setForm({ ...form, periodicidade: e.target.value })}
-                      className="dc-input dc-form-select"
-                      style={confidenceStyle('periodicidade')}
-                    >
-                      {PERIODICIDADES.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-                    </select>
+                    <Select
+                      options={PERIODICIDADES.map(p => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}
+                      value={{ value: form.periodicidade, label: form.periodicidade.charAt(0).toUpperCase() + form.periodicidade.slice(1) }}
+                      onChange={(option: any) => setForm({ ...form, periodicidade: option?.value || 'mensal' })}
+                      styles={{
+                        ...selectStyles,
+                        control: (base, state) => ({ ...selectStyles.control(base, state), ...confidenceStyle('periodicidade') })
+                      }}
+                      isSearchable={false}
+                    />
                   </div>
                 </div>
 
