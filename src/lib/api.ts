@@ -7,6 +7,23 @@ import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, Chart
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
+/**
+ * Custom fetch wrapper with automatic retries for network-level failures ('Failed to fetch').
+ * Does not retry on 4xx/5xx HTTP errors, only on connection drops/failures.
+ */
+async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 2, delay = 600): Promise<Response> {
+  try {
+    return await fetch(url, options);
+  } catch (err: any) {
+    if (retries > 0) {
+      console.warn(`[Network Error] Retrying fetch to ${url} in ${delay}ms... (${retries} retries left)`, err);
+      await new Promise(r => setTimeout(r, delay));
+      return fetchWithRetry(url, options, retries - 1, delay * 1.5);
+    }
+    throw err;
+  }
+}
+
 class ApiClient {
   private getToken(): string | null {
     if (typeof window === 'undefined') return null;
@@ -24,7 +41,7 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
     });
@@ -170,7 +187,7 @@ class ApiClient {
   }
 
   async extrairDadosFatura(formData: FormData) {
-    return fetch(`${API_BASE_URL}/concessionarias/extrair-dados`, {
+    return fetchWithRetry(`${API_BASE_URL}/concessionarias/extrair-dados`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${this.getToken()}`
@@ -197,7 +214,7 @@ class ApiClient {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {})
     };
 
-    const response = await fetch(`${API_BASE_URL}/faturas/exportar?formato=${formato}`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/faturas/exportar?formato=${formato}`, {
       headers
     });
 
@@ -274,7 +291,7 @@ class ApiClient {
 
   // Importações
   async previewImport(formData: FormData) {
-    const res = await fetch(`${API_BASE_URL}/importacoes/preview`, {
+    const res = await fetchWithRetry(`${API_BASE_URL}/importacoes/preview`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${this.getToken()}`
@@ -301,7 +318,7 @@ class ApiClient {
 
   async downloadTemplate(tipo: 'condominios' | 'concessionarias') {
     const token = this.getToken();
-    const response = await fetch(`${API_BASE_URL}/importacoes/template/${tipo}`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/importacoes/template/${tipo}`, {
       headers: {
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
@@ -339,7 +356,7 @@ class ApiClient {
     const headers: any = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetch(`${API_BASE_URL}/faturas/exportar?${params.toString()}`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/faturas/exportar?${params.toString()}`, {
       headers
     });
 
@@ -424,7 +441,7 @@ class ApiClient {
   }
 
   async uploadContratoPdf(formData: FormData) {
-    return fetch(`${API_BASE_URL}/contratos/upload-pdf`, {
+    return fetchWithRetry(`${API_BASE_URL}/contratos/upload-pdf`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.getToken()}`
@@ -434,7 +451,7 @@ class ApiClient {
   }
 
   async uploadContratoArquivo(id: string, formData: FormData) {
-    return fetch(`${API_BASE_URL}/contratos/${id}/arquivo`, {
+    return fetchWithRetry(`${API_BASE_URL}/contratos/${id}/arquivo`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.getToken()}`
@@ -445,7 +462,7 @@ class ApiClient {
 
   async downloadContratoArquivo(id: string) {
     const token = this.getToken();
-    const response = await fetch(`${API_BASE_URL}/contratos/${id}/arquivo`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/contratos/${id}/arquivo`, {
       headers: {
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       }
