@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import useSWR from 'swr';
@@ -36,6 +37,7 @@ function formatChartLabel(name: string): string {
 type ChartGroup = 'mes' | 'concessionaria' | 'condominio';
 
 export default function Dashboard() {
+  const router = useRouter();
   const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -245,11 +247,11 @@ export default function Dashboard() {
         <div className="dc-card dc-card-p" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
             <span className="dc-card-title">Alertas Críticos</span>
-            <button className="dc-card-link" onClick={() => window.location.href='/alertas'}>Ver todos →</button>
+            <button className="dc-card-link" onClick={() => router.push('/alertas')}>Ver todos →</button>
           </div>
           <div className="dc-space-y-3">
             {stats?.alertas?.map((a: any) => (
-              <div key={a.id} className="dc-alert-item" onClick={() => window.location.href='/alertas'}>
+              <div key={a.id} className="dc-alert-item" onClick={() => router.push('/alertas')}>
                 <div className={`dc-alert-icon-wrap ${a.gravidade === 'alta' ? 'high' : 'medium'}`}>
                   <AlertCircle size={18} />
                 </div>
@@ -278,7 +280,7 @@ export default function Dashboard() {
         <div className="dc-card">
           <div className="dc-card-header">
             <span className="dc-card-title">Últimas Faturas Recebidas</span>
-            <button className="dc-card-link" onClick={() => window.location.href='/faturas'}>Ver todas →</button>
+            <button className="dc-card-link" onClick={() => router.push('/faturas')}>Ver todas →</button>
           </div>
           <div className="dc-table-wrapper">
             <table className="dc-table">
@@ -293,7 +295,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {stats?.faturas?.map((f: any) => (
-                  <tr key={f.id} onClick={() => window.location.href='/faturas'} style={{ cursor: 'pointer' }}>
+                  <tr key={f.id} onClick={() => router.push('/faturas')} style={{ cursor: 'pointer' }}>
                     <td>
                       <div className="dc-cell-primary">{f.condominio?.nome || 'Processando...'}</div>
                       <div className="dc-cell-secondary">ID: {f.id.slice(0,8)}</div>

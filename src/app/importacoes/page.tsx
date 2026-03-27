@@ -7,8 +7,10 @@ import {
   AlertCircle, X as XIcon, Download, ChevronLeft, ChevronRight, ShieldCheck, FileSpreadsheet
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 
 export default function ImportacoesPage() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [baseType, setBaseType] = useState<'condominios' | 'concessionarias' | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -61,7 +63,7 @@ export default function ImportacoesPage() {
         rows: previewData.rows.filter((r: any) => r.acao !== 'IGNORAR' && r.acao !== 'ERRO')
       });
       alert('Importação concluída com sucesso!');
-      window.location.href = baseType === 'condominios' ? '/condominios' : '/concessionarias';
+      router.push(baseType === 'condominios' ? '/condominios' : '/concessionarias');
     } catch (err: any) {
       alert(err.message);
     } finally {

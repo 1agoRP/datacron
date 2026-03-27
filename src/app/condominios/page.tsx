@@ -6,13 +6,15 @@ import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X,
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import useSWR from 'swr';
 
 type SortField = 'nome' | 'numero';
 type SortDir = 'asc' | 'desc';
 
 export default function CondominiosPage() {
-  const [condos, setCondos] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: fetchCondos, isLoading: loading, mutate } = useSWR('condominios', () => api.getCondominios());
+  const condos = fetchCondos || [];
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newCondo, setNewCondo] = useState({
@@ -44,21 +46,7 @@ export default function CondominiosPage() {
   const [historyFaturas, setHistoryFaturas] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getCondominios();
-      setCondos(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // Removed manual fetchData in favor of useSWR
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +55,7 @@ export default function CondominiosPage() {
       await api.createCondominio(newCondo);
       setIsModalOpen(false);
       setNewCondo({ nome: '', numero: '', endereco: '', cnpj: '', sindico: '', cpf_sindico: '' });
-      await fetchData();
+      mutate();
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -101,9 +89,9 @@ export default function CondominiosPage() {
       let valA = a[sortField] || '';
       let valB = b[sortField] || '';
       if (sortField === 'numero') {
-        valA = parseInt(valA) || 0;
-        valB = parseInt(valB) || 0;
-        return sortDir === 'asc' ? valA - valB : valB - valA;
+        const numA = parseInt(valA as string) || 0;
+        const numB = parseInt(valB as string) || 0;
+        return sortDir === 'asc' ? numA - numB : numB - numA;
       }
       const cmp = String(valA).localeCompare(String(valB), 'pt-BR', { sensitivity: 'base' });
       return sortDir === 'asc' ? cmp : -cmp;
@@ -182,7 +170,7 @@ export default function CondominiosPage() {
         cpf_sindico: editCondo.cpf_sindico,
       });
       setEditCondo(null);
-      await fetchData();
+      mutate();
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -195,7 +183,7 @@ export default function CondominiosPage() {
     try {
       await api.deleteCondominio(id);
       setEditCondo(null);
-      await fetchData();
+      mutate();
     } catch (err: any) {
       alert(err.message);
     }
@@ -294,7 +282,7 @@ export default function CondominiosPage() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
-              ) : filtered.map(condo => {
+              ) : filtered.map((condo: any) => {
                 const total = condo.contas_esperadas || 0;
                 const rec = condo.contas_recebidas || 0;
                 const pct = total > 0 ? Math.round((rec / total) * 100) : 0;

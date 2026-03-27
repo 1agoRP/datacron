@@ -133,24 +133,29 @@ async def export_faturas(
         from reportlab.lib.pagesizes import letter, landscape
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
         from reportlab.lib import colors
+        from fastapi.concurrency import run_in_threadpool
         
-        output = io.BytesIO()
-        doc = SimpleDocTemplate(output, pagesize=landscape(letter))
-        elements = []
-        data = [headers] + rows
-        t = Table(data)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-            ('GRID', (0,0), (-1,-1), 1, colors.black)
-        ]))
-        elements.append(t)
-        doc.build(elements)
-        output.seek(0)
+        def _build_faturas_pdf():
+            output = io.BytesIO()
+            doc = SimpleDocTemplate(output, pagesize=landscape(letter))
+            elements = []
+            data = [headers] + rows
+            t = Table(data)
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('GRID', (0,0), (-1,-1), 1, colors.black)
+            ]))
+            elements.append(t)
+            doc.build(elements)
+            output.seek(0)
+            return output
+
+        output = await run_in_threadpool(_build_faturas_pdf)
         filename = f"faturas_{referencia or 'todos'}.pdf"
         return StreamingResponse(
             output,
@@ -284,99 +289,105 @@ async def download_relatorio_analitico(
             
     vencimento_medio_dias = (soma_dias_vencimento / faturas_com_vencimento) if faturas_com_vencimento > 0 else 0
 
-    # 2. Construir PDF Apresentação
-    output = io.BytesIO()
-    doc = SimpleDocTemplate(output, pagesize=landscape(letter), rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
-    styles = getSampleStyleSheet()
+    # 2. Construir PDF Apresentação (Offloaded to threadpool)
+    from fastapi.concurrency import run_in_threadpool
     
-    title_style = ParagraphStyle(name="TitleStyle", parent=styles['Heading1'], fontSize=22, textColor=colors.HexColor("#1e3a8a"), alignment=1, spaceAfter=20)
-    sub_style = ParagraphStyle(name="SubStyle", parent=styles['Heading2'], fontSize=16, textColor=colors.HexColor("#334155"), spaceAfter=15, spaceBefore=20)
-    normal_style = ParagraphStyle(name="NormalStyle", parent=styles['Normal'], fontSize=12, textColor=colors.black, spaceAfter=10, leading=16)
-    
-    Story = []
-    
-    # Título
-    Story.append(Paragraph(f"<b>Apresentação Analítica: Performance e Gestão de Contas (Até {hoje.strftime('%d/%m/%Y')})</b>", title_style))
-    Story.append(Paragraph("Este documento consolida em tempo real todas as informações de leitura óptica das faturas geradas pela automação Datacron.", normal_style))
-    
-    # KPIs Globais
-    Story.append(Paragraph("<b>1. Resumo Global de Faturamento</b>", sub_style))
-    summary_data = [
-        ["Total de Contas Recebidas", "Valor Total Mapeado", "Ticket Médio por Conta", "Dias Médios Vencimento"],
-        [f"{total_faturas}", f"R$ {valor_total:,.2f}", f"R$ {valor_medio:,.2f}", f"{vencimento_medio_dias:.0f} dias"],
-        ["Status Processadas", "Status Pendentes", "Status Erro OCR", "Status Revisão"],
-        [f"{status_counts['processada']}", f"{status_counts['pendente']}", f"{status_counts['erro']}", f"{status_counts['revisao']}"]
-    ]
-    t_summary = Table(summary_data, colWidths=[180]*4)
-    t_summary.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#f1f5f9")),
-        ('BACKGROUND', (0,2), (-1,2), colors.HexColor("#f1f5f9")),
-        ('TEXTCOLOR', (0,0), (-1,-1), colors.HexColor("#0f172a")),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTNAME', (0,2), (-1,2), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 11),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 12),
-        ('INNERGRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
-        ('BOX', (0,0), (-1,-1), 0.25, colors.lightgrey),
-    ]))
-    Story.append(t_summary)
-    
-    # Participação por Condomínio
-    Story.append(Paragraph("<b>2. Distribuição e Volumes por Condomínio</b>", sub_style))
-    Story.append(Paragraph("Abaixo é possível verificar a carga de contas segmentada por condomínio (% do portfólio) e seu ticket correspondente.", normal_style))
-    
-    condo_data = [["Condomínio", "Volume de Contas", "Participação (%)", "Gasto Total Mapeado"]]
-    for c_nome, dados in sorted(condos.items(), key=lambda x: x[1]['count'], reverse=True):
-        perc = (dados['count'] / total_faturas) * 100
-        condo_data.append([
-            c_nome,
-            str(dados['count']),
-            f"{perc:.1f}%",
-            f"R$ {dados['valor']:,.2f}"
-        ])
+    def _build_relatorio_pdf():
+        output = io.BytesIO()
+        doc = SimpleDocTemplate(output, pagesize=landscape(letter), rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+        styles = getSampleStyleSheet()
         
-    t_condos = Table(condo_data, colWidths=[250, 150, 150, 150])
-    t_condos.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#2563eb")),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('ALIGN', (0,1), (0,-1), 'LEFT'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ('INNERGRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#2563eb")),
-    ]))
-    Story.append(t_condos)
-    
-    # Concessionárias
-    Story.append(Paragraph("<b>3. Impacto de Centros de Custos (Concessionárias)</b>", sub_style))
-    conc_data = [["Distribuidora/Serviço", "Nº de Faturas Capturadas", "Impacto Financeiro"]]
-    for conc_nome, dados in sorted(concessionarias.items(), key=lambda x: x[1]['valor'], reverse=True):
-        conc_data.append([
-            conc_nome,
-            str(dados['count']),
-            f"R$ {dados['valor']:,.2f}"
-        ])
-    
-    t_conc = Table(conc_data, colWidths=[300, 200, 200])
-    t_conc.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#0f172a")),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ('INNERGRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#0f172a")),
-    ]))
-    Story.append(t_conc)
-    
-    # Disclaimer
-    Story.append(Spacer(1, 40))
-    Story.append(Paragraph("<i>* Relatório gerado dinamicamente via Datacron Business Intelligence - Compilação Real-time do Banco de Dados. Substitui a necessidade do agente externo (NotebookLM) que apresenta falhas de autenticação de cookies na nuvem. *</i>", ParagraphStyle(name="Italic", fontSize=10, textColor=colors.gray, alignment=1)))
+        title_style = ParagraphStyle(name="TitleStyle", parent=styles['Heading1'], fontSize=22, textColor=colors.HexColor("#1e3a8a"), alignment=1, spaceAfter=20)
+        sub_style = ParagraphStyle(name="SubStyle", parent=styles['Heading2'], fontSize=16, textColor=colors.HexColor("#334155"), spaceAfter=15, spaceBefore=20)
+        normal_style = ParagraphStyle(name="NormalStyle", parent=styles['Normal'], fontSize=12, textColor=colors.black, spaceAfter=10, leading=16)
+        
+        Story = []
+        
+        # Título
+        Story.append(Paragraph(f"<b>Apresentação Analítica: Performance e Gestão de Contas (Até {hoje.strftime('%d/%m/%Y')})</b>", title_style))
+        Story.append(Paragraph("Este documento consolida em tempo real todas as informações de leitura óptica das faturas geradas pela automação Datacron.", normal_style))
+        
+        # KPIs Globais
+        Story.append(Paragraph("<b>1. Resumo Global de Faturamento</b>", sub_style))
+        summary_data = [
+            ["Total de Contas Recebidas", "Valor Total Mapeado", "Ticket Médio por Conta", "Dias Médios Vencimento"],
+            [f"{total_faturas}", f"R$ {valor_total:,.2f}", f"R$ {valor_medio:,.2f}", f"{vencimento_medio_dias:.0f} dias"],
+            ["Status Processadas", "Status Pendentes", "Status Erro OCR", "Status Revisão"],
+            [f"{status_counts['processada']}", f"{status_counts['pendente']}", f"{status_counts['erro']}", f"{status_counts['revisao']}"]
+        ]
+        t_summary = Table(summary_data, colWidths=[180]*4)
+        t_summary.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#f1f5f9")),
+            ('BACKGROUND', (0,2), (-1,2), colors.HexColor("#f1f5f9")),
+            ('TEXTCOLOR', (0,0), (-1,-1), colors.HexColor("#0f172a")),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('FONTNAME', (0,2), (-1,2), 'Helvetica-Bold'),
+            ('FONTSIZE', (0,0), (-1,-1), 11),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 12),
+            ('INNERGRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
+            ('BOX', (0,0), (-1,-1), 0.25, colors.lightgrey),
+        ]))
+        Story.append(t_summary)
+        
+        # Participação por Condomínio
+        Story.append(Paragraph("<b>2. Distribuição e Volumes por Condomínio</b>", sub_style))
+        Story.append(Paragraph("Abaixo é possível verificar a carga de contas segmentada por condomínio (% do portfólio) e seu ticket correspondente.", normal_style))
+        
+        condo_data = [["Condomínio", "Volume de Contas", "Participação (%)", "Gasto Total Mapeado"]]
+        for c_nome, dados in sorted(condos.items(), key=lambda x: x[1]['count'], reverse=True):
+            perc = (dados['count'] / total_faturas) * 100
+            condo_data.append([
+                c_nome,
+                str(dados['count']),
+                f"{perc:.1f}%",
+                f"R$ {dados['valor']:,.2f}"
+            ])
+            
+        t_condos = Table(condo_data, colWidths=[250, 150, 150, 150])
+        t_condos.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#2563eb")),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('ALIGN', (0,1), (0,-1), 'LEFT'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('INNERGRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
+            ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#2563eb")),
+        ]))
+        Story.append(t_condos)
+        
+        # Concessionárias
+        Story.append(Paragraph("<b>3. Impacto de Centros de Custos (Concessionárias)</b>", sub_style))
+        conc_data = [["Distribuidora/Serviço", "Nº de Faturas Capturadas", "Impacto Financeiro"]]
+        for conc_nome, dados in sorted(concessionarias.items(), key=lambda x: x[1]['valor'], reverse=True):
+            conc_data.append([
+                conc_nome,
+                str(dados['count']),
+                f"R$ {dados['valor']:,.2f}"
+            ])
+        
+        t_conc = Table(conc_data, colWidths=[300, 200, 200])
+        t_conc.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#0f172a")),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('INNERGRID', (0,0), (-1,-1), 0.25, colors.lightgrey),
+            ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#0f172a")),
+        ]))
+        Story.append(t_conc)
+        
+        # Disclaimer
+        Story.append(Spacer(1, 40))
+        Story.append(Paragraph("<i>* Relatório gerado dinamicamente via Datacron Business Intelligence - Compilação Real-time do Banco de Dados. Substitui a necessidade do agente externo (NotebookLM) que apresenta falhas de autenticação de cookies na nuvem. *</i>", ParagraphStyle(name="Italic", fontSize=10, textColor=colors.gray, alignment=1)))
 
-    doc.build(Story)
-    output.seek(0)
+        doc.build(Story)
+        output.seek(0)
+        return output
+
+    output = await run_in_threadpool(_build_relatorio_pdf)
     
     return StreamingResponse(
         output,
