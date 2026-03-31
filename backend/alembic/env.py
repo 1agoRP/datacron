@@ -25,6 +25,8 @@ from app.models.concessionaria import Concessionaria
 from app.models.fatura import Fatura
 from app.models.alerta import Alerta, EmailLog
 from app.models.relatorio import RelatorioGerado
+from app.models.contrato import Contrato
+from app.models.contract_file import ContractFile
 from app.config import settings
 
 target_metadata = Base.metadata
