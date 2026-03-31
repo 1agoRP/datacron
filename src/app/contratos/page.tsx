@@ -670,25 +670,23 @@ export default function ContratosPage() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
-                    <label>Data de Início {confidenceBadge('data_inicio')}</label>
+                    <label>Data de Início</label>
                     <input
                       className="dc-form-input"
                       type="date"
                       required
                       value={form.data_inicio}
                       onChange={e => setForm({ ...form, data_inicio: e.target.value })}
-                      style={confidenceStyle('data_inicio')}
                     />
                   </div>
                   <div className="dc-form-group">
-                    <label>Data de Término {confidenceBadge('data_fim')}</label>
+                    <label>Data de Término</label>
                     <input
                       className="dc-form-input"
                       type="date"
                       value={form.data_fim}
                       onChange={e => setForm({ ...form, data_fim: e.target.value })}
                       placeholder="Deixe vazio para indeterminado"
-                      style={confidenceStyle('data_fim')}
                     />
                     <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>Vazio = indeterminado</span>
                   </div>
@@ -701,7 +699,7 @@ export default function ContratosPage() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
-                    <label>Valor Inicial (R$) {confidenceBadge('valor_inicial')}</label>
+                    <label>Valor Inicial (R$)</label>
                     <input
                       className="dc-form-input"
                       type="number"
@@ -709,33 +707,28 @@ export default function ContratosPage() {
                       required
                       value={form.valor_inicial}
                       onChange={e => setForm({ ...form, valor_inicial: parseFloat(e.target.value) || 0 })}
-                      style={confidenceStyle('valor_inicial')}
                     />
                   </div>
                   <div className="dc-form-group">
-                    <label>Valor Atual (R$) {confidenceBadge('valor_atual')}</label>
+                    <label>Valor Atual (R$)</label>
                     <input
                       className="dc-form-input"
                       type="number"
                       step="0.01"
                       value={form.valor_atual}
                       onChange={e => setForm({ ...form, valor_atual: parseFloat(e.target.value) || 0 })}
-                      style={confidenceStyle('valor_atual')}
                     />
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
-                    <label>Índice de Reajuste {confidenceBadge('indice_reajuste')}</label>
+                    <label>Índice de Reajuste</label>
                     <Select
                       options={[{value: '', label: 'Nenhum'}, ...INDICES.map(i => ({ value: i, label: i }))]}
                       value={form.indice_reajuste ? { value: form.indice_reajuste, label: form.indice_reajuste } : { value: '', label: 'Nenhum' }}
                       onChange={(option: any) => setForm({ ...form, indice_reajuste: option?.value || '' })}
-                      styles={{
-                        ...selectStyles,
-                        control: (base, state) => ({ ...selectStyles.control(base, state), ...confidenceStyle('indice_reajuste') })
-                      }}
+                      styles={selectStyles}
                       isSearchable
                       placeholder="Selecine..."
                       noOptionsMessage={() => "Nenhum índice encontrado"}
@@ -746,15 +739,12 @@ export default function ContratosPage() {
                     <input className="dc-form-input" type="date" value={form.data_reajuste} onChange={e => setForm({ ...form, data_reajuste: e.target.value })} />
                   </div>
                   <div className="dc-form-group">
-                    <label>Periodicidade {confidenceBadge('periodicidade')}</label>
+                    <label>Periodicidade</label>
                     <Select
                       options={PERIODICIDADES.map(p => ({ value: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}
                       value={{ value: form.periodicidade, label: form.periodicidade.charAt(0).toUpperCase() + form.periodicidade.slice(1) }}
                       onChange={(option: any) => setForm({ ...form, periodicidade: option?.value || 'mensal' })}
-                      styles={{
-                        ...selectStyles,
-                        control: (base, state) => ({ ...selectStyles.control(base, state), ...confidenceStyle('periodicidade') })
-                      }}
+                      styles={selectStyles}
                       isSearchable={false}
                     />
                   </div>
