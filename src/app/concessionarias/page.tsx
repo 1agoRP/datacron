@@ -105,8 +105,8 @@ export default function ConcessionariasPage() {
     return generatePasswordPreview(formConc.regra_senha, selectedCondoCnpjDigits, formConc.senha_manual);
   }, [formConc.regra_senha, selectedCondoCnpjDigits, formConc.senha_manual]);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     try {
       setCreating(true);
       const payload: any = { ...formConc };
@@ -134,9 +134,14 @@ export default function ConcessionariasPage() {
       
       handleCloseModal();
       fetchData();
+      setCreating(false);
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during save, retrying silently in 2s...');
+        setTimeout(() => handleSave(), 2000);
+        return; // maintain the loading (creating = true) state
+      }
       alert(err.message);
-    } finally {
       setCreating(false);
     }
   };
@@ -150,6 +155,11 @@ export default function ConcessionariasPage() {
       handleCloseModal();
       fetchData();
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during delete, retrying silently in 2s...');
+        setTimeout(() => handleDelete(), 2000);
+        return;
+      }
       alert(err.message);
     }
   };

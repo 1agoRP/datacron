@@ -11,7 +11,7 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
  * Custom fetch wrapper with automatic retries for network-level failures ('Failed to fetch').
  * Does not retry on 4xx/5xx HTTP errors, only on connection drops/failures.
  */
-async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 2, delay = 600): Promise<Response> {
+async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 5, delay = 1000): Promise<Response> {
   try {
     return await fetch(url, options);
   } catch (err: any) {
@@ -414,6 +414,10 @@ class ApiClient {
     for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
     const query = new URLSearchParams(safeParams).toString();
     return this.request<any[]>(`/contratos/?${query}`);
+  }
+
+  async getContractTypes() {
+    return this.request<string[]>('/contratos/tipos');
   }
 
   async getContratosStats() {

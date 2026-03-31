@@ -30,16 +30,21 @@ export default function LandingPage() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleLogin = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
     setError(null);
     setIsLoading(true);
     try {
       await login({ email, senha: password });
       router.push('/dashboard');
+      setIsLoading(false);
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during login, retrying silently in 2s...');
+        setTimeout(() => handleLogin(), 2000);
+        return;
+      }
       setError(err.message || 'Falha na autenticação');
-    } finally {
       setIsLoading(false);
     }
   };

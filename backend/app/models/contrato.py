@@ -22,6 +22,10 @@ class Contrato(Base):
         UUID(as_uuid=True), ForeignKey("condominios.id", ondelete="CASCADE"), nullable=False
     )
     empresa: Mapped[str] = mapped_column(String(200), nullable=False)
+    razao_social: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    cnpj_empresa: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    email_contato: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    telefone_contato: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     tipo_contrato: Mapped[str] = mapped_column(String(100), nullable=False)
     tipo_personalizado: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     data_inicio: Mapped[date] = mapped_column(Date, nullable=False)

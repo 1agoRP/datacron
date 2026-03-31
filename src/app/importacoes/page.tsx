@@ -47,9 +47,14 @@ export default function ImportacoesPage() {
       const res = await api.previewImport(formData);
       setPreviewData(res);
       setStep(3);
+      setLoading(false);
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during preview, retrying silently in 2s...');
+        setTimeout(() => handlePreview(), 2000);
+        return;
+      }
       alert(err.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -64,9 +69,14 @@ export default function ImportacoesPage() {
       });
       alert('Importação concluída com sucesso!');
       router.push(baseType === 'condominios' ? '/condominios' : '/concessionarias');
+      setLoading(false);
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during confirm import, retrying silently in 2s...');
+        setTimeout(() => handleConfirm(), 2000);
+        return;
+      }
       alert(err.message);
-    } finally {
       setLoading(false);
     }
   };

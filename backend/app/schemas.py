@@ -253,6 +253,10 @@ class RelatorioGeradoResponse(BaseModel):
 class ContratoCreate(BaseModel):
     condominio_id: uuid.UUID
     empresa: str
+    razao_social: Optional[str] = None
+    cnpj_empresa: Optional[str] = None
+    email_contato: Optional[str] = None
+    telefone_contato: Optional[str] = None
     tipo_contrato: str
     tipo_personalizado: Optional[str] = None
     data_inicio: date
@@ -267,6 +271,10 @@ class ContratoCreate(BaseModel):
 
 class ContratoUpdate(BaseModel):
     empresa: Optional[str] = None
+    razao_social: Optional[str] = None
+    cnpj_empresa: Optional[str] = None
+    email_contato: Optional[str] = None
+    telefone_contato: Optional[str] = None
     tipo_contrato: Optional[str] = None
     tipo_personalizado: Optional[str] = None
     data_inicio: Optional[date] = None
@@ -283,6 +291,10 @@ class ContratoResponse(BaseModel):
     id: uuid.UUID
     condominio_id: uuid.UUID
     empresa: str
+    razao_social: Optional[str] = None
+    cnpj_empresa: Optional[str] = None
+    email_contato: Optional[str] = None
+    telefone_contato: Optional[str] = None
     tipo_contrato: str
     tipo_personalizado: Optional[str] = None
     data_inicio: date

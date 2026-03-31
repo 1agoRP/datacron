@@ -4,13 +4,13 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Shell from '@/components/layout/Shell';
 import {
   Plus, Building2, FileSignature, Calendar, DollarSign, X, Trash2,
-  Search, Filter, Download, Upload, Sparkles, AlertTriangle, CheckCircle2,
+  Search, Filter, Download, Upload, AlertTriangle, CheckCircle2,
   Clock, Eye, FileText, ArrowUpDown, ChevronDown
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import Select from 'react-select';
 
-const CONTRACT_TYPES = [
+const DEFAULT_CONTRACT_TYPES = [
   'Manutenção de Elevadores',
   'Bombas',
   'Portaria',
@@ -80,6 +80,7 @@ export default function ContratosPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('Todos');
+  const [contractTypes, setContractTypes] = useState<string[]>(DEFAULT_CONTRACT_TYPES);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<string | null>(null);
@@ -90,9 +91,7 @@ export default function ContratosPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // IA state
-  const [extracting, setExtracting] = useState(false);
-  const [aiFields, setAiFields] = useState<Record<string, any>>({});
+  // File storage state
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -101,6 +100,10 @@ export default function ContratosPage() {
   const defaultForm = {
     condominio_id: '',
     empresa: '',
+    razao_social: '',
+    cnpj_empresa: '',
+    email_contato: '',
+    telefone_contato: '',
     tipo_contrato: 'Manutenção de Elevadores',
     tipo_personalizado: '',
     data_inicio: '',
@@ -118,14 +121,20 @@ export default function ContratosPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [contData, condoData, statsData] = await Promise.all([
+      const [contData, condoData, statsData, typesData] = await Promise.all([
         api.getContratos(),
         api.getCondominios(),
         api.getContratosStats(),
+        api.getContractTypes(),
       ]);
       setContratos(contData);
       setCondos(condoData);
       setStats(statsData);
+      if (typesData && Array.isArray(typesData)) {
+        // Ensure "Outros" is always there and at the end
+        const filtered = typesData.filter(t => t !== 'Outros');
+        setContractTypes([...filtered, 'Outros']);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -135,8 +144,8 @@ export default function ContratosPage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     try {
       setSaving(true);
       const payload = { ...form };
@@ -148,6 +157,10 @@ export default function ContratosPage() {
       if (!payload.ultimo_reajuste) payload.ultimo_reajuste = null;
       if (!payload.tipo_personalizado) payload.tipo_personalizado = null;
       if (!payload.observacoes) payload.observacoes = null;
+      if (!payload.razao_social) payload.razao_social = null;
+      if (!payload.cnpj_empresa) payload.cnpj_empresa = null;
+      if (!payload.email_contato) payload.email_contato = null;
+      if (!payload.telefone_contato) payload.telefone_contato = null;
       if (!payload.valor_inicial) payload.valor_inicial = 0;
       if (!payload.valor_atual) payload.valor_atual = payload.valor_inicial;
 
@@ -168,9 +181,14 @@ export default function ContratosPage() {
 
       handleCloseModal();
       fetchData();
+      setSaving(false);
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during save contrato, retrying silently in 2s...');
+        setTimeout(() => handleSave(), 2000);
+        return;
+      }
       alert(err.message);
-    } finally {
       setSaving(false);
     }
   };
@@ -183,6 +201,11 @@ export default function ContratosPage() {
       handleCloseModal();
       fetchData();
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during delete contrato, retrying silently in 2s...');
+        setTimeout(() => handleDelete(), 2000);
+        return;
+      }
       alert(err.message);
     }
   };
@@ -199,6 +222,10 @@ export default function ContratosPage() {
     setForm({
       condominio_id: c.condominio_id,
       empresa: c.empresa,
+      razao_social: c.razao_social || '',
+      cnpj_empresa: c.cnpj_empresa || '',
+      email_contato: c.email_contato || '',
+      telefone_contato: c.telefone_contato || '',
       tipo_contrato: c.tipo_contrato,
       tipo_personalizado: c.tipo_personalizado || '',
       data_inicio: c.data_inicio || '',
@@ -227,32 +254,7 @@ export default function ContratosPage() {
   // IA PDF extraction
   const handlePdfUpload = async (file: File) => {
     setPdfFile(file);
-    setExtracting(true);
-    setAiFields({});
-    try {
-      const fd = new FormData();
-      fd.append('pdf_file', file);
-      const result = await api.uploadContratoPdf(fd);
-      if (result?.campos) {
-        const campos = result.campos;
-        const newAiFields: Record<string, any> = {};
-        const updates: any = {};
-
-        for (const [key, meta] of Object.entries(campos) as [string, any][]) {
-          newAiFields[key] = meta;
-          if (meta.valor !== null && meta.valor !== undefined) {
-            updates[key] = meta.valor;
-          }
-        }
-
-        setAiFields(newAiFields);
-        setForm((prev: any) => ({ ...prev, ...updates }));
-      }
-    } catch (err: any) {
-      console.error('AI extraction failed:', err);
-    } finally {
-      setExtracting(false);
-    }
+    // IA extraction disabled for now
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -307,33 +309,9 @@ export default function ContratosPage() {
     return result;
   }, [contratos, tab, statusFilter, searchTerm, sortField, sortDir]);
 
-  const tabs = ['Todos', ...CONTRACT_TYPES];
+  const tabs = ['Todos', ...contractTypes];
 
-  const isAiField = (field: string) => !!aiFields[field];
-  const getConfidence = (field: string) => aiFields[field]?.confianca;
 
-  const confidenceStyle = (field: string): React.CSSProperties => {
-    if (!isAiField(field)) return {};
-    const conf = getConfidence(field);
-    if (conf === 'alta') return { borderColor: '#22c55e', boxShadow: '0 0 0 2px rgba(34,197,94,0.15)' };
-    if (conf === 'media') return { borderColor: '#f59e0b', boxShadow: '0 0 0 2px rgba(245,158,11,0.15)' };
-    return { borderColor: '#ef4444', boxShadow: '0 0 0 2px rgba(239,68,68,0.15)' };
-  };
-
-  const confidenceBadge = (field: string) => {
-    if (!isAiField(field)) return null;
-    const conf = getConfidence(field);
-    const colors: Record<string, string> = { alta: '#22c55e', media: '#f59e0b', baixa: '#ef4444' };
-    const labels: Record<string, string> = { alta: 'IA: Alta', media: 'IA: Média', baixa: 'IA: Baixa' };
-    return (
-      <span style={{
-        fontSize: '0.65rem', fontWeight: 700, color: colors[conf] || '#94a3b8',
-        display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 6,
-      }}>
-        <Sparkles size={10} /> {labels[conf] || 'IA'}
-      </span>
-    );
-  };
 
   return (
     <Shell>
@@ -477,8 +455,8 @@ export default function ContratosPage() {
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                        {c.arquivo_path && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6 }}>
+                        {c.arquivo_path ? (
                           <button
                             className="dc-btn dc-btn-ghost"
                             style={{ height: 34, padding: '0 10px', fontSize: '0.78rem' }}
@@ -490,12 +468,16 @@ export default function ContratosPage() {
                                 alert(err.message || 'Erro ao baixar contrato');
                               } finally {
                                 setDownloadingId(null);
-                              }
+                                }
                             }}
                             title="Baixar Arquivo Anexo do Contrato"
                           >
                             {downloadingId === c.id ? <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> : <Download size={14} />}
                           </button>
+                        ) : (
+                          <span style={{ color: '#dc2626', fontSize: '0.72rem', fontWeight: 700, padding: '0 8px' }}>
+                            Sem contrato assinado
+                          </span>
                         )}
                         <button
                           className="dc-btn dc-btn-dark"
@@ -544,7 +526,6 @@ export default function ContratosPage() {
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               <div className="dc-modal-body dc-space-y-4">
 
-                {/* PDF Upload Zone */}
                 {!editingId && (
                   <div
                     onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -568,30 +549,19 @@ export default function ContratosPage() {
                       onChange={handleFileSelect}
                       style={{ display: 'none' }}
                     />
-                    {extracting ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                        <div className="dc-loading-spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
-                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#2563eb' }}>Analisando contrato com IA...</span>
-                      </div>
-                    ) : pdfFile ? (
+                    {pdfFile ? (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                         <FileText size={20} style={{ color: '#22c55e' }} />
                         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#16a34a' }}>{pdfFile.name}</span>
-                        {Object.keys(aiFields).length > 0 && (
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: 8 }}>
-                            — {Object.keys(aiFields).length} campo(s) preenchido(s) automaticamente
-                          </span>
-                        )}
                       </div>
                     ) : (
                       <>
                         <Upload size={28} style={{ color: '#94a3b8', margin: '0 auto 8px' }} />
                         <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#475569' }}>
-                          <Sparkles size={14} style={{ display: 'inline', marginRight: 6, color: '#2563eb' }} />
                           Arraste o PDF do contrato ou clique para selecionar
                         </div>
                         <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 4 }}>
-                          A IA irá ler o contrato e preencher os campos automaticamente
+                          O arquivo ficará anexado a este registro para consulta rápida.
                         </div>
                       </>
                     )}
@@ -618,28 +588,67 @@ export default function ContratosPage() {
                 </div>
 
                 <div className="dc-form-group">
-                  <label>Empresa Contratada {confidenceBadge('empresa')}</label>
+                  <label>Empresa Contratada</label>
                   <input
                     className="dc-form-input"
                     required
                     value={form.empresa}
                     onChange={e => setForm({ ...form, empresa: e.target.value })}
                     placeholder="Ex: ThyssenKrupp Elevadores"
-                    style={confidenceStyle('empresa')}
                   />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
-                    <label>Tipo de Contrato {confidenceBadge('tipo_contrato')}</label>
+                    <label>Razão Social</label>
+                    <input
+                      className="dc-form-input"
+                      value={form.razao_social}
+                      onChange={e => setForm({ ...form, razao_social: e.target.value })}
+                      placeholder="..."
+                    />
+                  </div>
+                  <div className="dc-form-group">
+                    <label>CNPJ Empresa</label>
+                    <input
+                      className="dc-form-input"
+                      value={form.cnpj_empresa}
+                      onChange={e => setForm({ ...form, cnpj_empresa: e.target.value })}
+                      placeholder="00.000.000/0000-00"
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="dc-form-group">
+                    <label>E-mail de Contato</label>
+                    <input
+                      className="dc-form-input"
+                      type="email"
+                      value={form.email_contato}
+                      onChange={e => setForm({ ...form, email_contato: e.target.value })}
+                      placeholder="financeiro@empresa.com.br"
+                    />
+                  </div>
+                  <div className="dc-form-group">
+                    <label>Celular/Telefone</label>
+                    <input
+                      className="dc-form-input"
+                      value={form.telefone_contato}
+                      onChange={e => setForm({ ...form, telefone_contato: e.target.value })}
+                      placeholder="(00) 00000-0000"
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="dc-form-group">
+                    <label>Tipo de Contrato</label>
                     <Select
-                      options={CONTRACT_TYPES.map(t => ({ value: t, label: t }))}
+                      options={contractTypes.map(t => ({ value: t, label: t }))}
                       value={{ value: form.tipo_contrato, label: form.tipo_contrato }}
                       onChange={(option: any) => setForm({ ...form, tipo_contrato: option?.value || 'Outros' })}
-                      styles={{
-                        ...selectStyles,
-                        control: (base, state) => ({ ...selectStyles.control(base, state), ...confidenceStyle('tipo_contrato') })
-                      }}
+                      styles={selectStyles}
                       isSearchable
                       noOptionsMessage={() => "Nenhum tipo encontrado"}
                     />

@@ -17,6 +17,32 @@ from app.services.contract_processor import extract_contract_data
 from app.storage import save_file, get_file_content
 
 router = APIRouter(prefix="/contratos", tags=["Contratos"])
++
++
++@router.get("/tipos")
++async def get_unique_contract_types(
++    db: AsyncSession = Depends(get_db),
++    _: User = Depends(get_current_user),
++):
++    """Returns a unique list of contract types already in the database."""
++    # Get types and personalized types
++    stmt = select(Contrato.tipo_contrato).distinct()
++    result = await db.execute(stmt)
++    types = result.scalars().all()
++
++    stmt_p = select(Contrato.tipo_personalizado).distinct().where(Contrato.tipo_personalizado.isnot(None))
++    result_p = await db.execute(stmt_p)
++    p_types = result_p.scalars().all()
++
++    # Combine and clean
++    all_types = set(types) | set(p_types)
++    
++    # Defined defaults if some are missing
++    defaults = {"Manutenção de Elevadores", "Bombas", "Portaria", "Limpeza", "Segurança", "Outros"}
++    final_list = sorted(list(all_types | defaults))
++    
++    # Remove "Outros" from the main list if we want it to be separate or just keep it
++    return final_list
 
 
 def _compute_status(data_fim: Optional[date]) -> str:

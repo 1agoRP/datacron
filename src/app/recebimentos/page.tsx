@@ -44,21 +44,15 @@ export default function RecebimentosPage() {
       await api.forceEmailScan();
       alert('Varredura iniciada com sucesso! Os resultados aparecerão nos logs em instantes.');
       setTimeout(() => fetchData(), 3000);
+      setScanning(false);
     } catch (err: any) {
-      const msg = err.message || 'Erro desconhecido';
-      if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
-        alert(
-          '⚠️ Não foi possível conectar ao servidor.\n\n' +
-          'Possíveis causas:\n' +
-          '• O backend pode estar reiniciando\n' +
-          '• As credenciais do Gmail podem não estar configuradas no servidor\n' +
-          '• Problemas de conexão de rede\n\n' +
-          'Tente novamente em alguns minutos.'
-        );
-      } else {
-        alert('Erro ao iniciar varredura: ' + msg);
+      const msg = err.message || '';
+      if (msg.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during scan, retrying silently in 2s...');
+        setTimeout(() => handleForceScan(), 2000);
+        return;
       }
-    } finally {
+      alert('Erro ao iniciar varredura: ' + msg);
       setScanning(false);
     }
   };

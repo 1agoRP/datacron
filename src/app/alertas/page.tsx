@@ -48,9 +48,14 @@ export default function AlertasPage() {
 
       setAlertas(prev => prev.filter(a => a.id !== alerta.id));
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during resolve, retrying silently in 2s...');
+        setTimeout(() => handleResolve(alerta), 2000);
+        return;
+      }
       alert('Erro ao resolver: ' + err.message);
     } finally {
-      setResolving(null);
+      if (!resolving) setResolving(null); // only clear if we are not retrying
     }
   };
 
@@ -61,9 +66,14 @@ export default function AlertasPage() {
       await api.deleteAlerta(id);
       setAlertas(prev => prev.filter(a => a.id !== id));
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during discard, retrying silently in 2s...');
+        setTimeout(() => handleDiscard(id), 2000);
+        return;
+      }
       alert('Erro ao descartar: ' + err.message);
     } finally {
-      setDiscarding(null);
+      if (!discarding) setDiscarding(null);
     }
   };
 

@@ -48,17 +48,22 @@ export default function CondominiosPage() {
 
   // Removed manual fetchData in favor of useSWR
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreate = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     try {
       setCreating(true);
       await api.createCondominio(newCondo);
       setIsModalOpen(false);
       setNewCondo({ nome: '', numero: '', endereco: '', cnpj: '', sindico: '', cpf_sindico: '' });
       mutate();
+      setCreating(false);
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during create condo, retrying silently in 2s...');
+        setTimeout(() => handleCreate(), 2000);
+        return; // handleCreate will continue retrying without setting creating=false
+      }
       alert(err.message);
-    } finally {
       setCreating(false);
     }
   };
@@ -159,8 +164,8 @@ export default function CondominiosPage() {
     setEditCondo({ ...condo });
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpdate = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     try {
       setCreating(true);
       await api.updateCondominio(editCondo.id, {
@@ -171,9 +176,14 @@ export default function CondominiosPage() {
       });
       setEditCondo(null);
       mutate();
+      setCreating(false);
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during update condo, retrying silently in 2s...');
+        setTimeout(() => handleUpdate(), 2000);
+        return;
+      }
       alert(err.message);
-    } finally {
       setCreating(false);
     }
   };
@@ -185,6 +195,11 @@ export default function CondominiosPage() {
       setEditCondo(null);
       mutate();
     } catch (err: any) {
+      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during delete condo, retrying silently in 2s...');
+        setTimeout(() => handleDelete(id), 2000);
+        return;
+      }
       alert(err.message);
     }
   };

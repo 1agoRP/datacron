@@ -51,9 +51,14 @@ export default function ConfiguracoesPage() {
       });
       alert('Senha atualizada com sucesso!');
       setPwForm({ senhaAtual: '', novaSenha: '', confirmaSenha: '' });
+      setIsUpdatingPw(false);
     } catch (e: any) {
+      if (e.message && e.message.toLowerCase().includes('failed to fetch')) {
+        console.warn('Network error during password update, retrying silently in 2s...');
+        setTimeout(() => handleUpdatePassword(), 2000);
+        return;
+      }
       alert(e.message || 'Falha ao atualizar a senha');
-    } finally {
       setIsUpdatingPw(false);
     }
   };
