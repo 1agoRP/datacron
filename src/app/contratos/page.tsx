@@ -121,22 +121,40 @@ export default function ContratosPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [contData, condoData, statsData, typesData] = await Promise.all([
-        api.getContratos(),
-        api.getCondominios(),
-        api.getContratosStats(),
-        api.getContractTypes(),
-      ]);
-      setContratos(contData);
-      setCondos(condoData);
-      setStats(statsData);
-      if (typesData && Array.isArray(typesData)) {
-        // Ensure "Outros" is always there and at the end
-        const filtered = typesData.filter(t => t !== 'Outros');
-        setContractTypes([...filtered, 'Outros']);
+      
+      // Load condominios carefully so even if others fail, the dropdown works
+      try {
+        const condoData = await api.getCondominios();
+        setCondos(condoData);
+      } catch (err) {
+        console.error("Erro ao buscar condomínios:", err);
       }
+
+      // Load contract types
+      try {
+        const typesData = await api.getContractTypes();
+        if (typesData && Array.isArray(typesData)) {
+          const filtered = typesData.filter(t => t !== 'Outros');
+          setContractTypes([...filtered, 'Outros']);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar tipos:", err);
+      }
+
+      // Load main list and stats
+      try {
+        const [contData, statsData] = await Promise.all([
+          api.getContratos(),
+          api.getContratosStats(),
+        ]);
+        setContratos(contData);
+        setStats(statsData);
+      } catch (err) {
+        console.error("Erro ao buscar contratos ou stats:", err);
+      }
+      
     } catch (err) {
-      console.error(err);
+      console.error("Erro geral no fetch:", err);
     } finally {
       setLoading(false);
     }
