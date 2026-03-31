@@ -454,7 +454,7 @@ export default function ConcessionariasPage() {
                 <div className="dc-form-group">
                   <label>Condomínio</label>
                   <Select
-                    options={condos.map(c => ({ value: c.id, label: `${c.nome} (Nº ${c.numero})`, name: c.nome, num: c.numero }))}
+                    options={condos.map(c => ({ value: c.id, label: `${c.nome} (Nº ${c.numero})` }))}
                     value={formConc.condominio_id ? { value: formConc.condominio_id, label: condos.find(c => c.id === formConc.condominio_id) ? `${condos.find(c => c.id === formConc.condominio_id)?.nome} (Nº ${condos.find(c => c.id === formConc.condominio_id)?.numero})` : formConc.condominio_id } : null}
                     onChange={(option: any) => setFormConc({...formConc, condominio_id: option?.value || ''})}
                     placeholder="Busque por nome ou número..."
@@ -462,14 +462,6 @@ export default function ConcessionariasPage() {
                     styles={selectStyles}
                     noOptionsMessage={() => "Nenhum condomínio encontrado"}
                     isSearchable
-                    filterOption={(option: any, inputValue: string) => {
-                      if (!inputValue) return true;
-                      const q = inputValue.toLowerCase();
-                      return (
-                        option.data.name.toLowerCase().includes(q) ||
-                        option.data.num.toLowerCase().includes(q)
-                      );
-                    }}
                   />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
