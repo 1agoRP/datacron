@@ -3,7 +3,7 @@ import '@/styles/globals.css';
 import '@/styles/app.css';
 
 export const metadata: Metadata = {
-  title: 'Datacron | Gestão Inteligente de Concessionárias',
+  title: 'Datacron RPA',
   description: 'Sistema profissional para controle de contas e recebimento automático de faturas.',
 };
 

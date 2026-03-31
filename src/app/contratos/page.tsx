@@ -581,6 +581,11 @@ export default function ContratosPage() {
                     styles={selectStyles}
                     noOptionsMessage={() => "Nenhum condomínio encontrado"}
                     isSearchable
+                    filterOption={(option: any, inputValue: string) => {
+                      if (!inputValue) return true;
+                      const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                      return normalize(option.label).includes(normalize(inputValue));
+                    }}
                   />
                 </div>
 
