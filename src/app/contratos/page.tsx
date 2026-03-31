@@ -213,7 +213,6 @@ export default function ContratosPage() {
   const handleOpenCreate = () => {
     setForm({ ...defaultForm });
     setEditingId(null);
-    setAiFields({});
     setPdfFile(null);
     setIsModalOpen(true);
   };
@@ -239,7 +238,6 @@ export default function ContratosPage() {
       observacoes: c.observacoes || '',
     });
     setEditingId(c.id);
-    setAiFields({});
     setPdfFile(null);
     setIsModalOpen(true);
   };
@@ -247,7 +245,6 @@ export default function ContratosPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingId(null);
-    setAiFields({});
     setPdfFile(null);
   };
 
