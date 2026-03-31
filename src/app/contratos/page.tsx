@@ -573,14 +573,22 @@ export default function ContratosPage() {
                 <div className="dc-form-group">
                   <label>Condomínio</label>
                   <Select
-                    options={condos.map(c => ({ value: c.id, label: `${c.nome} (Nº ${c.numero})` }))}
+                    options={condos.map(c => ({ value: c.id, label: `${c.nome} (Nº ${c.numero})`, name: c.nome, num: c.numero }))}
                     value={form.condominio_id ? { value: form.condominio_id, label: condos.find(c => c.id === form.condominio_id) ? `${condos.find(c => c.id === form.condominio_id)?.nome} (Nº ${condos.find(c => c.id === form.condominio_id)?.numero})` : form.condominio_id } : null}
                     onChange={(option: any) => setForm({ ...form, condominio_id: option?.value || '' })}
-                    placeholder="Selecione um condomínio..."
+                    placeholder="Busque por nome ou número..."
                     isDisabled={!!editingId}
                     styles={selectStyles}
                     noOptionsMessage={() => "Nenhum condomínio encontrado"}
                     isSearchable
+                    filterOption={(option: any, inputValue: string) => {
+                      if (!inputValue) return true;
+                      const q = inputValue.toLowerCase();
+                      return (
+                        option.data.name.toLowerCase().includes(q) ||
+                        option.data.num.toLowerCase().includes(q)
+                      );
+                    }}
                   />
                 </div>
 

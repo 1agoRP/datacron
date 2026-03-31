@@ -3,13 +3,46 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
 import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2, Search, Filter, Key, Eye, EyeOff, ArrowUpDown } from 'lucide-react';
-import { api } from '@/lib/api';
+import Select from 'react-select';
 
 const COLOR_MAP: Record<string, { bg: string; color: string }> = {
   enel:   { bg: '#eff6ff', color: '#2563eb' },
   sabesp: { bg: '#ecfeff', color: '#0891b2' },
   'comgás': { bg: '#fff7ed', color: '#ea580c' },
   outros: { bg: '#f8fafc', color: '#475569' },
+};
+
+const selectStyles = {
+  control: (base: any, state: any) => ({
+    ...base,
+    background: state.isDisabled ? '#f1f5f9' : '#fff',
+    border: `1px solid ${state.isFocused ? '#2563eb' : '#e2e8f0'}`,
+    borderRadius: '8px',
+    boxShadow: state.isFocused ? '0 0 0 1px #2563eb' : 'none',
+    minHeight: '38px',
+    fontSize: '0.85rem',
+    fontWeight: 500,
+    color: '#0f172a',
+    cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+    '&:hover': { borderColor: state.isFocused ? '#2563eb' : '#cbd5e1' }
+  }),
+  menu: (base: any) => ({
+    ...base,
+    borderRadius: '8px',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    zIndex: 9999,
+    fontSize: '0.85rem'
+  }),
+  option: (base: any, state: any) => ({
+    ...base,
+    backgroundColor: state.isSelected ? '#eff6ff' : state.isFocused ? '#f8fafc' : 'white',
+    color: state.isSelected ? '#1d4ed8' : '#334155',
+    cursor: 'pointer',
+    padding: '8px 12px'
+  }),
+  singleValue: (base: any, state: any) => ({ ...base, color: state.isDisabled ? '#94a3b8' : '#0f172a' }),
+  placeholder: (base: any) => ({ ...base, color: '#94a3b8' }),
+  indicatorSeparator: (base: any) => ({...base, display: 'none'})
 };
 
 function getColors(tipo: string) {
@@ -419,16 +452,24 @@ export default function ConcessionariasPage() {
               <div className="dc-modal-body dc-space-y-4">
                 <div className="dc-form-group">
                   <label>Condomínio</label>
-                  <select 
-                    required 
-                    value={formConc.condominio_id} 
-                    onChange={e => setFormConc({...formConc, condominio_id: e.target.value})}
-                    className="dc-input dc-form-select"
-                    disabled={!!editingId}
-                  >
-                    <option value="">Selecione um condomínio...</option>
-                    {condos.map(c => <option key={c.id} value={c.id}>{c.nome} (Nº {c.numero})</option>)}
-                  </select>
+                  <Select
+                    options={condos.map(c => ({ value: c.id, label: `${c.nome} (Nº ${c.numero})`, name: c.nome, num: c.numero }))}
+                    value={formConc.condominio_id ? { value: formConc.condominio_id, label: condos.find(c => c.id === formConc.condominio_id) ? `${condos.find(c => c.id === formConc.condominio_id)?.nome} (Nº ${condos.find(c => c.id === formConc.condominio_id)?.numero})` : formConc.condominio_id } : null}
+                    onChange={(option: any) => setFormConc({...formConc, condominio_id: option?.value || ''})}
+                    placeholder="Busque por nome ou número..."
+                    isDisabled={!!editingId}
+                    styles={selectStyles}
+                    noOptionsMessage={() => "Nenhum condomínio encontrado"}
+                    isSearchable
+                    filterOption={(option: any, inputValue: string) => {
+                      if (!inputValue) return true;
+                      const q = inputValue.toLowerCase();
+                      return (
+                        option.data.name.toLowerCase().includes(q) ||
+                        option.data.num.toLowerCase().includes(q)
+                      );
+                    }}
+                  />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
