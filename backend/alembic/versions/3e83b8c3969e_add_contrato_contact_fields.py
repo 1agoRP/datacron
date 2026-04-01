@@ -19,18 +19,34 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add columns to contratos table
-    op.add_column('contratos', sa.Column('razao_social', sa.String(length=200), nullable=True))
-    op.add_column('contratos', sa.Column('cnpj_empresa', sa.String(length=20), nullable=True))
-    op.add_column('contratos', sa.Column('email_contato', sa.String(length=150), nullable=True))
-    op.add_column('contratos', sa.Column('telefone_contato', sa.String(length=20), nullable=True))
-    op.add_column('contratos', sa.Column('tipo_personalizado', sa.String(length=200), nullable=True))
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    existing_columns = [col['name'] for col in insp.get_columns('contratos')]
+
+    if 'razao_social' not in existing_columns:
+        op.add_column('contratos', sa.Column('razao_social', sa.String(length=200), nullable=True))
+    if 'cnpj_empresa' not in existing_columns:
+        op.add_column('contratos', sa.Column('cnpj_empresa', sa.String(length=20), nullable=True))
+    if 'email_contato' not in existing_columns:
+        op.add_column('contratos', sa.Column('email_contato', sa.String(length=150), nullable=True))
+    if 'telefone_contato' not in existing_columns:
+        op.add_column('contratos', sa.Column('telefone_contato', sa.String(length=20), nullable=True))
+    if 'tipo_personalizado' not in existing_columns:
+        op.add_column('contratos', sa.Column('tipo_personalizado', sa.String(length=200), nullable=True))
 
 
 def downgrade() -> None:
-    # Remove columns from contratos table
-    op.drop_column('contratos', 'tipo_personalizado')
-    op.drop_column('contratos', 'telefone_contato')
-    op.drop_column('contratos', 'email_contato')
-    op.drop_column('contratos', 'cnpj_empresa')
-    op.drop_column('contratos', 'razao_social')
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    existing_columns = [col['name'] for col in insp.get_columns('contratos')]
+
+    if 'tipo_personalizado' in existing_columns:
+        op.drop_column('contratos', 'tipo_personalizado')
+    if 'telefone_contato' in existing_columns:
+        op.drop_column('contratos', 'telefone_contato')
+    if 'email_contato' in existing_columns:
+        op.drop_column('contratos', 'email_contato')
+    if 'cnpj_empresa' in existing_columns:
+        op.drop_column('contratos', 'cnpj_empresa')
+    if 'razao_social' in existing_columns:
+        op.drop_column('contratos', 'razao_social')
