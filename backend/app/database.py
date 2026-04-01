@@ -3,9 +3,16 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
 
-# ─── Engine ──────────────────────────────────────────────────
+# Append prepared_statement_cache_size=0 to disable SQLAlchemy's prepared statement cache for PgBouncer
+db_url = settings.DATABASE_URL
+if "?" in db_url:
+    if "prepared_statement_cache_size" not in db_url:
+        db_url += "&prepared_statement_cache_size=0"
+else:
+    db_url += "?prepared_statement_cache_size=0"
+
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    db_url,
     echo=False,
     future=True,
     pool_size=15,
