@@ -213,18 +213,25 @@ export default function LandingPage() {
     setError(null);
     setIsLoading(true);
 
-    // 8-second safety timeout
+    // 60-second absolute timeout for cold starts on free tiers
     const timeout = setTimeout(() => {
-      setError('Tempo limite excedido. Verifique sua conexão e tente novamente.');
+      setError('Tempo limite excedido (60s). Verifique sua conexão e tente novamente.');
       setIsLoading(false);
-    }, 8000);
+    }, 60000);
+
+    // 5-second gentle warning
+    const warningTimeout = setTimeout(() => {
+      setError('O servidor está acordando (Render Free). Isso pode levar até 50 segundos. Por favor, aguarde...');
+    }, 5000);
 
     try {
       await login({ email, senha: password });
       clearTimeout(timeout);
+      clearTimeout(warningTimeout);
       router.push('/dashboard');
     } catch (err: any) {
       clearTimeout(timeout);
+      clearTimeout(warningTimeout);
       if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
         setError('Servidor indisponível. Verifique sua conexão e tente novamente.');
       } else {
