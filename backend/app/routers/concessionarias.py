@@ -44,15 +44,19 @@ async def create_concessionaria(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    # Validate condominio exists
+    # Validate condominio exists and capture it
     result = await db.execute(select(Condominio).where(Condominio.id == body.condominio_id))
-    if not result.scalar_one_or_none():
+    condo = result.scalar_one_or_none()
+    if not condo:
         raise HTTPException(status_code=404, detail="Condomínio não encontrado")
 
     conc = Concessionaria(**body.model_dump())
     db.add(conc)
     await db.commit()
     await db.refresh(conc)
+    
+    # Attach relationship explicitly to prevent Pydantic MissingGreenlet error
+    conc.condominio = condo
     return conc
 
 
@@ -62,7 +66,11 @@ async def get_concessionaria(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Concessionaria).where(Concessionaria.id == id))
+    result = await db.execute(
+        select(Concessionaria)
+        .options(selectinload(Concessionaria.condominio))
+        .where(Concessionaria.id == id)
+    )
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Concessionária não encontrada")
@@ -76,15 +84,24 @@ async def update_concessionaria(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Concessionaria).where(Concessionaria.id == id))
+    result = await db.execute(
+        select(Concessionaria)
+        .options(selectinload(Concessionaria.condominio))
+        .where(Concessionaria.id == id)
+    )
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Concessionária não encontrada")
 
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(c, field, value)
+        
     await db.commit()
     await db.refresh(c)
+    
+    # Ensure relationship is loaded for return
+    condo_result = await db.execute(select(Condominio).where(Condominio.id == c.condominio_id))
+    c.condominio = condo_result.scalar_one_or_none()
     return c
 
 
