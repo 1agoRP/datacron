@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -24,7 +25,11 @@ async def list_concessionarias(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    stmt = select(Concessionaria).where(Concessionaria.ativo == ativo)
+    stmt = (
+        select(Concessionaria)
+        .options(selectinload(Concessionaria.condominio))
+        .where(Concessionaria.ativo == ativo)
+    )
     if condominio_id:
         stmt = stmt.where(Concessionaria.condominio_id == condominio_id)
     if tipo:

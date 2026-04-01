@@ -11,7 +11,7 @@ from app.dependencies import (
     create_access_token, get_current_user, require_role,
 )
 from app.models.user import User
-from app.schemas import LoginRequest, TokenResponse, UserResponse, PasswordUpdate
+from app.schemas import LoginRequest, TokenResponse, UserResponse, UserInToken, PasswordUpdate
 from app.config import settings
 from app.limiter import limiter
 
@@ -38,7 +38,7 @@ def _validate_password(senha: str) -> None:
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("5/minute")
 async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """Authenticates the user and returns a JWT access token."""
+    """Authenticates the user and returns a JWT access token + user data in a single roundtrip."""
     result = await db.execute(select(User).where(User.email == body.email))
     user: User | None = result.scalar_one_or_none()
 
@@ -51,12 +51,18 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
         raise HTTPException(status_code=403, detail="Conta desativada")
 
     token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user.role},
+        data={"sub": str(user.id), "email": user.email, "role": user.role, "nome": user.nome},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     return TokenResponse(
         access_token=token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user=UserInToken(
+            id=str(user.id),
+            nome=user.nome,
+            email=user.email,
+            role=user.role,
+        ),
     )
 
 

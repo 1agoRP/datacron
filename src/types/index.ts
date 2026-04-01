@@ -15,7 +15,7 @@ export interface Concessionaria {
   tipo: string;
   instalacao: string;
   email_esperado: string | null;
-  regra_senha: 'fixa' | 'dinamica';
+  regra_senha: string;
   senha_manual: string | null;
   dia_vencimento: number;
   valor_medio: number | null;
@@ -34,6 +34,11 @@ export interface Fatura {
   status: 'pendente' | 'processada' | 'erro' | 'revisao';
   pdf_path: string | null;
   pdf_nome_original: string | null;
+  pdf_desbloqueado?: boolean;
+  email_remetente?: string | null;
+  email_assunto?: string | null;
+  dados_extraidos?: Record<string, any> | null;
+  variacao_percentual?: number | null;
   created_at: string;
 
   condominio?: Condominio;
@@ -44,7 +49,7 @@ export interface Alerta {
   id: string;
   condominio_id: string | null;
   fatura_id: string | null;
-  tipo: 'leitura' | 'vencimento' | 'variacao' | 'sistema' | 'email';
+  tipo: string;
   mensagem: string;
   gravidade: 'baixa' | 'media' | 'alta';
   resolvido: boolean;

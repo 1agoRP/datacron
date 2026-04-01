@@ -11,10 +11,18 @@ class LoginRequest(BaseModel):
     email: EmailStr
     senha: str
 
+class UserInToken(BaseModel):
+    id: str
+    nome: str
+    email: str
+    role: str
+    model_config = {"from_attributes": True}
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+    user: UserInToken
 
 class UserResponse(BaseModel):
     id: uuid.UUID
@@ -107,6 +115,14 @@ class ConcessionariaUpdate(BaseModel):
     valor_medio: Optional[float] = None
     ativo: Optional[bool] = None
 
+class CondominioMini(BaseModel):
+    """Minimal condominio data for nested responses."""
+    id: uuid.UUID
+    nome: str
+    numero: str
+    cnpj: str
+    model_config = {"from_attributes": True}
+
 class ConcessionariaResponse(BaseModel):
     id: uuid.UUID
     condominio_id: uuid.UUID
@@ -119,6 +135,7 @@ class ConcessionariaResponse(BaseModel):
     valor_medio: float
     ativo: bool
     created_at: datetime
+    condominio: Optional[CondominioMini] = None
     model_config = {"from_attributes": True}
 
 

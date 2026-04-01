@@ -58,12 +58,7 @@ export default function CondominiosPage() {
       mutate();
       setCreating(false);
     } catch (err: any) {
-      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
-        console.warn('Network error during create condo, retrying silently in 2s...');
-        setTimeout(() => handleCreate(), 2000);
-        return; // handleCreate will continue retrying without setting creating=false
-      }
-      alert(err.message);
+      alert(err.message || 'Erro ao criar');
       setCreating(false);
     }
   };
@@ -178,12 +173,7 @@ export default function CondominiosPage() {
       mutate();
       setCreating(false);
     } catch (err: any) {
-      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
-        console.warn('Network error during update condo, retrying silently in 2s...');
-        setTimeout(() => handleUpdate(), 2000);
-        return;
-      }
-      alert(err.message);
+      alert(err.message || 'Erro ao atualizar');
       setCreating(false);
     }
   };
@@ -195,12 +185,7 @@ export default function CondominiosPage() {
       setEditCondo(null);
       mutate();
     } catch (err: any) {
-      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
-        console.warn('Network error during delete condo, retrying silently in 2s...');
-        setTimeout(() => handleDelete(id), 2000);
-        return;
-      }
-      alert(err.message);
+      alert(err.message || 'Erro ao excluir');
     }
   };
 

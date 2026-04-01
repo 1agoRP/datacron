@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
   Search, Download, Printer, TrendingDown, TrendingUp, Calendar, Eye, X,
@@ -9,29 +9,18 @@ import {
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import useSWR from 'swr';
 
 export default function FaturasPage() {
-  const [faturas, setFaturas] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: faturas = [], isLoading: loading } = useSWR(
+    'faturas',
+    () => api.getFaturas(),
+    { revalidateOnFocus: true }
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [selectedFatura, setSelectedFatura] = useState<any | null>(null);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const data = await api.getFaturas();
-        setFaturas(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
 
   const filtered = useMemo(() => {
     return faturas.filter(f => {

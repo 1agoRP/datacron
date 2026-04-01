@@ -5,6 +5,7 @@ import Shell from '@/components/layout/Shell';
 import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2, Search, Filter, Key, Eye, EyeOff, ArrowUpDown } from 'lucide-react';
 import { api } from '@/lib/api';
 import Select from 'react-select';
+import useSWR from 'swr';
 
 const COLOR_MAP: Record<string, { bg: string; color: string }> = {
   enel:   { bg: '#eff6ff', color: '#2563eb' },
@@ -83,9 +84,20 @@ function generatePasswordPreview(regra: string, cnpjDigits: string, senhaManual:
 }
 
 export default function ConcessionariasPage() {
-  const [concs, setConcs] = useState<any[]>([]);
-  const [condos, setCondos] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // SWR for concessionárias — automatic cache + background revalidation
+  const { data: concs = [], isLoading: loading, mutate: mutateConcs } = useSWR(
+    'concessionarias',
+    () => api.getConcessionarias(),
+    { revalidateOnFocus: true }
+  );
+
+  // SWR for condominios — needed for the create/edit modal dropdown
+  const { data: condos = [] } = useSWR(
+    'condominios',
+    () => api.getCondominios(),
+    { revalidateOnFocus: false }
+  );
+
   const [tab, setTab] = useState('Todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -107,30 +119,10 @@ export default function ConcessionariasPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [concData, condoData] = await Promise.all([
-        api.getConcessionarias(),
-        api.getCondominios()
-      ]);
-      setConcs(concData);
-      setCondos(condoData);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   // Get CNPJ digits for the selected condominio
   const selectedCondoCnpjDigits = useMemo(() => {
     if (!formConc.condominio_id) return '';
-    const condo = condos.find(c => c.id === formConc.condominio_id);
+    const condo = condos.find((c: any) => c.id === formConc.condominio_id);
     return condo ? cnpjToDigits(condo.cnpj) : '';
   }, [formConc.condominio_id, condos]);
 
@@ -167,15 +159,10 @@ export default function ConcessionariasPage() {
       }
       
       handleCloseModal();
-      fetchData();
+      mutateConcs(); // SWR revalidation — instant UI update
       setCreating(false);
     } catch (err: any) {
-      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
-        console.warn('Network error during save, retrying silently in 2s...');
-        setTimeout(() => handleSave(), 2000);
-        return; // maintain the loading (creating = true) state
-      }
-      alert(err.message);
+      alert(err.message || 'Erro ao salvar');
       setCreating(false);
     }
   };
@@ -187,14 +174,9 @@ export default function ConcessionariasPage() {
     try {
       await api.deleteConcessionaria(editingId);
       handleCloseModal();
-      fetchData();
+      mutateConcs(); // SWR revalidation
     } catch (err: any) {
-      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
-        console.warn('Network error during delete, retrying silently in 2s...');
-        setTimeout(() => handleDelete(), 2000);
-        return;
-      }
-      alert(err.message);
+      alert(err.message || 'Erro ao excluir');
     }
   };
 
@@ -237,11 +219,12 @@ export default function ConcessionariasPage() {
   };
 
   const filtered = useMemo(() => {
-    let result = concs.filter(c => {
+    let result = [...concs].filter((c: any) => {
       const matchesTab = tab === 'Todas' || c.tipo.toLowerCase() === tab.toLowerCase();
       if (!matchesTab) return false;
       
-      const condo = condos.find(cd => cd.id === c.condominio_id);
+      // Use condominio data from the API response (selectinload)
+      const condo = c.condominio;
       
       if (!searchTerm.trim()) return true;
       const q = searchTerm.toLowerCase();
@@ -254,16 +237,16 @@ export default function ConcessionariasPage() {
     });
 
     if (sortField) {
-      result.sort((a, b) => {
-        const condoA = condos.find(cd => cd.id === a.condominio_id);
-        const condoB = condos.find(cd => cd.id === b.condominio_id);
-        let valA = condoA ? condoA[sortField] : '';
-        let valB = condoB ? condoB[sortField] : '';
+      result.sort((a: any, b: any) => {
+        const condoA = a.condominio;
+        const condoB = b.condominio;
+        const valA = condoA ? condoA[sortField] : '';
+        const valB = condoB ? condoB[sortField] : '';
         
         if (sortField === 'numero') {
-          valA = parseInt(valA as string) || 0;
-          valB = parseInt(valB as string) || 0;
-          return sortDir === 'asc' ? valA - valB : valB - valA;
+          const numA = parseInt(valA as string) || 0;
+          const numB = parseInt(valB as string) || 0;
+          return sortDir === 'asc' ? numA - numB : numB - numA;
         }
         
         const cmp = String(valA).localeCompare(String(valB), 'pt-BR', { sensitivity: 'base' });
@@ -272,7 +255,7 @@ export default function ConcessionariasPage() {
     }
 
     return result;
-  }, [concs, condos, tab, searchTerm, sortField, sortDir]);
+  }, [concs, tab, searchTerm, sortField, sortDir]);
 
   const tabs = ['Todas', 'Enel', 'Sabesp', 'Comgás', 'Outros'];
 
@@ -353,7 +336,7 @@ export default function ConcessionariasPage() {
               {loading ? (
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
               ) : filtered.map(conc => {
-                const condo = condos.find(c => c.id === conc.condominio_id);
+                const condo = conc.condominio;
                 const colors = getColors(conc.tipo);
                 const codigoLabel = getCodigoLabel(conc.tipo);
                 return (

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
   Plus, Building2, FileSignature, Calendar, DollarSign, X, Trash2,
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import Select from 'react-select';
+import useSWR from 'swr';
 
 const DEFAULT_CONTRACT_TYPES = [
   'Manutenção de Elevadores',
@@ -75,12 +76,35 @@ function formatCurrency(v: number | null | undefined): string {
 }
 
 export default function ContratosPage() {
-  const [contratos, setContratos] = useState<any[]>([]);
-  const [condos, setCondos] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // SWR for main data — automatic cache + background revalidation
+  const { data: contratos = [], isLoading: loading, mutate: mutateContratos } = useSWR(
+    'contratos',
+    () => api.getContratos(),
+    { revalidateOnFocus: true }
+  );
+  const { data: condos = [] } = useSWR(
+    'contratosCondos',
+    () => api.getCondominios(),
+    { revalidateOnFocus: false }
+  );
+  const { data: stats } = useSWR<any>(
+    'contratosStats',
+    () => api.getContratosStats(),
+    { revalidateOnFocus: true }
+  );
+  const { data: fetchedTypes } = useSWR(
+    'contractTypes',
+    () => api.getContractTypes().catch(() => null)
+  );
+  const contractTypes = useMemo(() => {
+    if (fetchedTypes && Array.isArray(fetchedTypes)) {
+      const filtered = fetchedTypes.filter((t: string) => t !== 'Outros');
+      return [...filtered, 'Outros'];
+    }
+    return DEFAULT_CONTRACT_TYPES;
+  }, [fetchedTypes]);
+
   const [tab, setTab] = useState('Todos');
-  const [contractTypes, setContractTypes] = useState<string[]>(DEFAULT_CONTRACT_TYPES);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<string | null>(null);
@@ -118,50 +142,6 @@ export default function ContratosPage() {
   };
   const [form, setForm] = useState<any>({ ...defaultForm });
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      
-      // Load condominios carefully so even if others fail, the dropdown works
-      try {
-        const condoData = await api.getCondominios();
-        setCondos(condoData);
-      } catch (err) {
-        console.error("Erro ao buscar condomínios:", err);
-      }
-
-      // Load contract types
-      try {
-        const typesData = await api.getContractTypes();
-        if (typesData && Array.isArray(typesData)) {
-          const filtered = typesData.filter(t => t !== 'Outros');
-          setContractTypes([...filtered, 'Outros']);
-        }
-      } catch (err) {
-        console.error("Erro ao buscar tipos:", err);
-      }
-
-      // Load main list and stats
-      try {
-        const [contData, statsData] = await Promise.all([
-          api.getContratos(),
-          api.getContratosStats(),
-        ]);
-        setContratos(contData);
-        setStats(statsData);
-      } catch (err) {
-        console.error("Erro ao buscar contratos ou stats:", err);
-      }
-      
-    } catch (err) {
-      console.error("Erro geral no fetch:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchData(); }, []);
-
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     try {
@@ -198,15 +178,10 @@ export default function ContratosPage() {
       }
 
       handleCloseModal();
-      fetchData();
+      mutateContratos(); // SWR revalidation
       setSaving(false);
     } catch (err: any) {
-      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
-        console.warn('Network error during save contrato, retrying silently in 2s...');
-        setTimeout(() => handleSave(), 2000);
-        return;
-      }
-      alert(err.message);
+      alert(err.message || 'Erro ao salvar');
       setSaving(false);
     }
   };
@@ -217,14 +192,9 @@ export default function ContratosPage() {
     try {
       await api.deleteContrato(editingId);
       handleCloseModal();
-      fetchData();
+      mutateContratos(); // SWR revalidation
     } catch (err: any) {
-      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
-        console.warn('Network error during delete contrato, retrying silently in 2s...');
-        setTimeout(() => handleDelete(), 2000);
-        return;
-      }
-      alert(err.message);
+      alert(err.message || 'Erro ao excluir');
     }
   };
 

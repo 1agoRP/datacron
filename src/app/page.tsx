@@ -212,16 +212,24 @@ export default function LandingPage() {
     if (e) e.preventDefault();
     setError(null);
     setIsLoading(true);
+
+    // 8-second safety timeout
+    const timeout = setTimeout(() => {
+      setError('Tempo limite excedido. Verifique sua conexão e tente novamente.');
+      setIsLoading(false);
+    }, 8000);
+
     try {
       await login({ email, senha: password });
+      clearTimeout(timeout);
       router.push('/dashboard');
-      setIsLoading(false);
     } catch (err: any) {
+      clearTimeout(timeout);
       if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
-        setTimeout(() => handleLogin(), 2000);
-        return;
+        setError('Servidor indisponível. Verifique sua conexão e tente novamente.');
+      } else {
+        setError(err.message || 'Falha na autenticação');
       }
-      setError(err.message || 'Falha na autenticação');
       setIsLoading(false);
     }
   };

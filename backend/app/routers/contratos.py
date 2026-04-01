@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, case, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -61,20 +62,42 @@ async def contratos_stats(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Returns KPI stats for contracts: total, active, expiring soon, expired."""
-    result = await db.execute(select(Contrato))
-    contratos = result.scalars().all()
+    """Returns KPI stats for contracts using SQL aggregation (no full table load)."""
+    today = date.today()
+    sixty_days = today.replace(day=1)  # approximate
+    from datetime import timedelta
+    sixty_days_from_now = today + timedelta(days=60)
 
-    total = len(contratos)
-    ativos = sum(1 for c in contratos if c.status == "ativo")
-    a_vencer = sum(1 for c in contratos if c.status == "a_vencer")
-    vencidos = sum(1 for c in contratos if c.status == "vencido")
+    result = await db.execute(
+        select(
+            func.count(Contrato.id).label("total"),
+            func.count(
+                case(
+                    (or_(Contrato.data_fim.is_(None), Contrato.data_fim >= sixty_days_from_now), Contrato.id),
+                    else_=None,
+                )
+            ).label("ativos"),
+            func.count(
+                case(
+                    (Contrato.data_fim.isnot(None) & (Contrato.data_fim >= today) & (Contrato.data_fim < sixty_days_from_now), Contrato.id),
+                    else_=None,
+                )
+            ).label("a_vencer"),
+            func.count(
+                case(
+                    (Contrato.data_fim.isnot(None) & (Contrato.data_fim < today), Contrato.id),
+                    else_=None,
+                )
+            ).label("vencidos"),
+        )
+    )
+    row = result.one()
 
     return {
-        "total": total,
-        "ativos": ativos,
-        "a_vencer": a_vencer,
-        "vencidos": vencidos,
+        "total": row.total,
+        "ativos": row.ativos,
+        "a_vencer": row.a_vencer,
+        "vencidos": row.vencidos,
     }
 
 
@@ -88,7 +111,11 @@ async def list_contratos(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    stmt = select(Contrato).join(Condominio, Contrato.condominio_id == Condominio.id)
+    stmt = (
+        select(Contrato)
+        .options(selectinload(Contrato.condominio))
+        .join(Condominio, Contrato.condominio_id == Condominio.id)
+    )
 
     if condominio_id:
         stmt = stmt.where(Contrato.condominio_id == condominio_id)
@@ -113,14 +140,12 @@ async def list_contratos(
     if status:
         contratos = [c for c in contratos if c.status == status]
 
-    # Enrich with condominio name
+    # Enrich with condominio name (now loaded via selectinload — no N+1)
     responses = []
     for c in contratos:
-        condo_result = await db.execute(select(Condominio.nome).where(Condominio.id == c.condominio_id))
-        condo_nome = condo_result.scalar_one_or_none()
         resp = ContratoResponse.model_validate(c)
         resp.status = c.status
-        resp.condominio_nome = condo_nome
+        resp.condominio_nome = c.condominio.nome if c.condominio else None
         responses.append(resp)
 
     return responses

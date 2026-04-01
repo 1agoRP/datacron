@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
   Mail, Search, Filter, CheckCircle2, AlertCircle,
@@ -9,50 +9,34 @@ import {
 } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
+import useSWR from 'swr';
 
 export default function RecebimentosPage() {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [status, setStatus] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  // SWR for logs and status — automatic cache + background revalidation
+  const { data: logs = [], isLoading: loading, mutate: mutateLogs } = useSWR(
+    'emailLogs',
+    () => api.getEmailLogs() as Promise<any[]>,
+    { revalidateOnFocus: true }
+  );
+  const { data: status } = useSWR<any>(
+    'emailStatus',
+    () => api.getAgentStatus(),
+    { revalidateOnFocus: true }
+  );
+
   const [scanning, setScanning] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [logsData, statusData] = await Promise.all([
-        api.getEmailLogs() as Promise<any[]>,
-        api.getAgentStatus()
-      ]);
-      setLogs(logsData);
-      setStatus(statusData);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const handleForceScan = async () => {
     try {
       setScanning(true);
       await api.forceEmailScan();
       alert('Varredura iniciada com sucesso! Os resultados aparecerão nos logs em instantes.');
-      setTimeout(() => fetchData(), 3000);
+      setTimeout(() => mutateLogs(), 3000); // revalidate after scan
       setScanning(false);
     } catch (err: any) {
-      const msg = err.message || '';
-      if (msg.toLowerCase().includes('failed to fetch')) {
-        console.warn('Network error during scan, retrying silently in 2s...');
-        setTimeout(() => handleForceScan(), 2000);
-        return;
-      }
-      alert('Erro ao iniciar varredura: ' + msg);
+      alert('Erro ao iniciar varredura: ' + (err.message || 'Erro desconhecido'));
       setScanning(false);
     }
   };

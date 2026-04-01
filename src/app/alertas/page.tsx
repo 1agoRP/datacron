@@ -1,35 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Shell from '@/components/layout/Shell';
 import { AlertCircle, Clock, CheckCircle2, ArrowUpRight, Trash2, Shield, XCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { format } from 'date-fns';
+import useSWR from 'swr';
 
 export default function AlertasPage() {
-  const [alertas, setAlertas] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: alertas = [], isLoading: loading, mutate } = useSWR(
+    'alertas',
+    () => api.getAlertas(),
+    { revalidateOnFocus: true }
+  );
   const [activeTab, setActiveTab] = useState('Todos');
   const [resolving, setResolving] = useState<string | null>(null);
   const [discarding, setDiscarding] = useState<string | null>(null);
   const [bulkResolving, setBulkResolving] = useState(false);
   const [bulkDiscarding, setBulkDiscarding] = useState(false);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getAlertas();
-      setAlertas(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   const handleResolve = async (alerta: any) => {
     try {
@@ -46,14 +34,10 @@ export default function AlertasPage() {
         `O alerta foi marcado como resolvido.`
       );
 
-      setAlertas(prev => prev.filter(a => a.id !== alerta.id));
+      // Optimistic update: remove from cache, then revalidate
+      mutate();
     } catch (err: any) {
-      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
-        console.warn('Network error during resolve, retrying silently in 2s...');
-        setTimeout(() => handleResolve(alerta), 2000);
-        return;
-      }
-      alert('Erro ao resolver: ' + err.message);
+      alert('Erro ao resolver: ' + (err.message || 'Erro desconhecido'));
     } finally {
       if (!resolving) setResolving(null); // only clear if we are not retrying
     }
@@ -64,14 +48,9 @@ export default function AlertasPage() {
     try {
       setDiscarding(id);
       await api.deleteAlerta(id);
-      setAlertas(prev => prev.filter(a => a.id !== id));
+      mutate();
     } catch (err: any) {
-      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
-        console.warn('Network error during discard, retrying silently in 2s...');
-        setTimeout(() => handleDiscard(id), 2000);
-        return;
-      }
-      alert('Erro ao descartar: ' + err.message);
+      alert('Erro ao descartar: ' + (err.message || 'Erro desconhecido'));
     } finally {
       if (!discarding) setDiscarding(null);
     }
@@ -98,7 +77,7 @@ export default function AlertasPage() {
       }
 
       alert(`✅ Ação em massa concluída!\n\n${resolved} pendência(s) resolvida(s).\n${errors > 0 ? `${errors} erro(s).` : ''}`);
-      setAlertas([]);
+      mutate();
     } catch (err: any) {
       alert('Erro: ' + err.message);
     } finally {
@@ -126,7 +105,7 @@ export default function AlertasPage() {
       }
 
       alert(`🗑️ Ação em massa concluída!\n\n${discarded} alerta(s) descartado(s).\n${errors > 0 ? `${errors} erro(s).` : ''}`);
-      setAlertas([]);
+      mutate();
     } catch (err: any) {
       alert('Erro: ' + err.message);
     } finally {
