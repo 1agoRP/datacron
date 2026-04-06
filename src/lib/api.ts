@@ -82,6 +82,38 @@ class ApiClient {
     return response.json();
   }
 
+  private async requestMultipart<T>(endpoint: string, formData: FormData, options: RequestInit = {}): Promise<T> {
+    const token = this.getToken();
+    const headers = {
+      ...options.headers,
+    } as any;
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetchWithRetry(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      let msg = 'Erro no processamento do arquivo';
+      
+      if (typeof errorData.detail === 'string') {
+        msg = errorData.detail;
+      } else if (Array.isArray(errorData.detail)) {
+        msg = errorData.detail.map((e: any) => e.msg).join(', ');
+      }
+      
+      throw new Error(msg);
+    }
+
+    return response.json();
+  }
+
   // Auth
   async login(credentials: any) {
     const data = await this.request<{ access_token: string; user: any }>('/auth/login', {
@@ -163,13 +195,7 @@ class ApiClient {
   }
 
   async uploadAtaEleicao(id: string, formData: FormData) {
-    return fetchWithRetry(`${API_BASE_URL}/condominios/${id}/ata-eleicao`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.getToken()}`
-      },
-      body: formData
-    }).then(r => r.json());
+    return this.requestMultipart(`/condominios/${id}/ata-eleicao`, formData, { method: 'POST' });
   }
 
   async downloadAtaEleicao(id: string) {
@@ -179,7 +205,10 @@ class ApiClient {
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       }
     });
-    if (!response.ok) throw new Error('Falha ao baixar ATA de Eleição');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Falha ao baixar ATA de Eleição');
+    }
     const blob = await response.blob();
     
     const disposition = response.headers.get('Content-Disposition');
@@ -230,23 +259,11 @@ class ApiClient {
   }
 
   async extrairDadosFatura(formData: FormData) {
-    return fetchWithRetry(`${API_BASE_URL}/concessionarias/extrair-dados`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${this.getToken()}`
-        },
-        body: formData
-    }).then(r => r.json());
+    return this.requestMultipart('/concessionarias/extrair-dados', formData, { method: 'POST' });
   }
 
   async aplicarReajusteConcessionaria(formData: FormData) {
-    return fetchWithRetry(`${API_BASE_URL}/concessionarias/reajuste`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${this.getToken()}`
-        },
-        body: formData
-    }).then(r => r.json());
+    return this.requestMultipart('/concessionarias/reajuste', formData, { method: 'POST' });
   }
 
   async getReajustesConcessionariaHistorico(tipo?: string) {
@@ -349,22 +366,7 @@ class ApiClient {
 
   // Importações
   async previewImport(formData: FormData) {
-    const res = await fetchWithRetry(`${API_BASE_URL}/importacoes/preview`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${this.getToken()}`
-        },
-        body: formData
-    });
-    const data = await res.json();
-    if (!res.ok) {
-        let msg = 'Erro ao processar arquivo';
-        if (data.detail) {
-            msg = Array.isArray(data.detail) ? data.detail.map((d: any) => d.msg).join(', ') : data.detail;
-        }
-        throw new Error(msg);
-    }
-    return data;
+    return this.requestMultipart('/importacoes/preview', formData, { method: 'POST' });
   }
 
   async confirmImport(data: { tipo: string; rows: any[] }) {
@@ -503,23 +505,11 @@ class ApiClient {
   }
 
   async uploadContratoPdf(formData: FormData) {
-    return fetchWithRetry(`${API_BASE_URL}/contratos/upload-pdf`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.getToken()}`
-      },
-      body: formData
-    }).then(r => r.json());
+    return this.requestMultipart('/contratos/upload-pdf', formData, { method: 'POST' });
   }
 
   async uploadContratoArquivo(id: string, formData: FormData) {
-    return fetchWithRetry(`${API_BASE_URL}/contratos/${id}/arquivo`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.getToken()}`
-      },
-      body: formData
-    }).then(r => r.json());
+    return this.requestMultipart(`/contratos/${id}/arquivo`, formData, { method: 'POST' });
   }
 
   async downloadContratoArquivo(id: string) {
@@ -548,19 +538,7 @@ class ApiClient {
   }
 
   async createReajusteMercado(formData: FormData) {
-    return fetchWithRetry(`${API_BASE_URL}/reajustes/`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${this.getToken()}`
-        },
-        body: formData
-    }).then(async r => {
-        if (!r.ok) {
-            const data = await r.json().catch(() => ({}));
-            throw new Error(data.detail || 'Erro ao criar reajuste');
-        }
-        return r.json();
-    });
+    return this.requestMultipart<ReajusteMercado>('/reajustes/', formData, { method: 'POST' });
   }
 
   async deleteReajusteMercado(id: string) {

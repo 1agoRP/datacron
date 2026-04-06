@@ -127,7 +127,7 @@ export default function CondominiosPage() {
     try {
       setUploadingAta(true);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('pdf_file', file);
       await api.uploadAtaEleicao(condoId, formData);
       alert('ATA de Eleição enviada com sucesso!');
       mutate();

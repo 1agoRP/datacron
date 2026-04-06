@@ -177,17 +177,32 @@ async def upload_ata_eleicao(
     if not condo:
         raise HTTPException(status_code=404, detail="Condomínio não encontrado")
 
-    if pdf_file.content_type != "application/pdf":
+    # Relax validation to allow common PDF variants
+    valid_pdf_mimes = ["application/pdf", "application/x-pdf", "binary/octet-stream"]
+    is_pdf_extension = (pdf_file.filename or "").lower().endswith(".pdf")
+    
+    if pdf_file.content_type not in valid_pdf_mimes and not is_pdf_extension:
         raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
 
     import base64
     pdf_bytes = await pdf_file.read()
     b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
 
+    with open("upload_debug.log", "a") as f:
+        f.write(f"[{datetime.now()}] Uploading for condo {id}: Bytes read={len(pdf_bytes)}, B64 len={len(b64_data)}\n")
+
     condo.ata_eleicao_base64 = b64_data
     condo.ata_eleicao_nome = pdf_file.filename or 'ata_eleicao.pdf'
     
-    await db.commit()
+    try:
+        await db.commit()
+        with open("upload_debug.log", "a") as f:
+            f.write(f"[{datetime.now()}] Commit successful for condo {id}\n")
+    except Exception as e:
+        with open("upload_debug.log", "a") as f:
+            f.write(f"[{datetime.now()}] Commit FAILED for condo {id}: {str(e)}\n")
+        raise e
+
     await db.refresh(condo)
 
     return {"mensagem": "ATA de Eleição salva com sucesso", "ata_eleicao_nome": condo.ata_eleicao_nome}

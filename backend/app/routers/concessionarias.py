@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -192,9 +192,9 @@ async def extrair_dados_fatura(
 
 @router.post("/reajuste", response_model=ReajusteConcessionariaResponse, status_code=201)
 async def aplicar_reajuste(
-    tipo_concessionaria: str = Query(...),
-    percentual: float = Query(...),
-    mes_aplicacao: str = Query(...),
+    tipo_concessionaria: str = Form(...),
+    percentual: float = Form(...),
+    mes_aplicacao: str = Form(...),
     pdf_file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),

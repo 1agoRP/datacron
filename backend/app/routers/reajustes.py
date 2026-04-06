@@ -3,7 +3,7 @@ import base64
 import io
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,11 +49,11 @@ async def get_reajuste(
 
 @router.post("/", response_model=ReajusteMercadoResponse, status_code=201)
 async def create_reajuste(
-    categoria: str = Query(...),
-    percentual: float = Query(...),
-    vigencia: str = Query(...),
-    descricao: Optional[str] = Query(None),
-    categoria_personalizada: Optional[str] = Query(None),
+    categoria: str = Form(...),
+    percentual: float = Form(...),
+    vigencia: str = Form(...),
+    descricao: Optional[str] = Form(None),
+    categoria_personalizada: Optional[str] = Form(None),
     pdf_file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
