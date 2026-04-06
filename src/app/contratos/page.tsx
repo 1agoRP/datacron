@@ -11,12 +11,17 @@ import { api } from '@/lib/api';
 import Select from 'react-select';
 import useSWR from 'swr';
 
-const DEFAULT_CONTRACT_TYPES = [
-  'Manutenção de Elevadores',
+const CONTRACT_TYPES = [
+  'Elevadores',
   'Bombas',
-  'Portaria',
+  'Gerador',
   'Limpeza',
+  'Portaria',
+  'CFTV/Portões/Interfone',
   'Segurança',
+  'Jardim',
+  'Piscina',
+  'Controle de Acesso',
   'Outros',
 ];
 
@@ -92,17 +97,7 @@ export default function ContratosPage() {
     () => api.getContratosStats(),
     { revalidateOnFocus: true }
   );
-  const { data: fetchedTypes } = useSWR(
-    'contractTypes',
-    () => api.getContractTypes().catch(() => null)
-  );
-  const contractTypes = useMemo(() => {
-    if (fetchedTypes && Array.isArray(fetchedTypes)) {
-      const filtered = fetchedTypes.filter((t: string) => t !== 'Outros');
-      return [...filtered, 'Outros'];
-    }
-    return DEFAULT_CONTRACT_TYPES;
-  }, [fetchedTypes]);
+
 
   const [tab, setTab] = useState('Todos');
   const [statusFilter, setStatusFilter] = useState('');
@@ -128,7 +123,7 @@ export default function ContratosPage() {
     cnpj_empresa: '',
     email_contato: '',
     telefone_contato: '',
-    tipo_contrato: 'Manutenção de Elevadores',
+    tipo_contrato: 'Elevadores',
     tipo_personalizado: '',
     data_inicio: '',
     data_fim: '',
@@ -294,7 +289,7 @@ export default function ContratosPage() {
     return result;
   }, [contratos, tab, statusFilter, searchTerm, sortField, sortDir]);
 
-  const tabs = ['Todos', ...contractTypes];
+  const tabs = ['Todos', ...CONTRACT_TYPES];
 
 
 
@@ -635,7 +630,7 @@ export default function ContratosPage() {
                   <div className="dc-form-group">
                     <label>Tipo de Contrato</label>
                     <Select
-                      options={contractTypes.map(t => ({ value: t, label: t }))}
+                      options={CONTRACT_TYPES.map(t => ({ value: t, label: t }))}
                       value={{ value: form.tipo_contrato, label: form.tipo_contrato }}
                       onChange={(option: any) => setForm({ ...form, tipo_contrato: option?.value || 'Outros' })}
                       styles={selectStyles}

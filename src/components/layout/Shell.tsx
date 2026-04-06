@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   BarChart3, Building2, Zap, Mail, FileText,
   AlertCircle, Download, ChevronLeft, ChevronRight,
-  Search, Layers, BarChart2, Settings, LogOut, FileSignature
+  Search, Layers, BarChart2, Settings, LogOut, FileSignature, TrendingUp
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import '@/styles/app.css';
@@ -16,6 +16,7 @@ const nav = [
   { href: '/condominios',    icon: Building2,    label: 'Condomínios' },
   { href: '/concessionarias',icon: Zap,          label: 'Concessionárias' },
   { href: '/contratos',      icon: FileSignature,label: 'Contratos' },
+  { href: '/reajustes',      icon: TrendingUp,   label: 'Reajustes' },
   { href: '/recebimentos',   icon: Mail,         label: 'Recebimentos' },
   { href: '/faturas',        icon: FileText,     label: 'Faturas' },
   { href: '/alertas',        icon: AlertCircle,  label: 'Alertas' },

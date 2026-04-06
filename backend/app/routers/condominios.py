@@ -2,7 +2,8 @@ import uuid
 from typing import Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, and_, extract
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -161,3 +162,59 @@ async def get_condominio_faturas(
     stmt = stmt.order_by(Fatura.created_at.desc())
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+@router.post("/{id}/ata-eleicao")
+async def upload_ata_eleicao(
+    id: uuid.UUID,
+    pdf_file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Uploads and saves the ATA de Eleição PDF in base64."""
+    result = await db.execute(select(Condominio).where(Condominio.id == id))
+    condo = result.scalar_one_or_none()
+    if not condo:
+        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+
+    if pdf_file.content_type != "application/pdf":
+        raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
+
+    import base64
+    pdf_bytes = await pdf_file.read()
+    b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
+
+    condo.ata_eleicao_base64 = b64_data
+    condo.ata_eleicao_nome = pdf_file.filename or 'ata_eleicao.pdf'
+    
+    await db.commit()
+    await db.refresh(condo)
+
+    return {"mensagem": "ATA de Eleição salva com sucesso", "ata_eleicao_nome": condo.ata_eleicao_nome}
+
+
+@router.get("/{id}/ata-eleicao")
+async def download_ata_eleicao(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Downloads the ATA de Eleição PDF."""
+    import io
+    import base64
+    
+    result = await db.execute(select(Condominio).where(Condominio.id == id))
+    condo = result.scalar_one_or_none()
+    
+    if not condo:
+        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+        
+    if not condo.ata_eleicao_base64:
+        raise HTTPException(status_code=404, detail="Este condomínio não possui ATA de eleição cadastrada")
+
+    pdf_bytes = base64.b64decode(condo.ata_eleicao_base64)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{condo.ata_eleicao_nome}"'},
+    )

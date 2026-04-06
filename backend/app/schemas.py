@@ -75,6 +75,8 @@ class CondominioUpdate(BaseModel):
     endereco: Optional[str] = None
     sindico: Optional[str] = None
     cpf_sindico: Optional[str] = None
+    ata_eleicao_base64: Optional[str] = None
+    ata_eleicao_nome: Optional[str] = None
     ativo: Optional[bool] = None
 
 class CondominioResponse(BaseModel):
@@ -85,6 +87,7 @@ class CondominioResponse(BaseModel):
     cnpj: str
     sindico: str
     cpf_sindico: Optional[str]
+    ata_eleicao_nome: Optional[str] = None
     ativo: bool
     created_at: datetime
     updated_at: datetime
@@ -98,13 +101,14 @@ class CondominioResponse(BaseModel):
 
 class ConcessionariaCreate(BaseModel):
     condominio_id: uuid.UUID
-    tipo: str  # Enel | Sabesp | Comgás | Outros
+    tipo: str  # Enel | Sabesp | Comgás | Claro | Vivo | TIM | Outros
     instalacao: str
     email_esperado: Optional[EmailStr] = None
     regra_senha: str = "5_primeiros_cnpj"
     senha_manual: Optional[str] = None
     dia_vencimento: int
     valor_medio: float = 0.0
+    nome_personalizado: Optional[str] = None
 
 class ConcessionariaUpdate(BaseModel):
     tipo: Optional[str] = None
@@ -113,6 +117,7 @@ class ConcessionariaUpdate(BaseModel):
     senha_manual: Optional[str] = None
     dia_vencimento: Optional[int] = None
     valor_medio: Optional[float] = None
+    nome_personalizado: Optional[str] = None
     ativo: Optional[bool] = None
 
 class CondominioMini(BaseModel):
@@ -133,6 +138,7 @@ class ConcessionariaResponse(BaseModel):
     senha_manual: Optional[str] = None
     dia_vencimento: int
     valor_medio: float
+    nome_personalizado: Optional[str] = None
     ativo: bool
     created_at: datetime
     condominio: Optional[CondominioMini] = None
@@ -328,4 +334,44 @@ class ContratoResponse(BaseModel):
     condominio_nome: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+# ─── Reajuste Concessionária ──────────────────────────────────
+
+class ReajusteConcessionariaCreate(BaseModel):
+    percentual: float
+    mes_aplicacao: str
+    tipo_concessionaria: str
+
+class ReajusteConcessionariaResponse(BaseModel):
+    id: uuid.UUID
+    tipo_concessionaria: str
+    percentual: float
+    mes_aplicacao: str
+    documento_nome: Optional[str] = None
+    aplicado_por: str
+    registros_afetados: int
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+# ─── Reajuste Mercado ─────────────────────────────────────────
+
+class ReajusteMercadoCreate(BaseModel):
+    categoria: str
+    categoria_personalizada: Optional[str] = None
+    percentual: float
+    vigencia: str
+    descricao: Optional[str] = None
+
+class ReajusteMercadoResponse(BaseModel):
+    id: uuid.UUID
+    categoria: str
+    categoria_personalizada: Optional[str] = None
+    percentual: float
+    vigencia: str
+    descricao: Optional[str] = None
+    documento_nome: Optional[str] = None
+    created_at: datetime
     model_config = {"from_attributes": True}

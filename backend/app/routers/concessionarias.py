@@ -11,8 +11,13 @@ from app.dependencies import get_current_user
 from app.models.user import User
 from app.models.concessionaria import Concessionaria
 from app.models.condominio import Condominio
-from app.schemas import ConcessionariaCreate, ConcessionariaUpdate, ConcessionariaResponse
+from app.models.reajuste_concessionaria import ReajusteConcessionaria
+from app.schemas import (
+    ConcessionariaCreate, ConcessionariaUpdate, ConcessionariaResponse,
+    ReajusteConcessionariaCreate, ReajusteConcessionariaResponse
+)
 from app.services.pdf_processor import test_pdf_password, extract_data
+import base64
 
 router = APIRouter(prefix="/concessionarias", tags=["Concessionárias"])
 
@@ -184,3 +189,64 @@ async def extrair_dados_fatura(
         "valor_medio": extracted.get("valor") or 0.0,
         "raw_data": extracted,
     }
+
+@router.post("/reajuste", response_model=ReajusteConcessionariaResponse, status_code=201)
+async def aplicar_reajuste(
+    tipo_concessionaria: str = Query(...),
+    percentual: float = Query(...),
+    mes_aplicacao: str = Query(...),
+    pdf_file: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Applies a rate percentage increase to all concessionárias of a given type."""
+    
+    # 1. Fetch all concessionarias of this type
+    result = await db.execute(select(Concessionaria).where(Concessionaria.tipo == tipo_concessionaria))
+    concs = result.scalars().all()
+    
+    # 2. Update their valor_medio
+    for c in concs:
+        # Increase by percentage
+        if c.valor_medio:
+            c.valor_medio = c.valor_medio * (1 + (percentual / 100.0))
+            
+    # 3. Handle PDF upload
+    pdf_base64 = None
+    pdf_name = None
+    if pdf_file:
+        pdf_bytes = await pdf_file.read()
+        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        pdf_name = pdf_file.filename
+        
+    # 4. Create Reajuste record
+    reajuste = ReajusteConcessionaria(
+        tipo_concessionaria=tipo_concessionaria,
+        percentual=percentual,
+        mes_aplicacao=mes_aplicacao,
+        documento_base64=pdf_base64,
+        documento_nome=pdf_name,
+        aplicado_por=user.nome,
+        registros_afetados=len(concs)
+    )
+    
+    db.add(reajuste)
+    await db.commit()
+    await db.refresh(reajuste)
+    return reajuste
+
+
+@router.get("/reajustes/historico", response_model=list[ReajusteConcessionariaResponse])
+async def listar_reajustes(
+    tipo_concessionaria: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Lists history of applied rate adjustments."""
+    stmt = select(ReajusteConcessionaria)
+    if tipo_concessionaria:
+        stmt = stmt.where(ReajusteConcessionaria.tipo_concessionaria == tipo_concessionaria)
+    stmt = stmt.order_by(ReajusteConcessionaria.created_at.desc())
+    
+    result = await db.execute(stmt)
+    return result.scalars().all()

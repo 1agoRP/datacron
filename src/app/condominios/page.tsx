@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History } from 'lucide-react';
+import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History, Upload, FileSignature } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -39,7 +39,9 @@ export default function CondominiosPage() {
   const [detailsCondo, setDetailsCondo] = useState<any>(null);
   const [editCondo, setEditCondo] = useState<any>(null);
   const [condoConcs, setCondoConcs] = useState<any[]>([]);
+  const [condoContratos, setCondoContratos] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [uploadingAta, setUploadingAta] = useState(false);
 
   // History modal
   const [historyConc, setHistoryConc] = useState<any>(null);
@@ -105,12 +107,46 @@ export default function CondominiosPage() {
     setHistoryConc(null);
     try {
       setLoadingDetails(true);
-      const concs = await api.getConcessionarias({ condominio_id: condo.id });
+      const [concs, contratos] = await Promise.all([
+        api.getConcessionarias({ condominio_id: condo.id }),
+        api.getContratos()
+      ]);
       setCondoConcs(concs);
+      setCondoContratos(contratos.filter((c: any) => c.condominio_id === condo.id));
     } catch (err) {
       console.error(err);
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  const handleUploadAta = async (condoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingAta(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      await api.uploadAtaEleicao(condoId, formData);
+      alert('ATA de Eleição enviada com sucesso!');
+      mutate();
+      if (detailsCondo && detailsCondo.id === condoId) {
+         setDetailsCondo({ ...detailsCondo, ata_eleicao_nome: file.name });
+      }
+    } catch (err: any) {
+      alert(err.message || 'Erro ao enviar ATA');
+    } finally {
+      setUploadingAta(false);
+      if (event.target) event.target.value = '';
+    }
+  };
+
+  const handleDownloadAta = async (condoId: string) => {
+    try {
+      await api.downloadAtaEleicao(condoId);
+    } catch (err: any) {
+      alert(err.message || 'Erro ao baixar ATA');
     }
   };
 
@@ -322,6 +358,11 @@ export default function CondominiosPage() {
                     </td>
                     <td>
                       <div className="dc-row-actions" style={{ justifyContent: 'flex-end' }}>
+                        {condo.ata_eleicao_nome && (
+                          <button className="dc-icon-action dc-badge-green" style={{ background: '#f0fdf4' }} title={`Baixar ATA: ${condo.ata_eleicao_nome}`} onClick={() => handleDownloadAta(condo.id)}>
+                            <FileSignature size={15} />
+                          </button>
+                        )}
                         <button className="dc-icon-action" title="Abrir detalhes" onClick={() => handleOpenDetails(condo)}><ExternalLink size={15} /></button>
                         <button className="dc-icon-action" title="Mais opções" onClick={() => handleOpenEdit(condo)}><MoreVertical size={15} /></button>
                       </div>
@@ -552,6 +593,76 @@ export default function CondominiosPage() {
                     </div>
                   </div>
 
+                  {/* Documentos */}
+                  <div style={{ marginTop: 24 }}>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <FileSignature size={16} color="#3b82f6" /> Documentos Importantes
+                    </h4>
+                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                          <FileText size={20} />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>ATA de Eleição</div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                            {detailsCondo.ata_eleicao_nome ? detailsCondo.ata_eleicao_nome : 'Nenhum documento enviado.'}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        {detailsCondo.ata_eleicao_nome && (
+                          <button className="dc-btn dc-btn-secondary" onClick={() => handleDownloadAta(detailsCondo.id)}>
+                            <Download size={14} /> Baixar
+                          </button>
+                        )}
+                        <label className="dc-btn dc-btn-primary" style={{ cursor: 'pointer' }}>
+                          {uploadingAta ? <div className="dc-loading-spinner" /> : <Upload size={14} />} 
+                          {detailsCondo.ata_eleicao_nome ? 'Substituir' : 'Enviar Documento'}
+                          <input type="file" accept="application/pdf" style={{ display: 'none' }} disabled={uploadingAta} onChange={(e) => handleUploadAta(detailsCondo.id, e)} />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contratos Vinculados */}
+                  <div style={{ marginTop: 24 }}>
+                    <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <FileSignature size={16} color="#10b981" /> Contratos Vinculados
+                    </h4>
+                    {loadingDetails ? (
+                       <div style={{ padding: '20px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
+                    ) : condoContratos.length === 0 ? (
+                      <div style={{ padding: 24, textAlign: 'center', background: '#f8fafc', borderRadius: 8, fontSize: '0.9rem', color: '#64748b', border: '1px dashed #cbd5e1' }}>
+                        Nenhum contrato ativo vinculado.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {condoContratos.map(contrato => (
+                          <div key={contrato.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                              <div style={{ width: 38, height: 38, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', fontWeight: 800 }}>
+                                {contrato.tipo_contrato[0]}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>{contrato.empresa}</div>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{contrato.tipo_contrato} {contrato.tipo_personalizado ? `(${contrato.tipo_personalizado})` : ''}</div>
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <span className={`dc-badge ${contrato.status === 'ativo' ? 'dc-badge-green' : contrato.status === 'vencido' ? 'dc-badge-red' : 'dc-badge-amber'}`}>
+                                {contrato.status}
+                              </span>
+                              <div className="dc-cell-secondary" style={{ marginTop: 4 }}>
+                                R$ {contrato.valor_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Concessionarias List */}
                   <div style={{ marginTop: 24 }}>
                     <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -572,7 +683,7 @@ export default function CondominiosPage() {
                                 {conc.tipo[0]}
                               </div>
                               <div>
-                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>{conc.tipo}</div>
+                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>{conc.tipo === 'Outros' && conc.nome_personalizado ? conc.nome_personalizado : conc.tipo}</div>
                                 <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Instalação: {conc.instalacao}</div>
                               </div>
                             </div>

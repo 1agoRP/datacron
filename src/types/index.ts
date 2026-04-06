@@ -6,6 +6,7 @@ export interface Condominio {
   cnpj: string;
   sindico: string;
   cpf_sindico: string;
+  ata_eleicao_nome?: string | null;
   created_at: string;
 }
 
@@ -19,6 +20,7 @@ export interface Concessionaria {
   senha_manual: string | null;
   dia_vencimento: number;
   valor_medio: number | null;
+  nome_personalizado?: string | null;
   created_at: string;
   
   condominio?: Condominio;
@@ -100,4 +102,26 @@ export interface Contrato {
   condominio_nome: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ReajusteConcessionaria {
+  id: string;
+  tipo_concessionaria: string;
+  percentual: number;
+  mes_aplicacao: string;
+  documento_nome?: string | null;
+  aplicado_por: string;
+  registros_afetados: number;
+  created_at: string;
+}
+
+export interface ReajusteMercado {
+  id: string;
+  categoria: string;
+  categoria_personalizada?: string | null;
+  percentual: number;
+  vigencia: string;
+  descricao?: string | null;
+  documento_nome?: string | null;
+  created_at: string;
 }

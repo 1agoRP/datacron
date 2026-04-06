@@ -3,7 +3,7 @@
  * Centralized fetch wrapper with support for JWT authentication.
  */
 
-import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData } from '@/types';
+import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData, ReajusteConcessionaria, ReajusteMercado } from '@/types';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -162,6 +162,45 @@ class ApiClient {
     });
   }
 
+  async uploadAtaEleicao(id: string, formData: FormData) {
+    return fetchWithRetry(`${API_BASE_URL}/condominios/${id}/ata-eleicao`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.getToken()}`
+      },
+      body: formData
+    }).then(r => r.json());
+  }
+
+  async downloadAtaEleicao(id: string) {
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/ata-eleicao`, {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    });
+    if (!response.ok) throw new Error('Falha ao baixar ATA de Eleição');
+    const blob = await response.blob();
+    
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = `ata_eleicao_${id}.pdf`;
+    if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="(.+)"/);
+        if (matches && matches.length > 1) {
+            filename = matches[1];
+        }
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
   // Concessionarias
   async getConcessionarias(params: Record<string, string | number> = {}) {
     const safeParams: Record<string, string> = {};
@@ -198,6 +237,21 @@ class ApiClient {
         },
         body: formData
     }).then(r => r.json());
+  }
+
+  async aplicarReajusteConcessionaria(formData: FormData) {
+    return fetchWithRetry(`${API_BASE_URL}/concessionarias/reajuste`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: formData
+    }).then(r => r.json());
+  }
+
+  async getReajustesConcessionariaHistorico(tipo?: string) {
+    const param = tipo ? `?tipo_concessionaria=${encodeURIComponent(tipo)}` : '';
+    return this.request<ReajusteConcessionaria[]>(`/concessionarias/reajustes/historico${param}`);
   }
 
   // Faturas
@@ -481,6 +535,63 @@ class ApiClient {
     const a = document.createElement('a');
     a.href = url;
     a.download = `contrato_${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  // Reajustes Mercado
+  async getReajustesMercado(categoria?: string) {
+    const param = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
+    return this.request<ReajusteMercado[]>(`/reajustes/${param}`);
+  }
+
+  async createReajusteMercado(formData: FormData) {
+    return fetchWithRetry(`${API_BASE_URL}/reajustes/`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${this.getToken()}`
+        },
+        body: formData
+    }).then(async r => {
+        if (!r.ok) {
+            const data = await r.json().catch(() => ({}));
+            throw new Error(data.detail || 'Erro ao criar reajuste');
+        }
+        return r.json();
+    });
+  }
+
+  async deleteReajusteMercado(id: string) {
+    return this.request(`/reajustes/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async downloadDocumentoReajusteMercado(id: string) {
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/reajustes/${id}/documento`, {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    });
+    if (!response.ok) throw new Error('Falha ao baixar documento');
+    const blob = await response.blob();
+    
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = `reajuste_${id}.pdf`;
+    if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="(.+)"/);
+        if (matches && matches.length > 1) {
+            filename = matches[1];
+        }
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);

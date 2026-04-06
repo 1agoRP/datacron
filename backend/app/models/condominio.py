@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import String, DateTime, Integer, func, Uuid as UUID
+from sqlalchemy import String, DateTime, Integer, Text, func, Uuid as UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -26,6 +26,8 @@ class Condominio(Base):
     cnpj: Mapped[str] = mapped_column(String(18), unique=True, nullable=False, index=True)
     sindico: Mapped[str] = mapped_column(String(200), nullable=False)
     cpf_sindico: Mapped[Optional[str]] = mapped_column(String(14), nullable=True)
+    ata_eleicao_base64: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ata_eleicao_nome: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     ativo: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

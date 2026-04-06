@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2, Search, Filter, Key, Eye, EyeOff, ArrowUpDown } from 'lucide-react';
+import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2, Search, Filter, Key, Eye, EyeOff, ArrowUpDown, TrendingUp, History } from 'lucide-react';
 import { api } from '@/lib/api';
 import Select from 'react-select';
 import useSWR from 'swr';
@@ -11,6 +11,9 @@ const COLOR_MAP: Record<string, { bg: string; color: string }> = {
   enel:   { bg: '#eff6ff', color: '#2563eb' },
   sabesp: { bg: '#ecfeff', color: '#0891b2' },
   'comgás': { bg: '#fff7ed', color: '#ea580c' },
+  claro:  { bg: '#fef2f2', color: '#ef4444' },
+  vivo:   { bg: '#faf5ff', color: '#9333ea' },
+  tim:    { bg: '#eff6ff', color: '#1e3a8a' },
   outros: { bg: '#f8fafc', color: '#475569' },
 };
 
@@ -111,13 +114,25 @@ export default function ConcessionariasPage() {
     dia_vencimento: 10,
     email_esperado: '',
     senha_manual: '',
-    valor_medio: 0
+    valor_medio: 0,
+    nome_personalizado: ''
   };
 
   const [formConc, setFormConc] = useState<any>({ ...defaultConc });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+
+  // Reajuste state
+  const [isReajusteModalOpen, setIsReajusteModalOpen] = useState(false);
+  const [isHistoricoModalOpen, setIsHistoricoModalOpen] = useState(false);
+  const [formReajuste, setFormReajuste] = useState({ tipo_concessionaria: 'Enel', percentual: 0, mes_aplicacao: '' });
+  const [pdfReajuste, setPdfReajuste] = useState<File | null>(null);
+  const [aplicandoReajuste, setAplicandoReajuste] = useState(false);
+  const { data: historicoReajustes = [], mutate: mutateHistorico } = useSWR(
+    'historicoReajustes',
+    () => api.getReajustesConcessionariaHistorico()
+  );
 
   // Get CNPJ digits for the selected condominio
   const selectedCondoCnpjDigits = useMemo(() => {
@@ -160,11 +175,50 @@ export default function ConcessionariasPage() {
       
       handleCloseModal();
       mutateConcs(); // SWR revalidation — instant UI update
-      setCreating(false);
+      setIsModalOpen(false);
     } catch (err: any) {
-      alert(err.message || 'Erro ao salvar');
+      alert(err.message);
+    } finally {
       setCreating(false);
     }
+  };
+
+  const handleAplicarReajuste = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formReajuste.tipo_concessionaria || formReajuste.percentual <= 0 || !formReajuste.mes_aplicacao) {
+      alert("Preencha todos os campos obrigatórios corretamente.");
+      return;
+    }
+    
+    try {
+      setAplicandoReajuste(true);
+      const formData = new FormData();
+      formData.append('tipo_concessionaria', formReajuste.tipo_concessionaria);
+      formData.append('percentual', formReajuste.percentual.toString());
+      formData.append('mes_aplicacao', formReajuste.mes_aplicacao);
+      if (pdfReajuste) {
+        formData.append('pdf_file', pdfReajuste);
+      }
+      
+      await api.aplicarReajusteConcessionaria(formData);
+      await mutateConcs();
+      await mutateHistorico();
+      setIsReajusteModalOpen(false);
+      setPdfReajuste(null);
+      setFormReajuste({ tipo_concessionaria: 'Enel', percentual: 0, mes_aplicacao: '' });
+      alert('Reajuste aplicado com sucesso!');
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setAplicandoReajuste(false);
+    }
+  };
+
+  const handleOpenCreate = () => {
+    setFormConc({ ...defaultConc });
+    setEditingId(null);
+    setShowPassword(false);
+    setIsModalOpen(true);
   };
 
   const handleDelete = async () => {
@@ -180,12 +234,7 @@ export default function ConcessionariasPage() {
     }
   };
 
-  const handleOpenCreate = () => {
-    setFormConc({ ...defaultConc });
-    setEditingId(null);
-    setShowPassword(false);
-    setIsModalOpen(true);
-  };
+
 
   const handleOpenEdit = (conc: any) => {
     setFormConc({
@@ -196,7 +245,8 @@ export default function ConcessionariasPage() {
       dia_vencimento: conc.dia_vencimento,
       email_esperado: conc.email_esperado || '',
       senha_manual: conc.senha_manual || '',
-      valor_medio: conc.valor_medio || 0
+      valor_medio: conc.valor_medio || 0,
+      nome_personalizado: conc.nome_personalizado || ''
     });
     setEditingId(conc.id);
     setShowPassword(false);
@@ -257,7 +307,7 @@ export default function ConcessionariasPage() {
     return result;
   }, [concs, tab, searchTerm, sortField, sortDir]);
 
-  const tabs = ['Todas', 'Enel', 'Sabesp', 'Comgás', 'Outros'];
+  const tabs = ['Todas', 'Enel', 'Sabesp', 'Comgás', 'Claro', 'Vivo', 'TIM', 'Outros'];
 
   const SortIcon = ({ field }: { field: 'nome' | 'numero' }) => (
     <ArrowUpDown
@@ -279,9 +329,17 @@ export default function ConcessionariasPage() {
             Configure regras de senha, e-mails esperados e vencimentos de cada vinculação.
           </p>
         </div>
-        <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
-          <Plus size={16} /> Vincular Nova
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="dc-btn dc-btn-secondary" onClick={() => setIsHistoricoModalOpen(true)}>
+            <History size={16} /> Histórico
+          </button>
+          <button className="dc-btn dc-btn-dark" onClick={() => setIsReajusteModalOpen(true)}>
+            <TrendingUp size={16} /> Aplicar Reajuste
+          </button>
+          <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
+            <Plus size={16} /> Vincular Nova
+          </button>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -365,7 +423,7 @@ export default function ConcessionariasPage() {
                           {conc.tipo[0]}
                         </div>
                         <div>
-                          <div className="dc-cell-primary">{conc.tipo}</div>
+                          <div className="dc-cell-primary">{conc.tipo === 'Outros' && conc.nome_personalizado ? conc.nome_personalizado : conc.tipo}</div>
                           <div className="dc-cell-secondary">{codigoLabel}: {conc.instalacao}</div>
                         </div>
                       </div>
@@ -459,9 +517,18 @@ export default function ConcessionariasPage() {
                       <option value="Enel">Enel</option>
                       <option value="Sabesp">Sabesp</option>
                       <option value="Comgás">Comgás</option>
+                      <option value="Claro">Claro</option>
+                      <option value="Vivo">Vivo</option>
+                      <option value="TIM">TIM</option>
                       <option value="Outros">Outros</option>
                     </select>
                   </div>
+                  {formConc.tipo === 'Outros' ? (
+                    <div className="dc-form-group">
+                      <label>Nome da Concessionária</label>
+                      <input className="dc-form-input" required value={formConc.nome_personalizado || ''} onChange={e => setFormConc({...formConc, nome_personalizado: e.target.value})} placeholder="Ex: Sanasa" disabled={!!editingId} />
+                    </div>
+                  ) : null}
                   <div className="dc-form-group">
                     <label>{getCodigoLabel(formConc.tipo)}</label>
                     <input className="dc-form-input" required value={formConc.instalacao} onChange={e => setFormConc({...formConc, instalacao: e.target.value})} placeholder="Ex: 82736412" disabled={!!editingId} />
@@ -561,6 +628,92 @@ export default function ConcessionariasPage() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Reajuste Modal */}
+      {isReajusteModalOpen && (
+        <div className="dc-modal-overlay">
+          <div className="dc-modal-content" style={{ maxWidth: 440 }}>
+            <div className="dc-modal-header">
+              <h2 className="dc-modal-title">Aplicar Reajuste</h2>
+              <button className="dc-modal-close" onClick={() => setIsReajusteModalOpen(false)}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleAplicarReajuste} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="dc-form-group">
+                <label>Tipo de Concessionária</label>
+                <select value={formReajuste.tipo_concessionaria} onChange={e => setFormReajuste({...formReajuste, tipo_concessionaria: e.target.value})} className="dc-input dc-form-select">
+                  <option value="Enel">Enel</option>
+                  <option value="Sabesp">Sabesp</option>
+                  <option value="Comgás">Comgás</option>
+                  <option value="Claro">Claro</option>
+                  <option value="Vivo">Vivo</option>
+                  <option value="TIM">TIM</option>
+                  <option value="Outros">Outros</option>
+                </select>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 4 }}>O valor médio de todas as concessionárias deste tipo será atualizado.</div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="dc-form-group">
+                  <label>Percentual (%)</label>
+                  <input type="number" step="0.01" className="dc-form-input" required value={formReajuste.percentual || ''} onChange={e => setFormReajuste({...formReajuste, percentual: parseFloat(e.target.value)})} placeholder="Ex: 5.32" />
+                </div>
+                <div className="dc-form-group">
+                  <label>Mês Presumido</label>
+                  <input type="month" className="dc-form-input" required value={formReajuste.mes_aplicacao} onChange={e => setFormReajuste({...formReajuste, mes_aplicacao: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="dc-form-group">
+                <label>Documento Comprobatório (Opcional)</label>
+                <input type="file" accept="application/pdf" className="dc-form-input" onChange={e => setPdfReajuste(e.target.files?.[0] || null)} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 10 }}>
+                <button type="button" className="dc-btn dc-btn-secondary" onClick={() => setIsReajusteModalOpen(false)}>Cancelar</button>
+                <button type="submit" className="dc-btn dc-btn-primary" disabled={aplicandoReajuste}>
+                  {aplicandoReajuste ? <div className="dc-loading-spinner" /> : <TrendingUp size={16} />}
+                  Aplicar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Histórico Modal */}
+      {isHistoricoModalOpen && (
+        <div className="dc-modal-overlay">
+          <div className="dc-modal-content" style={{ maxWidth: 640 }}>
+            <div className="dc-modal-header">
+              <h2 className="dc-modal-title">Histórico de Reajustes</h2>
+              <button className="dc-modal-close" onClick={() => setIsHistoricoModalOpen(false)}><X size={20} /></button>
+            </div>
+            <div style={{ padding: '20px', maxHeight: '60vh', overflowY: 'auto' }}>
+              <table className="dc-table">
+                <thead>
+                  <tr>
+                    <th>Data de Aplicação</th>
+                    <th>Concessionária</th>
+                    <th>Percentual</th>
+                    <th>Mês/Ano</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historicoReajustes.length === 0 ? (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>Nenhum reajuste aplicado.</td></tr>
+                  ) : historicoReajustes.map((r: any) => (
+                    <tr key={r.id}>
+                      <td>{new Date(r.created_at).toLocaleDateString('pt-BR')}</td>
+                      <td>{r.tipo_concessionaria}</td>
+                      <td style={{ color: '#059669', fontWeight: 600 }}>+{r.percentual.toFixed(2).replace('.', ',')}%</td>
+                      <td>{r.mes_aplicacao}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

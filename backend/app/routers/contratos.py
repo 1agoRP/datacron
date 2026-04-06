@@ -38,9 +38,8 @@ async def get_unique_contract_types(
     all_types = set(types) | set(p_types)
     
     # Defined defaults if some are missing
-    defaults = {"Manutenção de Elevadores", "Bombas", "Portaria", "Limpeza", "Segurança", "Outros"}
+    defaults = {"Elevadores", "Bombas", "Gerador", "Limpeza", "Portaria", "CFTV/Portões/Interfone", "Segurança", "Jardim", "Piscina", "Controle de Acesso", "Outros"}
     final_list = sorted(list(all_types | defaults))
-    
     # Remove "Outros" from the main list if we want it to be separate or just keep it
     return final_list
 
