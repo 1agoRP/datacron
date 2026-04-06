@@ -15,12 +15,18 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
   try {
     return await fetch(url, options);
   } catch (err: any) {
-    // Only retry safe, idempotent methods (GET by default if method is missing)
+    // Only retry safe, idempotent methods, OR any method if it is a network failure (server is warming up)
     const method = (options.method || 'GET').toUpperCase();
     const isIdempotent = ['GET', 'OPTIONS', 'HEAD', 'PUT', 'DELETE'].includes(method);
+    const isNetworkError = err.message && err.message.toLowerCase().includes('failed to fetch');
     
-    if (retries > 0 && isIdempotent) {
-      console.warn(`[Network Error] Retrying ${method} to ${url} in ${delay}ms... (${retries} retries left)`, err);
+    if (retries > 0 && (isIdempotent || isNetworkError)) {
+      console.warn(`[Network Error / Cold Start] Retrying ${method} to ${url} in ${delay}ms... (${retries} retries left)`, err);
+      if (isNetworkError) {
+          // Longer delay for cold starts
+          await new Promise(r => setTimeout(r, delay * 2));
+          return fetchWithRetry(url, options, retries - 1, delay * 3);
+      }
       await new Promise(r => setTimeout(r, delay));
       return fetchWithRetry(url, options, retries - 1, delay * 1.5);
     }
