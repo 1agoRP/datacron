@@ -2,7 +2,16 @@ import uuid
 from datetime import datetime, date
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import String, DateTime, Date, Float, Text, ForeignKey, func, Uuid as UUID
+from sqlalchemy import (
+    String,
+    DateTime,
+    Date,
+    Float,
+    Text,
+    ForeignKey,
+    func,
+    Uuid as UUID,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -19,7 +28,9 @@ class Contrato(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     condominio_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("condominios.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("condominios.id", ondelete="CASCADE"),
+        nullable=False,
     )
     empresa: Mapped[str] = mapped_column(String(200), nullable=False)
     razao_social: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
@@ -27,7 +38,9 @@ class Contrato(Base):
     email_contato: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     telefone_contato: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     tipo_contrato: Mapped[str] = mapped_column(String(100), nullable=False)
-    tipo_personalizado: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    tipo_personalizado: Mapped[Optional[str]] = mapped_column(
+        String(200), nullable=True
+    )
     data_inicio: Mapped[date] = mapped_column(Date, nullable=False)
     data_fim: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     valor_inicial: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
@@ -35,7 +48,11 @@ class Contrato(Base):
     data_reajuste: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     indice_reajuste: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     ultimo_reajuste: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    periodicidade: Mapped[str] = mapped_column(String(50), nullable=False, default="mensal")
+    periodicidade: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="mensal"
+    )
+    dia_vencimento: Mapped[Optional[int]] = mapped_column(nullable=True)
+    pagamento_recebido: Mapped[bool] = mapped_column(default=False)
     arquivo_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     observacoes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -46,7 +63,9 @@ class Contrato(Base):
     )
 
     # Relationships
-    condominio: Mapped["Condominio"] = relationship("Condominio", back_populates="contratos")
+    condominio: Mapped["Condominio"] = relationship(
+        "Condominio", back_populates="contratos"
+    )
     arquivos: Mapped[list["ContractFile"]] = relationship(
         "ContractFile", back_populates="contrato", cascade="all, delete-orphan"
     )

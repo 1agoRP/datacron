@@ -7,9 +7,11 @@ from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
 # ─── Auth ────────────────────────────────────────────────────
 
+
 class LoginRequest(BaseModel):
     email: EmailStr
     senha: str
+
 
 class UserInToken(BaseModel):
     id: str
@@ -18,11 +20,13 @@ class UserInToken(BaseModel):
     role: str
     model_config = {"from_attributes": True}
 
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
     user: UserInToken
+
 
 class UserResponse(BaseModel):
     id: uuid.UUID
@@ -32,12 +36,14 @@ class UserResponse(BaseModel):
     created_at: datetime
     model_config = {"from_attributes": True}
 
+
 class PasswordUpdate(BaseModel):
     senha_atual: str
     nova_senha: str
 
 
 # ─── Condomínio ───────────────────────────────────────────────
+
 
 class CondominioCreate(BaseModel):
     nome: str
@@ -53,7 +59,7 @@ class CondominioCreate(BaseModel):
         digits = "".join(filter(str.isdigit, v))
         if len(digits) != 14:
             raise ValueError("CNPJ deve ter 14 dígitos")
-        
+
         # Validar primeiro e segundo dígitos verificadores
         for i in range(12, 14):
             fator = i - 7
@@ -67,8 +73,9 @@ class CondominioCreate(BaseModel):
             digito_esperado = 0 if resultado >= 10 else resultado
             if digito_esperado != int(digits[i]):
                 raise ValueError("CNPJ inválido (dígito verificador incorreto)")
-        
+
         return v
+
 
 class CondominioUpdate(BaseModel):
     nome: Optional[str] = None
@@ -78,6 +85,7 @@ class CondominioUpdate(BaseModel):
     ata_eleicao_base64: Optional[str] = None
     ata_eleicao_nome: Optional[str] = None
     ativo: Optional[bool] = None
+
 
 class CondominioResponse(BaseModel):
     id: uuid.UUID
@@ -99,6 +107,7 @@ class CondominioResponse(BaseModel):
 
 # ─── Concessionária ───────────────────────────────────────────
 
+
 class ConcessionariaCreate(BaseModel):
     condominio_id: uuid.UUID
     tipo: str  # Enel | Sabesp | Comgás | Claro | Vivo | TIM | Outros
@@ -110,6 +119,7 @@ class ConcessionariaCreate(BaseModel):
     valor_medio: float = 0.0
     nome_personalizado: Optional[str] = None
 
+
 class ConcessionariaUpdate(BaseModel):
     tipo: Optional[str] = None
     email_esperado: Optional[EmailStr] = None
@@ -120,13 +130,16 @@ class ConcessionariaUpdate(BaseModel):
     nome_personalizado: Optional[str] = None
     ativo: Optional[bool] = None
 
+
 class CondominioMini(BaseModel):
     """Minimal condominio data for nested responses."""
+
     id: uuid.UUID
     nome: str
     numero: str
     cnpj: str
     model_config = {"from_attributes": True}
+
 
 class ConcessionariaResponse(BaseModel):
     id: uuid.UUID
@@ -147,6 +160,7 @@ class ConcessionariaResponse(BaseModel):
 
 # ─── Fatura ───────────────────────────────────────────────────
 
+
 class FaturaCreate(BaseModel):
     condominio_id: uuid.UUID
     concessionaria_id: uuid.UUID
@@ -156,8 +170,10 @@ class FaturaCreate(BaseModel):
     email_remetente: Optional[str] = None
     email_assunto: Optional[str] = None
 
+
 class FaturaStatusUpdate(BaseModel):
     status: str  # pendente | processada | erro | revisao
+
 
 class FaturaResponse(BaseModel):
     id: uuid.UUID
@@ -179,6 +195,7 @@ class FaturaResponse(BaseModel):
 
 # ─── Alerta ───────────────────────────────────────────────────
 
+
 class AlertaResponse(BaseModel):
     id: uuid.UUID
     condominio_id: Optional[uuid.UUID]
@@ -193,6 +210,7 @@ class AlertaResponse(BaseModel):
 
 
 # ─── Email Log ────────────────────────────────────────────────
+
 
 class EmailLogResponse(BaseModel):
     id: uuid.UUID
@@ -218,6 +236,7 @@ class EmailLogResponse(BaseModel):
 
 # ─── Pagination ───────────────────────────────────────────────
 
+
 class PaginatedResponse(BaseModel):
     items: list[Any]
     total: int
@@ -228,11 +247,13 @@ class PaginatedResponse(BaseModel):
 
 # ─── Import ───────────────────────────────────────────────────
 
+
 class ImportPreviewRow(BaseModel):
     acao: str  # CRIAR | ATUALIZAR | IGNORAR
     dados: dict[str, Any]
     validacao: bool
     mensagem: Optional[str] = None
+
 
 class ImportPreviewResponse(BaseModel):
     tipo: str
@@ -243,10 +264,12 @@ class ImportPreviewResponse(BaseModel):
     erros: int
     rows: list[ImportPreviewRow]
 
+
 class ImportConfirmResponse(BaseModel):
     sucesso: int
     erros: int
     mensagem: str
+
 
 class ImportConfirmRequest(BaseModel):
     tipo: Literal["condominios", "concessionarias"]
@@ -255,11 +278,15 @@ class ImportConfirmRequest(BaseModel):
 
 # ─── Relatórios Gerados ───────────────────────────────────────
 
+
 class RelatorioGeradoCreate(BaseModel):
     nome: str
-    tipo_relatorio: str  # relatorio_analitico | por_condominio | por_concessionaria | ...
+    tipo_relatorio: (
+        str  # relatorio_analitico | por_condominio | por_concessionaria | ...
+    )
     formato: str  # pdf | excel | csv
     usuario: str = "Operador"
+
 
 class RelatorioGeradoResponse(BaseModel):
     id: uuid.UUID
@@ -272,6 +299,7 @@ class RelatorioGeradoResponse(BaseModel):
 
 
 # ─── Contrato ─────────────────────────────────────────────────
+
 
 class ContratoCreate(BaseModel):
     condominio_id: uuid.UUID
@@ -290,7 +318,10 @@ class ContratoCreate(BaseModel):
     indice_reajuste: Optional[str] = None
     ultimo_reajuste: Optional[date] = None
     periodicidade: str = "mensal"
+    dia_vencimento: Optional[int] = None
+    pagamento_recebido: bool = False
     observacoes: Optional[str] = None
+
 
 class ContratoUpdate(BaseModel):
     empresa: Optional[str] = None
@@ -308,7 +339,10 @@ class ContratoUpdate(BaseModel):
     indice_reajuste: Optional[str] = None
     ultimo_reajuste: Optional[date] = None
     periodicidade: Optional[str] = None
+    dia_vencimento: Optional[int] = None
+    pagamento_recebido: Optional[bool] = None
     observacoes: Optional[str] = None
+
 
 class ContratoResponse(BaseModel):
     id: uuid.UUID
@@ -328,6 +362,8 @@ class ContratoResponse(BaseModel):
     indice_reajuste: Optional[str] = None
     ultimo_reajuste: Optional[date] = None
     periodicidade: str
+    dia_vencimento: Optional[int] = None
+    pagamento_recebido: bool = False
     arquivo_path: Optional[str] = None
     observacoes: Optional[str] = None
     status: str = "ativo"
@@ -339,10 +375,12 @@ class ContratoResponse(BaseModel):
 
 # ─── Reajuste Concessionária ──────────────────────────────────
 
+
 class ReajusteConcessionariaCreate(BaseModel):
     percentual: float
     mes_aplicacao: str
     tipo_concessionaria: str
+
 
 class ReajusteConcessionariaResponse(BaseModel):
     id: uuid.UUID
@@ -358,12 +396,14 @@ class ReajusteConcessionariaResponse(BaseModel):
 
 # ─── Reajuste Mercado ─────────────────────────────────────────
 
+
 class ReajusteMercadoCreate(BaseModel):
     categoria: str
     categoria_personalizada: Optional[str] = None
     percentual: float
     vigencia: str
     descricao: Optional[str] = None
+
 
 class ReajusteMercadoResponse(BaseModel):
     id: uuid.UUID
