@@ -225,7 +225,7 @@ export default function ReajustesPage() {
                     </div>
                   </td>
                   <td>
-                    <div className="dc-cell-primary">{r.vigencia ? format(new Date(r.vigencia), 'MMMM yyyy', { locale: ptBR }) : '—'}</div>
+                    <div className="dc-cell-primary">{r.vigencia ? format(new Date(r.vigencia + '-01T12:00:00'), 'MMMM yyyy', { locale: ptBR }) : '—'}</div>
                   </td>
                   <td>
                     <div className="dc-cell-secondary" style={{ maxWidth: 300, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
