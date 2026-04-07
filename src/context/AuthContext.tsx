@@ -1,12 +1,13 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { User } from '@/types';
 
 interface AuthContextType {
-  user: any | null;
+  user: User | null;
   loading: boolean;
-  login: (credentials: any) => Promise<void>;
+  login: (credentials: { email: string; senha: string }) => Promise<void>;
   logout: () => void;
 }
 
@@ -14,67 +15,85 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
  * Decodes a JWT payload without verification (for local instant render).
- * This avoids a network roundtrip just to know who the user is.
+ * Use only for non-sensitive UI state. Backend verifies the actual token.
  */
-function decodeJwtPayload(token: string): any | null {
+function decodeJwtPayload(token: string): Partial<User> | null {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    // Check expiration
-    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
-    return payload;
-  } catch {
+    
+    // Using Buffer-like approach for cross-environment compatibility if needed, 
+    // but atob is standard in modern browsers.
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(base64));
+    
+    // Expiration check (exp is in seconds)
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      return null;
+    }
+    
+    return {
+      id: payload.sub,
+      email: payload.email,
+      role: payload.role,
+      nome: payload.nome || payload.email?.split('@')[0] || 'Usuário',
+    };
+  } catch (error) {
+    console.error('JWT Decode Error:', error);
     return null;
   }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const initAuth = () => {
-      const token = localStorage.getItem('datacron_token');
-      if (token) {
-        // Sync cookie so middleware can protect routes
-        document.cookie = `datacron_token=${token}; path=/; SameSite=Strict; max-age=${60 * 60 * 24}`;
-
-        // Try to decode JWT locally for INSTANT render (no network wait)
-        const payload = decodeJwtPayload(token);
-        if (payload) {
-          setUser({
-            id: payload.sub,
-            email: payload.email,
-            role: payload.role,
-            nome: payload.nome || payload.email?.split('@')[0] || 'Usuário',
-          });
+    const initAuth = async () => {
+      try {
+        const token = localStorage.getItem('datacron_token');
+        if (!token) {
           setLoading(false);
-
-          // Validate with server in background (non-blocking)
-          api.getMe().then((userData) => {
-            setUser(userData);
-          }).catch(() => {
-            // Token invalid on server — cleanup
-            localStorage.removeItem('datacron_token');
-            document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
-            setUser(null);
-          });
           return;
         }
 
-        // Token couldn't be decoded (expired or malformed) — clear it
-        localStorage.removeItem('datacron_token');
-        document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
+        // 1. Instant local decode for UI snappiness
+        const payload = decodeJwtPayload(token);
+        if (payload) {
+          // Temporarily set user from token info
+          setUser(payload as User);
+          setLoading(false); // UI is now interactive
+
+          // 2. Background sync with server for full profile & security check
+          try {
+            const userData = await api.getMe();
+            setUser(userData);
+          } catch (err) {
+            // Token likely expired or revoked on server
+            console.warn('Session sync failed, logging out:', err);
+            handleLogoutCleanup();
+          }
+        } else {
+          handleLogoutCleanup();
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
+
     initAuth();
   }, []);
 
-  const login = async (credentials: any) => {
+  const handleLogoutCleanup = () => {
+    localStorage.removeItem('datacron_token');
+    document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
+    setUser(null);
+  };
+
+  const login = async (credentials: { email: string; senha: string }) => {
     const data = await api.login(credentials);
-    // Use user data from login response directly (no second roundtrip)
     setUser(data.user);
   };
 

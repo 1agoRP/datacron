@@ -24,152 +24,10 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import '@/styles/globals.css';
 import '@/styles/app.css';
+import '@/styles/landing.css';
 
-/* ─── INLINE STYLES & KEYFRAMES ─── */
-const globalStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
-  :root {
-    --blue-900: #0a1628;
-    --blue-800: #0d1f3c;
-    --blue-700: #1a3660;
-    --blue-600: #1e4a8a;
-    --blue-500: #2563eb;
-    --blue-400: #3b82f6;
-    --blue-300: #60a5fa;
-    --blue-200: #bfdbfe;
-    --blue-100: #dbeafe;
-    --blue-50:  #eff6ff;
-    --slate-900: #0f172a;
-    --slate-800: #1e293b;
-    --slate-700: #334155;
-    --slate-600: #475569;
-    --slate-400: #94a3b8;
-    --slate-300: #cbd5e1;
-    --slate-200: #e2e8f0;
-    --slate-100: #f1f5f9;
-    --slate-50:  #f8fafc;
-    --white: #ffffff;
-    --red-500: #ef4444;
-    --green-500: #22c55e;
-    --amber-500: #f59e0b;
-    --font-display: 'Syne', sans-serif;
-    --font-body: 'Space Grotesk', sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
-  }
-
-  html { scroll-behavior: smooth; }
-
-  @keyframes pulse-ring {
-    0% { transform: scale(0.8); opacity: 1; }
-    100% { transform: scale(2.2); opacity: 0; }
-  }
-  @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-8px); }
-  }
-  @keyframes marquee {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
-  }
-
-  .lp-nav { 
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 1.1rem 3rem; border-bottom: 1px solid rgba(226,232,240,0.7);
-    background: rgba(248,250,252,0.85); backdrop-filter: blur(20px);
-    position: sticky; top: 0; z-index: 50;
-  }
-  .lp-logo-text {
-    font-family: var(--font-display); font-size: 1.4rem; font-weight: 800;
-    letter-spacing: -0.01em; color: var(--slate-900);
-    display: flex; align-items: center; gap: 0.75rem;
-  }
-  .lp-logo-icon {
-    width: 38px; height: 38px; border-radius: 10px;
-    background: var(--blue-50); border: 1px solid var(--blue-200);
-    display: flex; align-items: center; justify-content: center; color: var(--blue-500);
-  }
-  .lp-btn-primary {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: var(--blue-500); color: var(--white);
-    border: none; border-radius: 10px; padding: 0.65rem 1.4rem;
-    font-family: var(--font-body); font-size: 0.9rem; font-weight: 600;
-    cursor: pointer; transition: all 0.2s ease; letter-spacing: -0.01em;
-  }
-  .lp-btn-primary:hover { background: var(--blue-600); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(37,99,235,0.35); }
-  .lp-btn-ghost {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: transparent; color: var(--slate-600);
-    border: 1px solid var(--slate-200); border-radius: 10px; padding: 0.65rem 1.4rem;
-    font-family: var(--font-body); font-size: 0.9rem; font-weight: 600;
-    cursor: pointer; transition: all 0.2s ease; letter-spacing: -0.01em;
-  }
-  .lp-btn-ghost:hover { border-color: var(--blue-300); color: var(--blue-500); background: var(--blue-50); }
-  .lp-card {
-    background: var(--white); border: 1px solid var(--slate-200);
-    border-radius: 16px; transition: all 0.3s ease;
-  }
-  .lp-card:hover { border-color: var(--blue-200); box-shadow: 0 12px 40px rgba(37,99,235,0.08); transform: translateY(-2px); }
-  .lp-form-input {
-    width: 100%; padding: 0.75rem 1rem;
-    background: var(--slate-50); border: 1.5px solid var(--slate-200);
-    border-radius: 10px; font-family: var(--font-body); font-size: 0.95rem;
-    color: var(--slate-900); outline: none; transition: all 0.2s;
-  }
-  .lp-form-input:focus { border-color: var(--blue-400); background: var(--white); box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
-  .lp-form-label { font-size: 0.82rem; font-weight: 600; color: var(--slate-700); margin-bottom: 0.4rem; display: block; letter-spacing: 0.01em; }
-  .lp-spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .lp-tag {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: var(--blue-50); color: var(--blue-500);
-    border: 1px solid var(--blue-200); border-radius: 20px;
-    padding: 0.35rem 0.9rem; font-size: 0.78rem; font-weight: 700;
-    letter-spacing: 0.05em; font-family: var(--font-mono);
-  }
-  .lp-tag-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue-400); animation: pulse-ring 1.5s infinite; }
-  .marquee-track { display: flex; gap: 3rem; animation: marquee 25s linear infinite; width: max-content; }
-  .marquee-item { display: flex; align-items: center; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.8rem; color: var(--slate-400); white-space: nowrap; font-weight: 500; }
-
-  .stat-card { 
-    background: var(--white); border: 1px solid var(--slate-200); border-radius: 16px;
-    padding: 2rem; display: flex; flex-direction: column; gap: 0.5rem;
-    transition: all 0.3s ease;
-  }
-  .stat-card:hover { border-color: var(--blue-200); box-shadow: 0 8px 32px rgba(37,99,235,0.1); transform: translateY(-2px); }
-  .stat-number { font-family: var(--font-display); font-size: 2.8rem; font-weight: 800; color: var(--slate-900); letter-spacing: -0.04em; line-height: 1; }
-  .stat-label { font-size: 0.9rem; color: var(--slate-500); font-weight: 500; line-height: 1.4; }
-  .stat-delta { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 700; color: var(--green-500); font-family: var(--font-mono); }
-
-  .process-step { display: flex; gap: 1.5rem; align-items: flex-start; padding: 1.75rem; border-radius: 14px; transition: background 0.2s; }
-  .process-step:hover { background: rgba(255,255,255,0.03); }
-  .step-num { 
-    font-family: var(--font-display); font-size: 1rem; font-weight: 800; 
-    color: var(--blue-500); width: 36px; height: 36px; background: var(--blue-50);
-    border: 1.5px solid var(--blue-200); border-radius: 10px;
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    letter-spacing: -0.02em;
-  }
-
-  .feat-icon { 
-    width: 48px; height: 48px; border-radius: 13px;
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 1.25rem; flex-shrink: 0;
-  }
-
-  .compare-row { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-  .compare-row:last-child { border-bottom: none; }
-
-  @media (max-width: 768px) {
-    .lp-nav { padding: 1rem 1.25rem; }
-    .bento-grid { grid-template-columns: 1fr !important; }
-    .hero-btns { flex-direction: column; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
-    .process-grid { grid-template-columns: 1fr !important; }
-    .compare-grid { grid-template-columns: 1fr !important; }
-    .hero-grid { grid-template-columns: 1fr !important; }
-  }
-`;
+/* ─── ANIMATED COUNTER ─── */
 
 /* ─── ANIMATED COUNTER ─── */
 function Counter({ end, suffix = '', duration = 2 }: { end: number; suffix?: string; duration?: number }) {
@@ -229,13 +87,14 @@ export default function LandingPage() {
       clearTimeout(timeout);
       clearTimeout(warningTimeout);
       router.push('/dashboard');
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(timeout);
       clearTimeout(warningTimeout);
-      if (err.message && err.message.toLowerCase().includes('failed to fetch')) {
+      const errorMsg = err instanceof Error ? err.message : 'Falha na autenticação';
+      if (errorMsg.toLowerCase().includes('failed to fetch')) {
         setError('Servidor indisponível. Verifique sua conexão e tente novamente.');
       } else {
-        setError(err.message || 'Falha na autenticação');
+        setError(errorMsg);
       }
       setIsLoading(false);
     }
@@ -266,7 +125,6 @@ export default function LandingPage() {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
 
       <div style={{ background: 'var(--slate-50)', minHeight: '100vh', fontFamily: 'var(--font-body)' }}>
 

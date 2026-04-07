@@ -4,21 +4,25 @@ from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
-# Append prepared_statement_cache_size=0 to disable SQLAlchemy's prepared statement cache for PgBouncer
+# ─── Engine Configuration ─────────────────────────────────────
+# For Supabase / PgBouncer in transaction mode, we MUST:
+# 1. Disable the prepared statement cache (statement_cache_size=0)
+# 2. Use NullPool to avoid keeping connections open in the pooler
+# 3. Ensure the URL doesn't conflict with these settings
+
 db_url = settings.DATABASE_URL
-if "?" in db_url:
-    if "prepared_statement_cache_size" not in db_url:
-        db_url += "&prepared_statement_cache_size=0"
-else:
-    db_url += "?prepared_statement_cache_size=0"
+
+# Robust URL cleaning for PgBouncer
+if "prepared_statement_cache_size" not in db_url:
+    separator = "&" if "?" in db_url else "?"
+    db_url += f"{separator}prepared_statement_cache_size=0"
 
 engine = create_async_engine(
     db_url,
-    echo=False,
-    future=True,
     poolclass=NullPool,
     connect_args={
         "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
     },
 )
 

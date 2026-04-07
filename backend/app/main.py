@@ -42,14 +42,6 @@ async def lifespan(app: FastAPI):
         logger.error("VULNERABILIDADE CRÍTICA: CORS aberto '*' em ambiente de produção!")
         raise RuntimeError("Deploy cancelado por segurança. Defina ALLOWED_ORIGINS corretamente.")
 
-    # Ensure tables exist (safe fallback — Alembic handles actual migrations).
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables verified")
-    except Exception as e:
-        logger.warning(f"Could not verify database tables (common with Supabase Transaction poolers): {e}")
-
     # Start background scheduler
     start_scheduler()
 
