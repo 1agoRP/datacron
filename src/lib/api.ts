@@ -123,7 +123,7 @@ class ApiClient {
 
   // Auth
   async login(credentials: any) {
-    const data = await this.request<{ access_token: string; user: any }>('/auth/login', {
+    const data = await this.request<{ access_token: string; user: User }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({
         email: credentials.email,
@@ -150,8 +150,8 @@ class ApiClient {
     });
   }
 
-  async getMe() {
-    return this.request('/auth/me');
+  async getMe(): Promise<User> {
+    return this.request<User>('/auth/me');
   }
 
   // Dashboard & Stats
