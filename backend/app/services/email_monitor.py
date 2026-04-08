@@ -68,6 +68,32 @@ def get_gmail_service():
 
     return build("gmail", "v1", credentials=creds)
 
+def send_notification_email(to: str, subject: str, message_text: str) -> bool:
+    """
+    Sends an email using the authenticated Gmail API.
+    """
+    try:
+        from email.message import EmailMessage
+        service = get_gmail_service()
+        if not service:
+            logger.error("Could not obtain Gmail service to send email.")
+            return False
+            
+        message = EmailMessage()
+        message.set_content(message_text)
+        message["To"] = to
+        message["From"] = settings.GMAIL_USER or "datacron.auth@gmail.com"
+        message["Subject"] = subject
+        
+        encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        create_message = {"raw": encoded_message}
+        
+        service.users().messages().send(userId="me", body=create_message).execute()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send email to {to}: {str(e)}")
+        return False
+
 
 def get_pdf_attachments(service, message_id: str) -> list[tuple[str, bytes]]:
     """

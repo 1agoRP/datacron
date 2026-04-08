@@ -11,8 +11,6 @@ const navItems = [
   { icon: User,       label: 'Perfil & Conta' },
   { icon: Shield,     label: 'Privacidade & Segurança' },
   { icon: Bell,       label: 'Notificações' },
-  { icon: Globe,      label: 'Domínio Datacron' },
-  { icon: Database,   label: 'Integração de Base' },
   { icon: Mail,       label: 'Conexão Gmail' },
 ];
 
@@ -71,20 +69,43 @@ export default function ConfiguracoesPage() {
     }, 1000);
   };
 
-  const [gmailStatus, setGmailStatus] = useState({ connected: false, email: '' });
-  const [isLoadingGmail, setIsLoadingGmail] = useState(false);
+  // Status Gmail
+  const [gmailStatus, setGmailStatus] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncHistory, setSyncHistory] = useState([
+    { date: '10 Out 2024, 08:00', status: 'Sucesso', count: 4 },
+    { date: '09 Out 2024, 14:00', status: 'Sucesso', count: 12 },
+    { date: '08 Out 2024, 20:00', status: 'Falha', count: 0 },
+  ]);
+
+  // Sessoes Ativas
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+
+  // Notifications
+  const [notifConfig, setNotifConfig] = useState({
+    invoiceCreated: true,
+    invoicePaid: true,
+    invoiceOverdue: true,
+    systemAlerts: false
+  });
 
   React.useEffect(() => {
     if (active === 'Conexão Gmail') {
-      setIsLoadingGmail(true);
-      api.getGmailStatus().then((res: any) => {
-        setGmailStatus({
-          connected: res.connected,
-          email: res.email || 'Não Conectado'
+      api.getGmailStatus()
+        .then((res: any) => setGmailStatus(res))
+        .catch(err => {
+          console.error("Failed to load Gmail Status", err);
+          setGmailStatus({ connected: false });
         });
-      }).catch((err: any) => console.error("Error fetching gmail status", err))
-      .finally(() => setIsLoadingGmail(false));
+    }
+
+    if (active === 'Privacidade & Segurança') {
+      setIsLoadingSessions(true);
+      api.getSessions()
+        .then((res: any) => setSessions(res))
+        .catch(err => console.error("Failed to load sessions", err))
+        .finally(() => setIsLoadingSessions(false));
     }
   }, [active]);
 
@@ -97,6 +118,32 @@ export default function ConfiguracoesPage() {
       alert(e.message || 'Falha ao forçar sincronização.');
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleConnectGmail = async () => {
+    try {
+      const res = await api.getGmailAuthUrl() as any;
+      if (res && res.url) {
+        // Open OAuth in Popup
+        const width = 500;
+        const height = 600;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        
+        window.open(
+          res.url,
+          'GoogleOAuth',
+          `width=${width},height=${height},left=${left},top=${top}`
+        );
+        
+        // Simulating the user coming back after successful connection since no real callback exists yet:
+        setTimeout(() => {
+          api.getGmailStatus().then((st: any) => setGmailStatus(st));
+        }, 8000);
+      }
+    } catch (e: any) {
+      alert('Erro ao obter link de autenticação.');
     }
   };
 
@@ -254,142 +301,89 @@ export default function ConfiguracoesPage() {
               <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 20 }}>Dispositivos com acesso atual à sua conta.</div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, borderBottom: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-                      <Smartphone size={20} />
+                {isLoadingSessions ? (
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Carregando sessões...</div>
+                ) : sessions.length === 0 ? (
+                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Nenhuma sessão encontrada.</div>
+                ) : (
+                  sessions.map(s => (
+                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, borderBottom: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                          {s.device.includes('Navegador') || s.device.includes('Chrome') || s.device.includes('Mac') ? <Globe size={20} /> : <Smartphone size={20} />}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>{s.device}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{s.location} • {s.last_active}</div>
+                        </div>
+                      </div>
+                      {s.is_current ? (
+                        <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600 }}>Ativo</div>
+                      ) : (
+                        <button className="dc-btn" style={{ fontSize: '0.8rem', padding: '6px 12px' }}>Encerrar</button>
+                      )}
                     </div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>Windows 11 (Datacron App)</div>
-                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>São Paulo, BR • Sessão Atual</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600 }}>Ativo</div>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-                      <Globe size={20} />
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>Chrome (Mac OS)</div>
-                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Rio de Janeiro, BR • Há 2 dias</div>
-                    </div>
-                  </div>
-                  <button className="dc-btn" style={{ fontSize: '0.8rem', padding: '6px 12px' }}>Encerrar</button>
-                </div>
+                  ))
+                )}
               </div>
             </div>
           </>
         );
 
       case 'Notificações':
-        const notificationOption = (title: string, desc: string, defaultChecked = true) => (
+        const notificationOption = (key: keyof typeof notifConfig, title: string, desc: string) => (
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #e2e8f0' }}>
-            <div style={{ paddingRight: 20 }}>
-              <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#334155', marginBottom: 4 }}>{title}</div>
-              <div style={{ fontSize: '0.875rem', color: '#64748b' }}>{desc}</div>
+            <div style={{ maxWidth: '80%' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155', marginBottom: 4 }}>{title}</div>
+              <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>{desc}</div>
             </div>
-            <input type="checkbox" defaultChecked={defaultChecked} style={{ width: 18, height: 18, accentColor: '#2563eb', marginTop: 4 }} />
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }}>
+              <input 
+                type="checkbox" 
+                style={{ opacity: 0, position: 'absolute', width: 0, height: 0 }} 
+                checked={notifConfig[key]}
+                onChange={(e) => setNotifConfig({ ...notifConfig, [key]: e.target.checked })}
+              />
+              <div style={{ 
+                width: 40, height: 24, borderRadius: 12, 
+                background: notifConfig[key] ? '#2563eb' : '#cbd5e1',
+                padding: 2, transition: 'all 0.2s', display: 'flex'
+              }}>
+                <div style={{ 
+                  width: 20, height: 20, borderRadius: '50%', background: '#fff', 
+                  transition: 'all 0.2s', transform: notifConfig[key] ? 'translateX(16px)' : 'translateX(0)' 
+                }} />
+              </div>
+            </label>
           </div>
         );
 
         return (
           <div className="dc-card dc-card-p">
             <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: 6 }}>Preferências de Notificação</div>
-            <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 20 }}>Escolha como e quando você deseja ser alertado pelo Datacron.</div>
+            <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 8 }}>Gerencie todos os alertas que chegam ao seu e-mail.</div>
             
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {notificationOption('Resumo Semanal', 'Receba um relatório semanal com o processamento de faturas.', true)}
-              {notificationOption('Fatores Críticos e Alertas', 'Seja notificado imediatamente se houver falha de leitura ou webhook.', true)}
-              {notificationOption('Condomínios Novos', 'Alerta quando novos condomínios forem cadastrados na base.', false)}
-              {notificationOption('Atualizações Datacron', 'Novidades e atualizações sobre o sistema Datacron.', false)}
-            </div>
-
-            <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
-              <button className="dc-btn dc-btn-primary" onClick={() => alert('Preferências salvas!')}>Salvar Preferências</button>
+            {notificationOption('invoiceCreated', 'Nova Fatura Processada', 'Seja notificado no e-mail assim que o extrator finalizar a leitura de um novo PDF no Gmail.')}
+            {notificationOption('invoicePaid', 'Aviso de Pagamento Confirmado', 'Receba um e-mail quando recebermos os metadados do ERP atualizando o status.')}
+            {notificationOption('invoiceOverdue', 'Alerta de Vencimento', 'Gera um alerta de urgência para faturas não conciliadas 2 dias antes do vencimento.')}
+            {notificationOption('systemAlerts', 'Alertas do Sistema', 'Receba notificações de segurança e atualizações importantes sobre a saúde do seu servidor.')}
+            
+            <div style={{ marginTop: 24 }}>
+              <button 
+                className="dc-btn dc-btn-primary" 
+                onClick={async () => {
+                  try {
+                    const res: any = await api.saveNotifications(notifConfig);
+                    const emailMsg = res?.email_dispatched 
+                      ? ' (E-mail de confirmação enviado!)' 
+                      : ' (Integração de E-mail inativa).';
+                    alert('Preferências de notificação salvas com sucesso!' + emailMsg);
+                  } catch (e: any) {
+                    alert('Falha ao salvar preferências: ' + e.message);
+                  }
+              }}>Salvar Preferências</button>
             </div>
           </div>
-        );
-
-      case 'Domínio Datacron':
-        return (
-          <div className="dc-card dc-card-p">
-            <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: 6 }}>Configurar Domínio Personalizado</div>
-            <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 20 }}>Acesse sua área através do seu próprio domínio (ex: portal.suaempresa.com.br).</div>
-            
-            <div className="dc-form-group" style={{ maxWidth: 400 }}>
-              <label className="dc-form-label">Domínio</label>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <input className="dc-form-input" type="text" placeholder="portal.empresa.com.br" />
-                <button className="dc-btn dc-btn-primary" onClick={() => alert('Verificação iniciada. Aguarde a propagação DNS.')}>Verificar</button>
-              </div>
-            </div>
-
-            <div style={{ padding: '16px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', marginTop: 24 }}>
-              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155', marginBottom: 8 }}>Instruções de DNS</div>
-              <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.6 }}>
-                1. Acesse o seu provedor de domínio (HostGator, Registro.br, etc).<br />
-                2. Crie um registro do tipo <strong>CNAME</strong> apontando para <code>cname.datacron.com.br</code>.<br />
-                3. A propagação pode levar até 24 horas.
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'Integração de Base':
-        return (
-          <>
-            <div className="dc-card dc-card-p">
-              <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: 6 }}>Chaves de API</div>
-              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 20 }}>Conecte o ERP da sua administradora com o Datacron via API.</div>
-              
-              <div style={{ padding: '16px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>Chave de Produção</div>
-                  <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontFamily: 'monospace', letterSpacing: 1, marginTop: 4 }}>sk_live_*************************</div>
-                </div>
-                <button className="dc-btn" style={{ gap: 6 }} onClick={() => alert('Chave copiada para a área de transferência.')}>
-                  <Copy size={14} /> Copiar
-                </button>
-              </div>
-
-              <button className="dc-btn" style={{ gap: 6, color: '#2563eb' }}>
-                <RefreshCw size={14} /> Gerar Nova Chave
-              </button>
-            </div>
-
-            <div className="dc-card dc-card-p">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: 6 }}>Webhooks Ativos</div>
-                  <div style={{ fontSize: '0.875rem', color: '#64748b' }}>Receba eventos em tempo real no seu sistema.</div>
-                </div>
-                <button className="dc-btn dc-btn-primary" style={{ gap: 6 }} onClick={() => alert('Fluxo para adicionar webhook seria aberto aqui.')}>
-                  <Plus size={16} /> Novo Webhook
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>https://api.empresa.com.br/hooks/datacron</div>
-                    <div style={{ fontSize: '0.8rem', color: '#94a3b8', gap: 8, display: 'flex' }}>
-                      <span>Eventos: invoice.created, invoice.paid</span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="dc-btn" onClick={() => alert('Testar webhook...')}>Testar</button>
-                  <button className="dc-btn dc-btn-danger" style={{ background: 'transparent', padding: '8px' }} onClick={() => confirm('Remover webhook?')}>
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
         );
 
       case 'Conexão Gmail':
@@ -407,7 +401,7 @@ export default function ConfiguracoesPage() {
 
             <div style={{ padding: '24px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center', marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-                {isLoadingGmail ? (
+                {!gmailStatus ? (
                   <div style={{ padding: '12px 24px', background: '#94a3b8', color: '#fff', borderRadius: '24px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center' }}>
                     <RefreshCw size={16} className="animate-spin" /> Carregando status...
                   </div>
@@ -425,16 +419,16 @@ export default function ConfiguracoesPage() {
                 O Datacron está monitorando esta caixa de entrada para novas faturas (Sabesp, Light, Enel, etc) utilizando Inteligência Artificial para ler o corpo dos emails.
               </div>
               
-              {!gmailStatus.connected && !isLoadingGmail && (
+              {gmailStatus && !gmailStatus.connected && (
                 <div style={{ marginTop: 20 }}>
-                  <button className="dc-btn dc-btn-primary" onClick={() => alert('Por favor, contate o Suporte para realizar a autenticação inicial com as credenciais seguras do Google Workspace.')}>
+                  <button className="dc-btn dc-btn-primary" onClick={handleConnectGmail}>
                     Conectar Conta Google
                   </button>
                 </div>
               )}
             </div>
 
-            {gmailStatus.connected && (
+            {gmailStatus?.connected && (
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="dc-btn" style={{ gap: 8 }} onClick={handleForceSync} disabled={isSyncing}>
                   <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} /> {isSyncing ? 'Sincronizando...' : 'Forçar Sincronização'}

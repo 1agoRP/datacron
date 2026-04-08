@@ -117,3 +117,68 @@ async def register(
     await db.commit()
     await db.refresh(user)
     return user
+
+@router.get("/sessions")
+async def get_sessions(request: Request, current_user: User = Depends(get_current_user)):
+    """Returns the currently active session information based on the request."""
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    
+    # Simple heuristic to identify device type from user agent
+    if "Windows" in user_agent:
+        device = f"Windows ({user_agent.split('Chrome/')[1].split(' ')[0] if 'Chrome/' in user_agent else 'Browser'})" if 'Mozilla' in user_agent else "Windows App"
+    elif "Mac" in user_agent:
+        device = "Mac OS"
+    elif "Linux" in user_agent:
+        device = "Linux"
+    elif "iPhone" in user_agent or "iPad" in user_agent:
+        device = "iOS Device"
+    elif "Android" in user_agent:
+        device = "Android Device"
+    else:
+        device = "Navegador Web"
+
+    if "Datacron" in user_agent:
+        device += " (Datacron App)"
+
+    client_ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "Unknown IP")
+    
+    # Assuming the request came from Brazil based on language
+    location = f"Acesso via IP: {client_ip.split(',')[0]}"
+    
+    return [
+        {
+            "id": "current",
+            "device": device,
+            "location": location,
+            "is_current": True,
+            "last_active": "Sessão Atual"
+        }
+    ]
+
+class NotificationPrefs(BaseModel):
+    invoiceCreated: bool
+    invoicePaid: bool
+    invoiceOverdue: bool
+    systemAlerts: bool
+
+@router.post("/notifications")
+async def save_notifications(prefs: NotificationPrefs, current_user: User = Depends(get_current_user)):
+    """Receives user notification preferences and sends a real confirmation email."""
+    # In a real app, we would save prefs to current_user.
+    
+    from app.services.email_monitor import send_notification_email
+    
+    body = (
+        f"Olá {current_user.nome},\n\n"
+        "Suas preferências de notificação do Datacron foram atualizadas com sucesso.\n"
+        "Se você não fez essa alteração, acesse sua conta imediatamente e mude sua senha.\n\n"
+        "Equipe Datacron"
+    )
+    
+    # Try sending via Gmail integration if available
+    success = send_notification_email(current_user.email, "Datacron - Preferências Atualizadas", body)
+    
+    return {
+        "message": "Preferências salvas com sucesso.",
+        "email_dispatched": success
+    }

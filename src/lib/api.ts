@@ -375,6 +375,21 @@ class ApiClient {
     return this.request('/emails/gmail/status');
   }
 
+  async getGmailAuthUrl() {
+    return this.request('/emails/gmail/auth');
+  }
+
+  async getSessions() {
+    return this.request('/auth/sessions');
+  }
+
+  async saveNotifications(prefs: any) {
+    return this.request('/auth/notifications', {
+      method: 'POST',
+      body: JSON.stringify(prefs)
+    });
+  }
+
   // Importações
   async previewImport(formData: FormData) {
     return this.requestMultipart('/importacoes/preview', formData, { method: 'POST' });
