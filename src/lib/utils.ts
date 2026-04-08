@@ -28,10 +28,22 @@ export function generatePdfPassword(concessionaria: 'Enel' | 'Sabesp' | 'Comgás
  * Utilitário para formatar moedas
  */
 export function formatCurrency(value: number): string {
+  const ceiledValue = Math.ceil(value * 100) / 100;
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
-  }).format(value);
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(ceiledValue);
+}
+
+/**
+ * Utilitário para formatar moedas com arredondamento para cima e retornando apenas o valor (sem R$)
+ * Isso é útil para lugares onde o 'R$' já é renderizado fora da máscara
+ */
+export function formatCurrencyCeil(value: number): string {
+  const ceiledValue = Math.ceil(value * 100) / 100;
+  return ceiledValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /**

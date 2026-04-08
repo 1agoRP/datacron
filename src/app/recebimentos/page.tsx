@@ -143,7 +143,7 @@ export default function RecebimentosPage() {
           <div>
             <div className="dc-stat-label">VALOR PROCESSADO</div>
             <div className="dc-stat-value" style={{ fontSize: '1.5rem' }}>
-              R$ {logs.reduce((sum, l) => sum + (l.fatura_valor || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              R$ {(Math.ceil(logs.reduce((sum, l) => sum + (l.fatura_valor || 0), 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
         </div>
@@ -252,7 +252,7 @@ export default function RecebimentosPage() {
                   </span>
                   {item.fatura_valor !== null && item.fatura_valor !== undefined && item.fatura_valor > 0 && (
                     <span className="dc-proc-step done" style={{ color: '#0f172a', borderColor: '#e2e8f0' }}>
-                      💰 R$ {item.fatura_valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      💰 R$ {(Math.ceil(item.fatura_valor * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   )}
                   {item.fatura_vencimento && (

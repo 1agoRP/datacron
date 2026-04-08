@@ -109,7 +109,7 @@ export default function FaturasPage() {
       <div className="dc-overview-strip">
         <div className="dc-overview-card primary">
           <div className="dc-ov-label">Total Extraído</div>
-          <div className="dc-ov-value">R$ {stats.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+          <div className="dc-ov-value">R$ {(Math.ceil(stats.total * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
           <div className="dc-ov-badge up">
             <TrendingUp size={11} /> {stats.count} faturas no total
           </div>
@@ -117,7 +117,7 @@ export default function FaturasPage() {
         <div className="dc-overview-card light">
           <div className="dc-ov-label" style={{ color: '#64748b' }}>Média por Fatura</div>
           <div className="dc-ov-value" style={{ color: '#0f172a' }}>
-            R$ {(stats.count > 0 ? stats.total / stats.count : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            R$ {(Math.ceil((stats.count > 0 ? stats.total / stats.count : 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <div className="dc-ov-badge down">
             <TrendingDown size={11} /> Processado via IA
@@ -231,7 +231,7 @@ export default function FaturasPage() {
                       <div className="dc-cell-secondary">Ciclo Mensal</div>
                     </td>
                     <td>
-                      <div className="dc-cell-primary">R$ {(f.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                      <div className="dc-cell-primary">R$ {(Math.ceil((f.valor || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                     </td>
                     <td>
                       <span className={`dc-badge ${isOk ? 'dc-badge-green' : f.status === 'erro' ? 'dc-badge-red' : 'dc-badge-amber'}`}>
@@ -345,7 +345,7 @@ export default function FaturasPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
                 <DetailItem icon={<Mail size={16} />} label="Remetente" value={selectedFatura.email_remetente || '—'} />
                 <DetailItem icon={<FileText size={16} />} label="Assunto" value={selectedFatura.email_assunto || '—'} />
-                <DetailItem icon={<DollarSign size={16} />} label="Valor" value={`R$ ${(selectedFatura.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} highlight />
+                <DetailItem icon={<DollarSign size={16} />} label="Valor" value={`R$ ${(Math.ceil((selectedFatura.valor || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} highlight />
                 <DetailItem icon={<Calendar size={16} />} label="Vencimento" value={selectedFatura.vencimento ? format(new Date(selectedFatura.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'} />
                 <DetailItem icon={<Hash size={16} />} label="Referência" value={selectedFatura.referencia} />
                 <DetailItem icon={<Clock size={16} />} label="Processado em" value={selectedFatura.created_at ? format(new Date(selectedFatura.created_at), "dd/MM/yyyy 'às' HH:mm") : '—'} />

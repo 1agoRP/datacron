@@ -437,7 +437,7 @@ export default function ConcessionariasPage() {
                       <div className="dc-cell-primary">Dia {conc.dia_vencimento}</div>
                     </td>
                     <td>
-                      <div className="dc-cell-primary">R$ {(conc.valor_medio || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                      <div className="dc-cell-primary">R$ {(Math.ceil((conc.valor_medio || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                     </td>
                     <td>
                       <span className="dc-badge dc-badge-green">

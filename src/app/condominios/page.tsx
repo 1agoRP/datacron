@@ -540,7 +540,7 @@ export default function CondominiosPage() {
                           <tr key={f.id}>
                             <td><span className="dc-cell-primary">{f.referencia || '—'}</span></td>
                             <td>{f.vencimento ? format(new Date(f.vencimento), 'dd/MM/yyyy') : '—'}</td>
-                            <td><span className="dc-cell-primary">R$ {(f.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></td>
+                            <td><span className="dc-cell-primary">R$ {(Math.ceil((f.valor || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></td>
                             <td>
                               <span className={`dc-badge ${f.status === 'processada' ? 'dc-badge-green' : 'dc-badge-amber'}`}>
                                 {(f.status || 'pendente').charAt(0).toUpperCase() + (f.status || 'pendente').slice(1)}
@@ -654,7 +654,7 @@ export default function CondominiosPage() {
                                 {contrato.status}
                               </span>
                               <div className="dc-cell-secondary" style={{ marginTop: 4 }}>
-                                R$ {contrato.valor_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                R$ {(Math.ceil((contrato.valor_atual || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </div>
                             </div>
                           </div>

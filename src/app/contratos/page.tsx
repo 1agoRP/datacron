@@ -77,7 +77,7 @@ function formatDate(d: string | null | undefined): string {
 
 function formatCurrency(v: number | null | undefined): string {
   if (v == null) return '—';
-  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  return `R$ ${(Math.ceil(v * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default function ContratosPage() {
