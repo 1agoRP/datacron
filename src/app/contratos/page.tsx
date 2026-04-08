@@ -10,6 +10,7 @@ import {
 import { api } from '@/lib/api';
 import Select from 'react-select';
 import useSWR from 'swr';
+import { formatCurrency } from '@/lib/utils';
 
 const CONTRACT_TYPES = [
   'Elevadores',
@@ -75,10 +76,7 @@ function formatDate(d: string | null | undefined): string {
   } catch { return d; }
 }
 
-function formatCurrency(v: number | null | undefined): string {
-  if (v == null) return '—';
-  return `R$ ${(Math.ceil(v * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+
 
 export default function ContratosPage() {
   // SWR for main data — automatic cache + background revalidation

@@ -11,6 +11,7 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { api } from '@/lib/api';
+import { formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -217,7 +218,7 @@ export default function Dashboard() {
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} tickFormatter={(v: any) => `R$${(v / 1000).toFixed(0)}k`} />
                   <Tooltip
                     contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', fontSize: 13 }}
-                    formatter={(v: any) => [`R$ ${(Math.ceil(Number(v) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Total']}
+                    formatter={(v: any) => [formatCurrency(Number(v)), 'Total']}
                   />
                   <Bar dataKey="valor" fill="#2563eb" radius={[6, 6, 0, 0]} />
                 </BarChart>
@@ -234,7 +235,7 @@ export default function Dashboard() {
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} tickFormatter={(v: any) => `R$${(v / 1000).toFixed(0)}k`} />
                   <Tooltip
                     contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', fontSize: 13 }}
-                    formatter={(v: any) => [`R$ ${(Math.ceil(Number(v) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Total']}
+                    formatter={(v: any) => [formatCurrency(Number(v)), 'Total']}
                   />
                   <Area type="monotone" dataKey="valor" stroke="#2563eb" strokeWidth={2.5} fill="url(#grad)" dot={false} />
                 </AreaChart>
@@ -315,7 +316,7 @@ export default function Dashboard() {
                       {f.vencimento ? format(new Date(f.vencimento), "dd/MM/yyyy") : '—'}
                     </td>
                     <td>
-                      <span className="dc-cell-primary">R$ {(Math.ceil(f.valor * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="dc-cell-primary">{formatCurrency(f.valor)}</span>
                     </td>
                     <td>
                       <span className={`dc-badge ${f.status === 'processada' ? 'dc-badge-green' : 'dc-badge-amber'}`}>

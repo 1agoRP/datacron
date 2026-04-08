@@ -6,6 +6,7 @@ import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Tra
 import { api } from '@/lib/api';
 import Select from 'react-select';
 import useSWR from 'swr';
+import { formatCurrencyCeil } from '@/lib/utils';
 
 const COLOR_MAP: Record<string, { bg: string; color: string }> = {
   enel:   { bg: '#eff6ff', color: '#2563eb' },
@@ -437,7 +438,7 @@ export default function ConcessionariasPage() {
                       <div className="dc-cell-primary">Dia {conc.dia_vencimento}</div>
                     </td>
                     <td>
-                      <div className="dc-cell-primary">R$ {(Math.ceil((conc.valor_medio || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="dc-cell-primary">{formatCurrencyCeil(conc.valor_medio || 0)}</div>
                     </td>
                     <td>
                       <span className="dc-badge dc-badge-green">

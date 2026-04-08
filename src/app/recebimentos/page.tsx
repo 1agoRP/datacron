@@ -8,6 +8,7 @@ import {
   Download, FileDigit, FileText
 } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
+import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import useSWR from 'swr';
 
@@ -143,7 +144,7 @@ export default function RecebimentosPage() {
           <div>
             <div className="dc-stat-label">VALOR PROCESSADO</div>
             <div className="dc-stat-value" style={{ fontSize: '1.5rem' }}>
-              R$ {(Math.ceil(logs.reduce((sum, l) => sum + (l.fatura_valor || 0), 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatCurrency(logs.reduce((sum, l) => sum + (l.fatura_valor || 0), 0))}
             </div>
           </div>
         </div>
@@ -252,7 +253,7 @@ export default function RecebimentosPage() {
                   </span>
                   {item.fatura_valor !== null && item.fatura_valor !== undefined && item.fatura_valor > 0 && (
                     <span className="dc-proc-step done" style={{ color: '#0f172a', borderColor: '#e2e8f0' }}>
-                      💰 R$ {(Math.ceil(item.fatura_valor * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      💰 {formatCurrency(item.fatura_valor)}
                     </span>
                   )}
                   {item.fatura_vencimento && (

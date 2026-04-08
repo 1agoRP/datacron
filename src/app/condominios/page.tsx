@@ -7,6 +7,7 @@ import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import useSWR from 'swr';
+import { formatCurrencyCeil } from '@/lib/utils';
 
 type SortField = 'nome' | 'numero';
 type SortDir = 'asc' | 'desc';
@@ -540,7 +541,7 @@ export default function CondominiosPage() {
                           <tr key={f.id}>
                             <td><span className="dc-cell-primary">{f.referencia || '—'}</span></td>
                             <td>{f.vencimento ? format(new Date(f.vencimento), 'dd/MM/yyyy') : '—'}</td>
-                            <td><span className="dc-cell-primary">R$ {(Math.ceil((f.valor || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></td>
+                            <td><span className="dc-cell-primary">{formatCurrencyCeil(f.valor || 0)}</span></td>
                             <td>
                               <span className={`dc-badge ${f.status === 'processada' ? 'dc-badge-green' : 'dc-badge-amber'}`}>
                                 {(f.status || 'pendente').charAt(0).toUpperCase() + (f.status || 'pendente').slice(1)}
@@ -654,7 +655,7 @@ export default function CondominiosPage() {
                                 {contrato.status}
                               </span>
                               <div className="dc-cell-secondary" style={{ marginTop: 4 }}>
-                                R$ {(Math.ceil((contrato.valor_atual || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatCurrencyCeil(contrato.valor_atual || 0)}
                               </div>
                             </div>
                           </div>
