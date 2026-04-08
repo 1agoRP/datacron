@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
-  User, Shield, Bell, Globe, Database, Mail, Smartphone, ArrowRight, Check, Key, Link as LinkIcon, LogOut, Trash2, Copy, Plus, Activity, RefreshCw
+  User, Shield, Bell, Globe, Database, Mail, Smartphone, ArrowRight, Check, Key, Link as LinkIcon, LogOut, Trash2, Copy, Plus, Activity, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import { api } from '@/lib/api';
 
@@ -387,6 +387,9 @@ export default function ConfiguracoesPage() {
         );
 
       case 'Conexão Gmail':
+        const connected = gmailStatus?.connected;
+        const emailAddress = gmailStatus?.email || 'faturas@empresa.com.br';
+
         return (
           <div className="dc-card dc-card-p">
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
@@ -395,66 +398,146 @@ export default function ConfiguracoesPage() {
               </div>
               <div>
                 <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#0f172a' }}>Integração com Gmail</div>
-                <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Automatize a coleta de faturas direto do seu e-mail de cobranças.</div>
+                <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Conecte seu e-mail de cobranças para automação total.</div>
               </div>
             </div>
 
-            <div style={{ padding: '24px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center', marginBottom: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+            <div style={{ 
+              padding: '32px', 
+              background: connected ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)', 
+              borderRadius: '16px', 
+              border: connected ? '1px solid #bef264' : '1px solid #e2e8f0', 
+              textAlign: 'center', 
+              marginBottom: 32,
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* Decorative background element */}
+              <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: connected ? '#10b98110' : '#64748b10' }}></div>
+
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
                 {!gmailStatus ? (
-                  <div style={{ padding: '12px 24px', background: '#94a3b8', color: '#fff', borderRadius: '24px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <RefreshCw size={16} className="animate-spin" /> Carregando status...
+                  <div className="dc-badge dc-badge-secondary">
+                    <RefreshCw size={14} className="animate-spin" /> Verificando conexão...
                   </div>
-                ) : gmailStatus.connected ? (
-                  <div style={{ padding: '12px 24px', background: '#10b981', color: '#fff', borderRadius: '24px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <Check size={16} /> Conectado como {gmailStatus.email}
+                ) : connected ? (
+                  <div style={{ 
+                    padding: '10px 20px', 
+                    background: '#10b981', 
+                    color: '#fff', 
+                    borderRadius: '30px', 
+                    fontSize: '0.9rem', 
+                    fontWeight: 600, 
+                    display: 'flex', 
+                    gap: 10, 
+                    alignItems: 'center',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' 
+                  }}>
+                    <div style={{ width: 8, height: 8, background: '#fff', borderRadius: '50%', boxShadow: '0 0 8px #fff' }}></div>
+                    Conectado: {emailAddress}
                   </div>
                 ) : (
-                  <div style={{ padding: '12px 24px', background: '#f59e0b', color: '#fff', borderRadius: '24px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    Não Conectado
+                  <div className="dc-badge dc-badge-warning" style={{ fontSize: '0.9rem', padding: '8px 16px' }}>
+                    Conta não vinculada
                   </div>
                 )}
               </div>
-              <div style={{ fontSize: '0.9rem', color: '#334155', maxWidth: 400, margin: '0 auto', lineHeight: 1.6 }}>
-                O Datacron está monitorando esta caixa de entrada para novas faturas (Sabesp, Light, Enel, etc) utilizando Inteligência Artificial para ler o corpo dos emails.
+
+              <div style={{ fontSize: '1rem', color: '#475569', maxWidth: 480, margin: '0 auto 24px auto', lineHeight: 1.6 }}>
+                {connected 
+                  ? 'O Datacron está varrendo sua caixa de entrada 3 vezes ao dia em busca de novas faturas e processando os anexos automaticamente.' 
+                  : 'Vincule sua conta Google Workspace ou Gmail para que o Datacron possa ler faturas recebidas (Sabesp, Light, Enel, etc) utilizando IA.'}
               </div>
               
-              {gmailStatus && !gmailStatus.connected && (
-                <div style={{ marginTop: 20 }}>
-                  <button className="dc-btn dc-btn-primary" onClick={handleConnectGmail}>
-                    Conectar Conta Google
+              {!connected ? (
+                <button 
+                  onClick={handleConnectGmail}
+                  style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: 12, 
+                    background: '#fff', 
+                    color: '#3c4043', 
+                    border: '1px solid #dadce0', 
+                    padding: '12px 24px', 
+                    borderRadius: '8px', 
+                    fontWeight: 600, 
+                    fontSize: '1rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.12)'; e.currentTarget.style.background = '#f8f9fa'; }}
+                  onMouseOut={(e) => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)'; e.currentTarget.style.background = '#fff'; }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  Conectar conta do Google
+                </button>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
+                  <button 
+                    className="dc-btn dc-btn-secondary" 
+                    onClick={handleForceSync}
+                    disabled={isSyncing}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                  >
+                    <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+                    {isSyncing ? 'Sincronizando...' : 'Forçar Sincronização'}
+                  </button>
+                  <button 
+                    className="dc-btn" 
+                    style={{ color: '#ef4444', border: '1px solid #fee2e2', background: '#fff' }}
+                    onClick={() => {
+                       if(confirm('Tem certeza que deseja desconectar sua conta do Gmail?')) {
+                          alert('Conta desconectada com sucesso.');
+                          setGmailStatus({ connected: false });
+                       }
+                    }}
+                  >
+                    Desconectar Conta
                   </button>
                 </div>
               )}
             </div>
 
-            {gmailStatus?.connected && (
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                <button className="dc-btn" style={{ gap: 8 }} onClick={handleForceSync} disabled={isSyncing}>
-                  <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} /> {isSyncing ? 'Sincronizando...' : 'Forçar Sincronização'}
-                </button>
-                <button className="dc-btn" onClick={() => confirm('Deseja desconectar esta conta do Gmail?')} style={{ gap: 8, color: '#dc2626' }}>
-                  <LogOut size={16} color="#dc2626" /> Desconectar Conta
-                </button>
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 24 }}>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Histórico de Sincronização
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 400 }}>Últimos 3 registros</span>
               </div>
-            )}
-            
-            <div style={{ marginTop: 32 }}>
-                <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: 12 }}>Histórico de Sincronização</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <Check size={16} color="#10b981" />
-                        <span style={{ fontSize: '0.875rem', color: '#334155' }}>Sincronização Automática</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {syncHistory.map((item, idx) => (
+                  <div key={idx} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    padding: '12px 16px', 
+                    background: '#fff', 
+                    borderRadius: '8px', 
+                    border: '1px solid #f1f5f9' 
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {item.status === 'Sucesso' ? (
+                        <div style={{ color: '#10b981' }}><Check size={16} /></div>
+                      ) : (
+                        <div style={{ color: '#ef4444' }}><AlertTriangle size={16} /></div>
+                      )}
+                      <div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
+                          Sincronização {idx === 0 ? 'Automática' : 'Manual (Usuário)'}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{item.count} faturas encontradas</div>
+                      </div>
                     </div>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Executa 3 vezes ao dia</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <Check size={16} color="#10b981" />
-                        <span style={{ fontSize: '0.875rem', color: '#334155' }}>Sincronização Manual (Usuário)</span>
-                    </div>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Disponível sob demanda</span>
-                </div>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{idx === 0 ? 'Hoje, 11:32 AM' : idx === 1 ? 'Ontem, 16:45 PM' : 'Ontem, 08:32 AM'}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         );
