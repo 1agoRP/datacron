@@ -371,6 +371,10 @@ class ApiClient {
     return this.request('/emails/status');
   }
 
+  async getGmailStatus() {
+    return this.request('/emails/gmail/status');
+  }
+
   // Importações
   async previewImport(formData: FormData) {
     return this.requestMultipart('/importacoes/preview', formData, { method: 'POST' });

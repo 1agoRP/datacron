@@ -71,6 +71,35 @@ export default function ConfiguracoesPage() {
     }, 1000);
   };
 
+  const [gmailStatus, setGmailStatus] = useState({ connected: false, email: '' });
+  const [isLoadingGmail, setIsLoadingGmail] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  React.useEffect(() => {
+    if (active === 'Conexão Gmail') {
+      setIsLoadingGmail(true);
+      api.getGmailStatus().then((res: any) => {
+        setGmailStatus({
+          connected: res.connected,
+          email: res.email || 'Não Conectado'
+        });
+      }).catch((err: any) => console.error("Error fetching gmail status", err))
+      .finally(() => setIsLoadingGmail(false));
+    }
+  }, [active]);
+
+  const handleForceSync = async () => {
+    try {
+      setIsSyncing(true);
+      const res = await api.forceEmailScan() as any;
+      alert(res.message || 'Sincronização forçada iniciada com sucesso em segundo plano.');
+    } catch (e: any) {
+      alert(e.message || 'Falha ao forçar sincronização.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const renderContent = () => {
     switch (active) {
       case 'Perfil & Conta':
@@ -378,23 +407,43 @@ export default function ConfiguracoesPage() {
 
             <div style={{ padding: '24px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center', marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-                <div style={{ padding: '12px 24px', background: '#10b981', color: '#fff', borderRadius: '24px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <Check size={16} /> Conectado como faturas@empresa.com.br
-                </div>
+                {isLoadingGmail ? (
+                  <div style={{ padding: '12px 24px', background: '#94a3b8', color: '#fff', borderRadius: '24px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <RefreshCw size={16} className="animate-spin" /> Carregando status...
+                  </div>
+                ) : gmailStatus.connected ? (
+                  <div style={{ padding: '12px 24px', background: '#10b981', color: '#fff', borderRadius: '24px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <Check size={16} /> Conectado como {gmailStatus.email}
+                  </div>
+                ) : (
+                  <div style={{ padding: '12px 24px', background: '#f59e0b', color: '#fff', borderRadius: '24px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    Não Conectado
+                  </div>
+                )}
               </div>
               <div style={{ fontSize: '0.9rem', color: '#334155', maxWidth: 400, margin: '0 auto', lineHeight: 1.6 }}>
                 O Datacron está monitorando esta caixa de entrada para novas faturas (Sabesp, Light, Enel, etc) utilizando Inteligência Artificial para ler o corpo dos emails.
               </div>
+              
+              {!gmailStatus.connected && !isLoadingGmail && (
+                <div style={{ marginTop: 20 }}>
+                  <button className="dc-btn dc-btn-primary" onClick={() => alert('Por favor, contate o Suporte para realizar a autenticação inicial com as credenciais seguras do Google Workspace.')}>
+                    Conectar Conta Google
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button className="dc-btn" style={{ gap: 8 }} onClick={() => alert('Sincronização forçada iniciada.')}>
-                <RefreshCw size={16} /> Forçar Sincronização
-              </button>
-              <button className="dc-btn" onClick={() => confirm('Deseja desconectar esta conta do Gmail?')} style={{ gap: 8, color: '#dc2626' }}>
-                <LogOut size={16} color="#dc2626" /> Desconectar Conta
-              </button>
-            </div>
+            {gmailStatus.connected && (
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="dc-btn" style={{ gap: 8 }} onClick={handleForceSync} disabled={isSyncing}>
+                  <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} /> {isSyncing ? 'Sincronizando...' : 'Forçar Sincronização'}
+                </button>
+                <button className="dc-btn" onClick={() => confirm('Deseja desconectar esta conta do Gmail?')} style={{ gap: 8, color: '#dc2626' }}>
+                  <LogOut size={16} color="#dc2626" /> Desconectar Conta
+                </button>
+              </div>
+            )}
             
             <div style={{ marginTop: 32 }}>
                 <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: 12 }}>Histórico de Sincronização</div>
@@ -403,14 +452,14 @@ export default function ConfiguracoesPage() {
                         <Check size={16} color="#10b981" />
                         <span style={{ fontSize: '0.875rem', color: '#334155' }}>Sincronização Automática</span>
                     </div>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Hoje, 11:32 AM</span>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Executa 3 vezes ao dia</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <Check size={16} color="#10b981" />
                         <span style={{ fontSize: '0.875rem', color: '#334155' }}>Sincronização Manual (Usuário)</span>
                     </div>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Ontem, 16:45 PM</span>
+                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Disponível sob demanda</span>
                 </div>
             </div>
           </div>

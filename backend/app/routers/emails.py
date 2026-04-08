@@ -74,3 +74,15 @@ async def get_agent_status(_: User = Depends(get_current_user)):
             for j in jobs
         ],
     }
+
+import os
+from app.config import settings
+
+@router.get("/gmail/status")
+async def get_gmail_status(_: User = Depends(get_current_user)):
+    """Returns Gmail connection status."""
+    is_connected = os.path.exists(settings.GMAIL_TOKEN_PATH)
+    return {
+        "connected": is_connected,
+        "email": settings.GMAIL_USER if is_connected else None
+    }

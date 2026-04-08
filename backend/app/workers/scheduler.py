@@ -63,10 +63,10 @@ def start_scheduler():
         return
 
     # If we got here, we own the lock
-    # Email scan — every N minutes
+    # Email scan — 3 times a day (08:00, 14:00, 20:00)
     scheduler.add_job(
         _run_email_scan_job,
-        trigger=IntervalTrigger(minutes=settings.EMAIL_POLL_INTERVAL_MINUTES),
+        trigger=CronTrigger(hour='8,14,20', minute=0),
         id="email_scan",
         name="Gmail Inbox Scan",
         replace_existing=True,
@@ -84,7 +84,7 @@ def start_scheduler():
 
     scheduler.start()
     logger.info(
-        f"Scheduler started with lock. Email scan every {settings.EMAIL_POLL_INTERVAL_MINUTES} minutes."
+        "Scheduler started with lock. Email scan scheduled 3 times a day (08:00, 14:00, 20:00)."
     )
 
 
