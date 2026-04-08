@@ -4,16 +4,18 @@ from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
-import uuid
-
 # ─── Engine Configuration ─────────────────────────────────────
 # For Supabase / PgBouncer in transaction mode, we MUST:
 # 1. Disable the prepared statement cache (statement_cache_size=0)
 # 2. Use NullPool to avoid keeping connections open in the pooler
-# 3. Use prepared_statement_name_func to avoid naming collisions
+
+db_url = settings.DATABASE_URL
+if "prepared_statement_cache_size" not in db_url:
+    separator = "&" if "?" in db_url else "?"
+    db_url += f"{separator}prepared_statement_cache_size=0"
 
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    db_url,
     poolclass=NullPool,
     connect_args={
         "server_settings": {
@@ -21,7 +23,6 @@ engine = create_async_engine(
         },
         "statement_cache_size": 0,
     },
-    prepared_statement_name_func=lambda: f"__asyncpg_{uuid.uuid4().hex}__",
 )
 
 # ─── Session factory ─────────────────────────────────────────
