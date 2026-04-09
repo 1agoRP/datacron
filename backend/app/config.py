@@ -27,9 +27,8 @@ class Settings(BaseSettings):
         return v
 
     # ─── Gmail ────────────────────────────────────────────────
-    GMAIL_CREDENTIALS_PATH: str = "./credentials.json"
-    GMAIL_TOKEN_PATH: str = "./token.json"
     GMAIL_USER: str = "datacroncompany@gmail.com"
+    GMAIL_APP_PASSWORD: str = "" # Senha de aplicativo do Gmail
     EMAIL_POLL_INTERVAL_MINUTES: int = 5
 
     # ─── Storage ──────────────────────────────────────────────

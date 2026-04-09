@@ -1,7 +1,7 @@
 """
 Gmail Email Monitor Service
 ============================
-Polls the Gmail inbox for new invoice emails, identifies the related
+Polls the Gmail inbox via IMAP for new invoice emails, identifies the related
 condominio/concessionaria, downloads PDF attachments, unlocks and
 extracts data from them, then saves a Fatura record to the database.
 """
@@ -15,10 +15,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
+import imaplib
+import smtplib
+import email
+from email.message import EmailMessage
+from email.utils import parsedate_to_datetime
+from email.header import decode_header
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,109 +36,75 @@ from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 
-# Gmail API scope (read-only is sufficient for monitoring)
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.send",
-]
 
+def get_imap_connection():
+    """Authenticates with Gmail via IMAP using App Password."""
+    if not settings.GMAIL_USER or not settings.GMAIL_APP_PASSWORD:
+        logger.error("Credenciais do Gmail (GMAIL_USER/GMAIL_APP_PASSWORD) não configuradas.")
+        return None
+    try:
+        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        mail.login(settings.GMAIL_USER, settings.GMAIL_APP_PASSWORD)
+        return mail
+    except Exception as e:
+        logger.error(f"Erro ao conectar no IMAP da conta {settings.GMAIL_USER}: {e}")
+        return None
 
-def get_gmail_service():
-    """
-    Authenticates with Gmail API using OAuth2.
-    On first run, opens a browser for user consent and saves tokens.
-    Subsequent runs reuse saved tokens.
-    """
-    creds = None
-    token_path = settings.GMAIL_TOKEN_PATH
-    creds_path = settings.GMAIL_CREDENTIALS_PATH
-
-    if os.path.exists(token_path):
-        creds = Credentials.from_authorized_user_file(token_path, SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            if not os.path.exists(creds_path):
-                logger.error(f"Gmail credentials not found at {creds_path}")
-                return None
-            flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
-            creds = flow.run_local_server(port=0)
-
-        with open(token_path, "w") as f:
-            f.write(creds.to_json())
-
-    return build("gmail", "v1", credentials=creds)
 
 def send_notification_email(to: str, subject: str, message_text: str) -> bool:
-    """
-    Sends an email using the authenticated Gmail API.
-    """
+    """Sends an email using Gmail SMTP."""
+    if not settings.GMAIL_USER or not settings.GMAIL_APP_PASSWORD:
+        logger.error("Credenciais do Gmail não configuradas para enviar e-mail.")
+        return False
     try:
-        from email.message import EmailMessage
-        service = get_gmail_service()
-        if not service:
-            logger.error("Could not obtain Gmail service to send email.")
-            return False
-            
-        message = EmailMessage()
-        message.set_content(message_text)
-        message["To"] = to
-        message["From"] = settings.GMAIL_USER or "datacron.auth@gmail.com"
-        message["Subject"] = subject
+        msg = EmailMessage()
+        msg.set_content(message_text)
+        msg["To"] = to
+        msg["From"] = settings.GMAIL_USER
+        msg["Subject"] = subject
         
-        encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-        create_message = {"raw": encoded_message}
-        
-        service.users().messages().send(userId="me", body=create_message).execute()
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(settings.GMAIL_USER, settings.GMAIL_APP_PASSWORD)
+            server.send_message(msg)
         return True
     except Exception as e:
         logger.error(f"Failed to send email to {to}: {str(e)}")
         return False
 
 
-def get_pdf_attachments(service, message_id: str) -> list[tuple[str, bytes]]:
-    """
-    Downloads all PDF attachments from a Gmail message.
-    Returns a list of (filename, pdf_bytes) tuples.
-    """
+def get_pdf_attachments(msg) -> list[tuple[str, bytes]]:
+    """Downloads all PDF attachments from an email message."""
     attachments = []
-    msg = service.users().messages().get(userId="me", id=message_id).execute()
-    parts = msg.get("payload", {}).get("parts", [])
-
-    def _process_parts(parts_list):
-        for part in parts_list:
-            # Recurse into multipart
-            if part.get("parts"):
-                _process_parts(part["parts"])
-            mime = part.get("mimeType", "")
-            filename = part.get("filename", "")
-            if "pdf" in mime.lower() or (filename and filename.lower().endswith(".pdf")):
-                body = part.get("body", {})
-                attachment_id = body.get("attachmentId")
-                if attachment_id:
-                    att = service.users().messages().attachments().get(
-                        userId="me", messageId=message_id, id=attachment_id
-                    ).execute()
-                    data = base64.urlsafe_b64decode(att["data"])
-                    attachments.append((filename or f"attachment_{attachment_id}.pdf", data))
-                elif body.get("data"):
-                    data = base64.urlsafe_b64decode(body["data"])
-                    attachments.append((filename or "attachment.pdf", data))
-
-    _process_parts(parts)
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_maintype() == 'multipart':
+                continue
+            if part.get('Content-Disposition') is None:
+                continue
+                
+            filename = part.get_filename()
+            content_type = part.get_content_type()
+            
+            if filename:
+                decoded_filename = decode_header(filename)[0][0]
+                if isinstance(decoded_filename, bytes):
+                    # Handle bytes filename
+                    try:
+                        filename = decoded_filename.decode('utf-8')
+                    except UnicodeDecodeError:
+                        filename = decoded_filename.decode('latin1', errors='ignore')
+                        
+                if filename.lower().endswith('.pdf') or "pdf" in content_type.lower():
+                    data = part.get_payload(decode=True)
+                    if data:
+                        attachments.append((filename, data))
     return attachments
 
 
 async def find_concessionaria(
     sender: str, subject: str, body_text: str, db: AsyncSession
 ) -> tuple[Optional[Concessionaria], Optional[str]]:
-    """
-    Matches sender, subject, and body text to a registered concessionaria.
-    STRICT: Only returns a match when the identification code from the email
-    body matches a registered instalacao code exactly.
-    """
+    """Matches sender, subject, and body text to a registered concessionaria."""
     domain = sender.split('@')[-1]
     result = await db.execute(
         select(Concessionaria).where(
@@ -147,12 +116,10 @@ async def find_concessionaria(
     if not concs:
         return None, None
 
-    # 1. Try to match instalacao code verbatim in body or subject
     for conc in concs:
         if conc.instalacao and (conc.instalacao in body_text or conc.instalacao in subject):
             return conc, conc.instalacao
 
-    # 2. Extract identification code from body and match against registered instalacoes
     tipo = concs[0].tipo if concs else None
     code_from_body = _extract_identification_code(body_text, tipo) if tipo else None
 
@@ -161,26 +128,21 @@ async def find_concessionaria(
             if conc.instalacao == code_from_body:
                 return conc, code_from_body
 
-    # 3. If only ONE concessionaria exists for this domain, it's safe to identify
     if len(concs) == 1:
         return concs[0], code_from_body or concs[0].instalacao
 
-    # 4. Multiple concessionarias and no exact match — cannot identify with certainty
     return None, code_from_body
 
 
 def _extract_identification_code(body_text: str, tipo: str) -> Optional[str]:
     """Extracts identification code from email body based on concessionaria type."""
     if tipo == 'Enel':
-        # N° DA INSTALAÇÃO/UC: 0057562482 (handles encoding issues)
         m = re.search(r'INSTALA.{1,5}O[/:]?\s*(?:UC[:\s]*)?\s*(\d{8,12})', body_text, re.IGNORECASE)
         if m: return m.group(1)
     elif tipo in ['Comgás', 'Comgas']:
-        # Código do usuário: 2442361
         m = re.search(r'C.digo do usu.rio[:\s]*(\d+)', body_text, re.IGNORECASE)
         if m: return m.group(1)
     elif tipo == 'Sabesp':
-        # Fornecimento: 609129015001
         m = re.search(r'Fornecimento[:\s]*(\d+)', body_text, re.IGNORECASE)
         if m: return m.group(1)
     return None
@@ -191,54 +153,44 @@ def extract_data_from_body(body_text: str, tipo: str) -> dict:
     data = {}
     
     if tipo == 'Enel':
-        # Quanto eu vou pagar? R$ 644,51
         m = re.search(r'[Qq]uanto.*?pagar.*?R\$\s*([\d.,]+)', body_text)
         if m:
             try: data['valor'] = float(m.group(1).replace('.', '').replace(',', '.'))
             except: pass
-        # Data de vencimento 30/03/2026
         m = re.search(r'[Dd]ata de vencimento\s*(\d{2}/\d{2}/\d{4})', body_text)
         if m:
             d, mo, y = m.group(1).split('/')
             data['vencimento'] = f"{y}-{mo}-{d}"
-        # Código de barras
         m = re.search(r'[Cc].digo.{1,5}barras[:\s]*([\d\s.]+)', body_text)
         if m:
             data['codigo_barras'] = re.sub(r'\s+', '', m.group(1))[:48]
 
     elif tipo in ['Comgás', 'Comgas']:
-        # valor de R$ 40,36
         m = re.search(r'valor de R\$\s*([\d.,]+)', body_text, re.IGNORECASE)
         if m:
             try: data['valor'] = float(m.group(1).replace('.', '').replace(',', '.'))
             except: pass
-        # vencimento para 22.03.2026
         m = re.search(r'vencimento\s+para\s+(\d{2}[./]\d{2}[./]\d{4})', body_text, re.IGNORECASE)
         if m:
             parts = re.split(r'[./]', m.group(1))
             data['vencimento'] = f"{parts[2]}-{parts[1]}-{parts[0]}"
-        # código de barras
         m = re.search(r'c.digo\s+de\s+barras\s+([\d\s]+)', body_text, re.IGNORECASE)
         if m:
             data['codigo_barras'] = re.sub(r'\s+', '', m.group(1))[:48]
 
     elif tipo == 'Sabesp':
-        # Valor: R$ 11498,2
         m = re.search(r'Valor[:\s]*R\$\s*([\d.,]+)', body_text, re.IGNORECASE)
         if m:
             try: data['valor'] = float(m.group(1).replace('.', '').replace(',', '.'))
             except: pass
-        # Vencimento: 01/04/2026
         m = re.search(r'Vencimento[:\s]*(\d{2}/\d{2}/\d{4})', body_text, re.IGNORECASE)
         if m:
             d, mo, y = m.group(1).split('/')
             data['vencimento'] = f"{y}-{mo}-{d}"
-        # Código de barras
         m = re.search(r'[Cc].digo\s+de\s+barras[:\s]*([\d\s.]+)', body_text, re.IGNORECASE)
         if m:
             data['codigo_barras'] = re.sub(r'\s+', '', m.group(1))[:48]
 
-    # Generic fallback: try valor R$ pattern
     if 'valor' not in data:
         m = re.search(r'R\$\s*([\d.,]+)', body_text)
         if m:
@@ -248,9 +200,21 @@ def extract_data_from_body(body_text: str, tipo: str) -> dict:
     return data
 
 
-async def process_email_message(service, msg_id: str, msg_data: dict, db: AsyncSession):
+def _decode_header_value(header_val):
+    if not header_val: return ""
+    decoded_list = decode_header(header_val)
+    result = ""
+    for decoded, charset in decoded_list:
+        if isinstance(decoded, bytes):
+            result += decoded.decode(charset or 'utf-8', errors='ignore')
+        else:
+            result += str(decoded)
+    return result
+
+
+async def process_email_message(msg_id: str, msg, db: AsyncSession):
     """
-    Full pipeline for processing a single Gmail message:
+    Full pipeline for processing a single IMAP message:
     1. Parse headers to get sender, subject, date
     2. Check if already processed (email_logs)
     3. Find matching concessionaria
@@ -260,44 +224,32 @@ async def process_email_message(service, msg_id: str, msg_data: dict, db: AsyncS
     7. Generate alerts if needed
     """
 
-    # ── Extract headers ──────────────────────────────────────
-    headers = {h["name"].lower(): h["value"] for h in msg_data.get("payload", {}).get("headers", [])}
-    sender  = headers.get("from", "").split("<")[-1].replace(">", "").strip()
-    subject = headers.get("subject", "")
-    date_str = headers.get("date", "")
+    sender = _decode_header_value(msg.get("From", "")).split("<")[-1].replace(">", "").strip()
+    subject = _decode_header_value(msg.get("Subject", ""))
+    date_str = msg.get("Date", "")
 
     try:
-        received_at = datetime.now(timezone.utc)  # fallback
+        received_at = parsedate_to_datetime(date_str)
     except Exception:
         received_at = datetime.now(timezone.utc)
 
-    # ── Extract body ─────────────────────────────────────────
-    def _extract_body(parts_list):
-        text = ""
-        for part in parts_list:
-            if part.get("mimeType") in ["text/plain", "text/html"]:
-                data = part.get("body", {}).get("data")
-                if data:
-                    text += base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore') + " "
-            elif part.get("parts"):
-                text += _extract_body(part["parts"])
-        return text
-
-    # Extract body before checking concessionaria so find_concessionaria uses clean text
-    payload = msg_data.get("payload", {})
     raw_body = ""
-    if payload.get("parts"):
-        raw_body = _extract_body(payload.get("parts"))
+    if msg.is_multipart():
+        for part in msg.walk():
+            ct = part.get_content_type()
+            cd = str(part.get('Content-Disposition'))
+            if ct in ('text/plain', 'text/html') and 'attachment' not in cd:
+                payload = part.get_payload(decode=True)
+                if payload:
+                    raw_body += payload.decode(part.get_content_charset() or 'utf-8', errors='ignore') + " "
     else:
-        data = payload.get("body", {}).get("data")
-        if data:
-            raw_body = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
-            
-    # Clean HTML tags and excessive whitespaces
+        payload = msg.get_payload(decode=True)
+        if payload:
+            raw_body = payload.decode(msg.get_content_charset() or 'utf-8', errors='ignore')
+
     body_text = re.sub(r'<[^>]+>', ' ', raw_body)
     body_text = re.sub(r'\s+', ' ', body_text)
     
-    # ── Check if already processed ───────────────────────────
     existing = await db.execute(
         select(EmailLog).where(EmailLog.gmail_message_id == msg_id)
     )
@@ -305,7 +257,6 @@ async def process_email_message(service, msg_id: str, msg_data: dict, db: AsyncS
         logger.info(f"Email {msg_id} already processed, skipping")
         return
 
-    # ── Create initial log entry ─────────────────────────────
     email_log = EmailLog(
         gmail_message_id=msg_id,
         remetente=sender,
@@ -316,7 +267,6 @@ async def process_email_message(service, msg_id: str, msg_data: dict, db: AsyncS
     db.add(email_log)
     await db.flush()
 
-    # ── Find matching concessionaria ─────────────────────────
     conc, codigo_encontrado = await find_concessionaria(sender, subject, body_text, db)
     
     if codigo_encontrado:
@@ -333,7 +283,6 @@ async def process_email_message(service, msg_id: str, msg_data: dict, db: AsyncS
             mensagem=f"E-mail recebido de '{sender}' com assunto '{subject}' não foi identificado como concessionária cadastrada.",
         ))
 
-    # ── Get condominio for CNPJ password generation ───────────
     password = ""
     condo: Optional[Condominio] = None
     
@@ -348,14 +297,12 @@ async def process_email_message(service, msg_id: str, msg_data: dict, db: AsyncS
     if conc:
         body_data = extract_data_from_body(body_text, conc.tipo)
     else:
-        # Try all known types and use the one that extracts the most data
         for t in ['Enel', 'Comgás', 'Sabesp']:
             candidate = extract_data_from_body(body_text, t)
             if len(candidate) > len(body_data):
                 body_data = candidate
 
-    # ── Download PDF attachments ─────────────────────────────
-    attachments = get_pdf_attachments(service, msg_id)
+    attachments = get_pdf_attachments(msg)
     if not attachments:
         logger.info(f"No PDF attachments in message {msg_id}")
         email_log.status = "processado"
@@ -367,21 +314,18 @@ async def process_email_message(service, msg_id: str, msg_data: dict, db: AsyncS
         pdf_unlocked = unlocked_bytes is not None
         final_bytes = unlocked_bytes or pdf_bytes
 
-        # Save to disk
         if codigo_encontrado:
             safe_filename = f"fatura_{codigo_encontrado}_{filename}".replace("/", "_")
         else:
-            safe_filename = f"{msg_id}_{filename}".replace("/", "_")
+            safe_filename = f"{msg_id.replace('<', '').replace('>', '')}_{filename}".replace("/", "_")
             
         pdf_path = save_pdf(final_bytes, safe_filename)
 
-        # Extract data
         extracted = extract_data(final_bytes)
         for k, v in body_data.items():
             if v:
                 extracted[k] = v
 
-        # Determine valor and vencimento
         valor = extracted.get("valor") or 0.0
         vencimento_str = extracted.get("vencimento")
         from datetime import date
@@ -394,7 +338,6 @@ async def process_email_message(service, msg_id: str, msg_data: dict, db: AsyncS
 
         referencia = extracted.get("referencia") or _guess_referencia()
 
-        # ── Create Fatura ────────────────────────────────────
         fatura = Fatura(
             condominio_id=conc.condominio_id if conc else None,
             concessionaria_id=conc.id if conc else None,
@@ -413,11 +356,9 @@ async def process_email_message(service, msg_id: str, msg_data: dict, db: AsyncS
         db.add(fatura)
         await db.flush()
 
-        # Update email log
         email_log.fatura_id = fatura.id
         email_log.status = "processado"
 
-        # Check and create alerts (value variation, etc.)
         if conc:
             await check_and_create_alerts(fatura, conc, db)
 
@@ -434,43 +375,53 @@ def _guess_referencia() -> str:
 
 
 async def run_email_scan():
-    """
-    Main entry point called by the scheduler.
-    Fetches new unread emails containing PDFs and processes them.
-    """
-    logger.info("Starting Gmail inbox scan...")
+    """Main entry point called by the scheduler."""
+    logger.info("Starting Gmail IMAP inbox scan...")
 
-    service = get_gmail_service()
-    if not service:
-        logger.error("Gmail service unavailable. Check credentials.")
+    mail = get_imap_connection()
+    if not mail:
         return
 
     try:
-        # Search for unread emails with attachments (PDFs from utilities)
-        results = service.users().messages().list(
-            userId="me",
-            q="is:unread has:attachment filename:pdf",
-            maxResults=20,
-        ).execute()
+        mail.select("inbox")
+        status, messages = mail.search(None, "UNSEEN")
+        if status != "OK":
+            logger.error("Erro ao buscar emails no IMAP: " + str(status))
+            return
 
-        messages = results.get("messages", [])
-        if not messages:
-            logger.info("No new messages found")
+        msg_ids = messages[0].split()
+        if not msg_ids:
+            logger.info("No new UNSEEN messages found")
             return
 
         async with AsyncSessionLocal() as db:
-            for msg_ref in messages:
-                msg_id = msg_ref["id"]
+            for m_id in msg_ids:
+                msg_id_str = m_id.decode('utf-8')
                 try:
-                    msg_data = service.users().messages().get(
-                        userId="me", id=msg_id, format="full"
-                    ).execute()
-                    await process_email_message(service, msg_id, msg_data, db)
+                    res, msg_data = mail.fetch(m_id, "(RFC822)")
+                    if res != "OK": continue
+                    
+                    raw_email = msg_data[0][1]
+                    msg = email.message_from_bytes(raw_email)
+                    
+                    # Message-ID works as unique identifier
+                    unique_msg_id = msg.get("Message-ID", f"imap-{msg_id_str}-{datetime.now().timestamp()}")
+                    unique_msg_id = str(unique_msg_id).strip()
+                    if len(unique_msg_id) > 255:
+                        unique_msg_id = unique_msg_id[:255] # Ensure fits in column
+
+                    await process_email_message(unique_msg_id, msg, db)
                 except Exception as e:
-                    logger.error(f"Error processing message {msg_id}: {e}")
+                    logger.error(f"Error processing IMAP message ID {msg_id_str}: {e}")
                     continue
 
-        logger.info(f"Scan complete. Processed {len(messages)} message(s)")
+        logger.info(f"Scan complete. Processed {len(msg_ids)} message(s)")
 
     except Exception as e:
         logger.error(f"Gmail scan failed: {e}")
+    finally:
+        try:
+            mail.close()
+            mail.logout()
+        except:
+            pass

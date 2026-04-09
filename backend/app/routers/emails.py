@@ -81,7 +81,7 @@ from app.config import settings
 @router.get("/gmail/status")
 async def get_gmail_status(_: User = Depends(get_current_user)):
     """Returns Gmail connection status."""
-    is_connected = os.path.exists(settings.GMAIL_TOKEN_PATH)
+    is_connected = bool(settings.GMAIL_USER) and bool(settings.GMAIL_APP_PASSWORD)
     return {
         "connected": is_connected,
         "email": settings.GMAIL_USER if is_connected else None
