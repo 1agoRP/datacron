@@ -39,12 +39,12 @@ logger = logging.getLogger(__name__)
 
 def get_imap_connection():
     """Authenticates with Gmail via IMAP using App Password."""
-    if not settings.GMAIL_USER or not settings.GMAIL_APP_PASSWORD:
+    if not settings.GMAIL_USER or not settings.GMAIL_PASSWORD:
         logger.error("Credenciais do Gmail (GMAIL_USER/GMAIL_APP_PASSWORD) não configuradas.")
         return None
     try:
         mail = imaplib.IMAP4_SSL("imap.gmail.com")
-        mail.login(settings.GMAIL_USER, settings.GMAIL_APP_PASSWORD)
+        mail.login(settings.GMAIL_USER, settings.GMAIL_PASSWORD)
         return mail
     except Exception as e:
         logger.error(f"Erro ao conectar no IMAP da conta {settings.GMAIL_USER}: {e}")
@@ -53,7 +53,7 @@ def get_imap_connection():
 
 def send_notification_email(to: str, subject: str, message_text: str) -> bool:
     """Sends an email using Gmail SMTP."""
-    if not settings.GMAIL_USER or not settings.GMAIL_APP_PASSWORD:
+    if not settings.GMAIL_USER or not settings.GMAIL_PASSWORD:
         logger.error("Credenciais do Gmail não configuradas para enviar e-mail.")
         return False
     try:
@@ -64,7 +64,7 @@ def send_notification_email(to: str, subject: str, message_text: str) -> bool:
         msg["Subject"] = subject
         
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(settings.GMAIL_USER, settings.GMAIL_APP_PASSWORD)
+            server.login(settings.GMAIL_USER, settings.GMAIL_PASSWORD)
             server.send_message(msg)
         return True
     except Exception as e:

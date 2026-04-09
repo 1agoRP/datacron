@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # ─── Gmail ────────────────────────────────────────────────
     GMAIL_USER: str = "datacroncompany@gmail.com"
-    GMAIL_APP_PASSWORD: str = "" # Senha de aplicativo do Gmail
+    GMAIL_PASSWORD: str = "" # Senha de aplicativo do Gmail
     EMAIL_POLL_INTERVAL_MINUTES: int = 5
 
     # ─── Storage ──────────────────────────────────────────────
