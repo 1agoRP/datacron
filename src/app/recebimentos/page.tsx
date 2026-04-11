@@ -24,6 +24,11 @@ export default function RecebimentosPage() {
     () => api.getAgentStatus(),
     { revalidateOnFocus: true }
   );
+  const { data: inboxData, mutate: mutateInbox } = useSWR(
+    'inboxCount',
+    () => api.getInboxCount(),
+    { revalidateOnFocus: true }
+  );
 
   const [scanning, setScanning] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -34,7 +39,10 @@ export default function RecebimentosPage() {
       setScanning(true);
       await api.forceEmailScan();
       alert('Varredura iniciada com sucesso! Os resultados aparecerão nos logs em instantes.');
-      setTimeout(() => mutateLogs(), 3000); // revalidate after scan
+      setTimeout(() => {
+        mutateLogs();
+        mutateInbox();
+      }, 3000); // revalidate after scan
       setScanning(false);
     } catch (err: any) {
       alert('Erro ao iniciar varredura: ' + (err.message || 'Erro desconhecido'));
@@ -66,14 +74,14 @@ export default function RecebimentosPage() {
       <div className="dc-stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
         <div className="dc-stat-card">
           <div className="dc-stat-top">
-            <span className="dc-stat-badge" style={{ background: '#f1f5f9', color: '#64748b' }}>Logs</span>
+            <span className="dc-stat-badge" style={{ background: '#eff6ff', color: '#2563eb' }}>Inbox</span>
             <div className="dc-stat-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>
               <Mail size={24} />
             </div>
           </div>
           <div>
-            <div className="dc-stat-label">E-MAILS PROCESSADOS</div>
-            <div className="dc-stat-value">{logs.length}</div>
+            <div className="dc-stat-label">E-MAILS NA INBOX</div>
+            <div className="dc-stat-value">{inboxData?.inbox_count ?? '—'}</div>
           </div>
         </div>
         

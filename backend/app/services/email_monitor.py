@@ -51,6 +51,70 @@ def get_imap_connection():
         return None
 
 
+def ensure_gmail_label(mail: imaplib.IMAP4_SSL, label_name: str) -> bool:
+    """Creates a Gmail label via IMAP if it doesn't exist."""
+    try:
+        # Check if label already exists
+        status, labels = mail.list('""', f'"{label_name}"')
+        if status == "OK" and labels and labels[0] is not None and labels[0] != b'()':
+            return True  # already exists
+
+        # Create the label
+        status, _ = mail.create(f'"{label_name}"')
+        if status == "OK":
+            logger.info(f"Label '{label_name}' criado com sucesso no Gmail.")
+            return True
+        else:
+            logger.warning(f"Falha ao criar label '{label_name}': status={status}")
+            return False
+    except Exception as e:
+        logger.error(f"Erro ao criar label '{label_name}': {e}")
+        return False
+
+
+def move_email_to_label(mail: imaplib.IMAP4_SSL, msg_num: bytes, label_name: str) -> bool:
+    """Moves an email from Inbox to the specified Gmail label."""
+    try:
+        # Ensure label exists
+        ensure_gmail_label(mail, label_name)
+
+        # Copy to destination label
+        status, _ = mail.copy(msg_num, f'"{label_name}"')
+        if status != "OK":
+            logger.error(f"Falha ao copiar e-mail para '{label_name}'")
+            return False
+
+        # Mark as deleted in Inbox
+        mail.store(msg_num, '+FLAGS', '(\\Deleted)')
+        return True
+    except Exception as e:
+        logger.error(f"Erro ao mover e-mail para '{label_name}': {e}")
+        return False
+
+
+def get_inbox_count() -> int:
+    """Returns the count of emails currently in the Gmail inbox."""
+    mail = get_imap_connection()
+    if not mail:
+        return 0
+    try:
+        mail.select("inbox")
+        status, messages = mail.search(None, "ALL")
+        if status != "OK":
+            return 0
+        msg_ids = messages[0].split()
+        return len(msg_ids) if msg_ids and msg_ids[0] else 0
+    except Exception as e:
+        logger.error(f"Erro ao contar e-mails na inbox: {e}")
+        return 0
+    finally:
+        try:
+            mail.close()
+            mail.logout()
+        except:
+            pass
+
+
 def send_notification_email(to: str, subject: str, message_text: str) -> bool:
     """Sends an email using Gmail SMTP."""
     if not settings.GMAIL_USER or not settings.GMAIL_PASSWORD:
@@ -212,7 +276,7 @@ def _decode_header_value(header_val):
     return result
 
 
-async def process_email_message(msg_id: str, msg, db: AsyncSession):
+async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[str]:
     """
     Full pipeline for processing a single IMAP message:
     1. Parse headers to get sender, subject, date
@@ -222,6 +286,9 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession):
     5. Extract invoice data
     6. Save Fatura to DB
     7. Generate alerts if needed
+
+    Returns:
+        The condominio name if identified, or None if not identified.
     """
 
     sender = _decode_header_value(msg.get("From", "")).split("<")[-1].replace(">", "").strip()
@@ -255,7 +322,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession):
     )
     if existing.scalar_one_or_none():
         logger.info(f"Email {msg_id} already processed, skipping")
-        return
+        return None  # already processed, skip
 
     email_log = EmailLog(
         gmail_message_id=msg_id,
@@ -271,6 +338,8 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession):
     
     if codigo_encontrado:
         email_log.codigo_identificacao = codigo_encontrado
+
+    condo_name: Optional[str] = None
 
     if conc:
         email_log.status = "identificado"
@@ -291,6 +360,8 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession):
             select(Condominio).where(Condominio.id == conc.condominio_id)
         )
         condo = condo_result.scalar_one_or_none()
+        if condo:
+            condo_name = condo.nome
         password = conc.gerar_senha_pdf(condo.cnpj_digits if condo else "")
     
     body_data = {}
@@ -307,7 +378,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession):
         logger.info(f"No PDF attachments in message {msg_id}")
         email_log.status = "processado"
         await db.commit()
-        return
+        return condo_name
 
     for filename, pdf_bytes in attachments:
         unlocked_bytes = unlock_pdf(pdf_bytes, password)
@@ -364,6 +435,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession):
 
     await db.commit()
     logger.info(f"Email {msg_id} processed successfully")
+    return condo_name
 
 
 def _guess_referencia() -> str:
@@ -375,7 +447,15 @@ def _guess_referencia() -> str:
 
 
 async def run_email_scan():
-    """Main entry point called by the scheduler."""
+    """Main entry point called by the scheduler.
+    
+    Scans ALL emails in the inbox, processes them, and moves each one
+    to the appropriate Gmail label:
+    - Datacron/{condominio_name} if identified
+    - Datacron/E-mails não identificados if not identified
+    
+    After the scan, the inbox should be empty.
+    """
     logger.info("Starting Gmail IMAP inbox scan...")
 
     mail = get_imap_connection()
@@ -384,15 +464,22 @@ async def run_email_scan():
 
     try:
         mail.select("inbox")
-        status, messages = mail.search(None, "UNSEEN")
+        status, messages = mail.search(None, "ALL")
         if status != "OK":
             logger.error("Erro ao buscar emails no IMAP: " + str(status))
             return
 
         msg_ids = messages[0].split()
-        if not msg_ids:
-            logger.info("No new UNSEEN messages found")
+        if not msg_ids or (len(msg_ids) == 1 and msg_ids[0] == b''):
+            logger.info("No messages found in inbox")
             return
+
+        # Ensure the "not identified" label exists
+        ensure_gmail_label(mail, "Datacron/E-mails não identificados")
+
+        # Process in reverse order (newest first) to handle EXPUNGE correctly
+        # We collect results first, then move in reverse
+        results: list[tuple[bytes, Optional[str]]] = []
 
         async with AsyncSessionLocal() as db:
             for m_id in msg_ids:
@@ -408,14 +495,28 @@ async def run_email_scan():
                     unique_msg_id = msg.get("Message-ID", f"imap-{msg_id_str}-{datetime.now().timestamp()}")
                     unique_msg_id = str(unique_msg_id).strip()
                     if len(unique_msg_id) > 255:
-                        unique_msg_id = unique_msg_id[:255] # Ensure fits in column
+                        unique_msg_id = unique_msg_id[:255]
 
-                    await process_email_message(unique_msg_id, msg, db)
+                    condo_name = await process_email_message(unique_msg_id, msg, db)
+                    results.append((m_id, condo_name))
                 except Exception as e:
                     logger.error(f"Error processing IMAP message ID {msg_id_str}: {e}")
+                    # Still move unprocessable emails to "não identificados"
+                    results.append((m_id, None))
                     continue
 
-        logger.info(f"Scan complete. Processed {len(msg_ids)} message(s)")
+        # Move emails to labels (reverse order to avoid sequence number issues)
+        for m_id, condo_name in reversed(results):
+            if condo_name:
+                label = f"Datacron/{condo_name}"
+            else:
+                label = "Datacron/E-mails não identificados"
+            move_email_to_label(mail, m_id, label)
+
+        # Expunge all deleted messages at once
+        mail.expunge()
+
+        logger.info(f"Scan complete. Processed and moved {len(results)} message(s)")
 
     except Exception as e:
         logger.error(f"Gmail scan failed: {e}")

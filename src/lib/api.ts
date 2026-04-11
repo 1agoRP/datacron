@@ -371,6 +371,10 @@ class ApiClient {
     return this.request('/emails/status');
   }
 
+  async getInboxCount() {
+    return this.request<{ inbox_count: number }>('/emails/inbox');
+  }
+
   async getGmailStatus() {
     return this.request('/emails/gmail/status');
   }

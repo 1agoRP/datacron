@@ -75,6 +75,14 @@ async def get_agent_status(_: User = Depends(get_current_user)):
         ],
     }
 
+
+@router.get("/inbox")
+async def get_inbox_status(_: User = Depends(get_current_user)):
+    """Returns the current count of emails in the Gmail inbox."""
+    from app.services.email_monitor import get_inbox_count
+    count = get_inbox_count()
+    return {"inbox_count": count}
+
 import os
 from app.config import settings
 

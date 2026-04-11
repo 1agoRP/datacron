@@ -2,7 +2,9 @@ import uuid
 from typing import Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, and_, extract
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,8 @@ from app.models.user import User
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
 from app.schemas import CondominioCreate, CondominioUpdate, CondominioResponse, FaturaResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/condominios", tags=["Condomínios"])
 
@@ -74,10 +78,11 @@ async def list_condominios(
 @router.post("/", response_model=CondominioResponse, status_code=201)
 async def create_condominio(
     body: CondominioCreate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Creates a new condominio."""
+    """Creates a new condominio and its Gmail label."""
     # Check unique constraints
     existing = await db.execute(
         select(Condominio).where(
@@ -91,7 +96,28 @@ async def create_condominio(
     db.add(condominio)
     await db.commit()
     await db.refresh(condominio)
+
+    # Create Gmail label in background
+    background_tasks.add_task(_create_gmail_label_for_condo, condominio.nome)
+
     return condominio
+
+
+def _create_gmail_label_for_condo(condo_nome: str):
+    """Background task: creates Gmail label Datacron/{condo_nome}."""
+    try:
+        from app.services.email_monitor import get_imap_connection, ensure_gmail_label
+        mail = get_imap_connection()
+        if mail:
+            label_name = f"Datacron/{condo_nome}"
+            ensure_gmail_label(mail, label_name)
+            try:
+                mail.logout()
+            except:
+                pass
+            logger.info(f"Label Gmail '{label_name}' criado para novo condomínio.")
+    except Exception as e:
+        logger.error(f"Erro ao criar label Gmail para condomínio '{condo_nome}': {e}")
 
 
 @router.get("/{id}", response_model=CondominioResponse)
