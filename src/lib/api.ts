@@ -502,6 +502,11 @@ class ApiClient {
     return this.request<Fatura[]>(url);
   }
 
+  // Gmail History (Direct from folders)
+  async getGmailHistory(condominioId: string, concessionariaId: string) {
+    return this.request<any[]>(`/condominios/${condominioId}/gmail-history?concessionaria_id=${concessionariaId}`);
+  }
+
   // Contratos
   async getContratos(params: Record<string, string | number> = {}) {
     const safeParams: Record<string, string> = {};

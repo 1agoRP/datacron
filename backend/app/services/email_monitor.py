@@ -169,6 +169,8 @@ async def find_concessionaria(
     sender: str, subject: str, body_text: str, db: AsyncSession
 ) -> tuple[Optional[Concessionaria], Optional[str]]:
     """Matches sender, subject, and body text to a registered concessionaria."""
+    
+    # 1. Tentar por domínio do remetente (Lógica atual)
     domain = sender.split('@')[-1]
     result = await db.execute(
         select(Concessionaria).where(
@@ -177,25 +179,39 @@ async def find_concessionaria(
         )
     )
     concs = result.scalars().all()
-    if not concs:
-        return None, None
-
-    for conc in concs:
-        if conc.instalacao and (conc.instalacao in body_text or conc.instalacao in subject):
-            return conc, conc.instalacao
-
-    tipo = concs[0].tipo if concs else None
-    code_from_body = _extract_identification_code(body_text, tipo) if tipo else None
-
-    if code_from_body:
+    
+    if concs:
         for conc in concs:
-            if conc.instalacao == code_from_body:
-                return conc, code_from_body
+            if conc.instalacao and (conc.instalacao in body_text or conc.instalacao in subject):
+                return conc, conc.instalacao
+        
+        # Se achou o domínio mas não a instalação específica, tenta extrair do corpo
+        tipo = concs[0].tipo if concs else None
+        code_from_body = _extract_identification_code(body_text, tipo) if tipo else None
+        if code_from_body:
+            for conc in concs:
+                if conc.instalacao == code_from_body:
+                    return conc, code_from_body
+        
+        # Se for único para aquele domínio, assume como sendo ele
+        if len(concs) == 1:
+            return concs[0], code_from_body or concs[0].instalacao
 
-    if len(concs) == 1:
-        return concs[0], code_from_body or concs[0].instalacao
-
-    return None, code_from_body
+    # 2. BUSCA GLOBAL (Melhoria para e-mails encaminhados)
+    # Se chegamos aqui, ou o remetente não é o oficial (encaminhado) ou não achou a UC nos concs do domínio.
+    # Vamos buscar em TODAS as concessionárias ativas
+    
+    all_concs_result = await db.execute(select(Concessionaria).where(Concessionaria.ativo == True))
+    all_concs = all_concs_result.scalars().all()
+    
+    # Procura por número de instalação exato no assunto ou corpo
+    for conc in all_concs:
+        if conc.instalacao and len(conc.instalacao) >= 4: # Ignora códigos muito curtos para evitar falso-positivo
+            if conc.instalacao in subject or conc.instalacao in body_text:
+                logger.info(f"Identificado via Busca Global (UC: {conc.instalacao})")
+                return conc, conc.instalacao
+                
+    return None, None
 
 
 def _extract_identification_code(body_text: str, tipo: str) -> Optional[str]:
@@ -528,3 +544,57 @@ async def run_email_scan():
             mail.logout()
         except:
             pass
+def get_gmail_history(label_name: str, filter_text: str) -> list[dict]:
+    """Fetches list of invoices directly from a Gmail label via IMAP."""
+    mail = get_imap_connection()
+    if not mail:
+        return []
+
+    history = []
+    try:
+        # Codifica label para evitar problemas de acento (IMAP UTF-7)
+        # Se falhar ou não achar a pasta, retorna vazio
+        status, _ = mail.select(f'"{label_name}"')
+        if status != "OK":
+            logger.warning(f"Label '{label_name}' não encontrada ou vazia no Gmail.")
+            return []
+
+        # Busca e-mails que contenham o texto de filtro (ex: número da UC)
+        # Gmail IMAP supports 'BODY' and 'SUBJECT' filters
+        status, messages = mail.search(None, f'(OR (SUBJECT "{filter_text}") (BODY "{filter_text}"))')
+        if status != "OK" or not messages[0]:
+            return []
+
+        msg_ids = messages[0].split()
+        for m_id in reversed(msg_ids): # Mais novos primeiro
+            try:
+                # Pegamos apenas o Header para ser rápido
+                res, data = mail.fetch(m_id, "(BODY[HEADER.FIELDS (SUBJECT DATE MESSAGE-ID)])")
+                if res == "OK":
+                    msg = email.message_from_bytes(data[0][1])
+                    subject = _decode_header_value(msg.get("Subject", "Sem Assunto"))
+                    date_str = msg.get("Date", "")
+                    msg_id = msg.get("Message-ID", "").strip()
+                    
+                    history.append({
+                        "id": msg_id,
+                        "referencia": subject, # Usamos o assunto como referência visual
+                        "vencimento": date_str,
+                        "status": "gmail_archive",
+                        "valor": 0.0, # Valor não extraído em tempo real para performance
+                        "pdf_nome_original": subject,
+                        "created_at": date_str
+                    })
+            except:
+                continue
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar histórico no Gmail: {e}")
+    finally:
+        try:
+            mail.close()
+            mail.logout()
+        except:
+            pass
+
+    return history

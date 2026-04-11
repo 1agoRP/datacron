@@ -191,6 +191,41 @@ async def get_condominio_faturas(
     return result.scalars().all()
 
 
+@router.get("/{id}/gmail-history")
+async def get_condominio_gmail_history(
+    id: uuid.UUID,
+    concessionaria_id: uuid.UUID = Query(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Fetches list of invoices directly from the Condominio's Gmail label."""
+    # 1. Obter Condomínio e Concessionária
+    result = await db.execute(
+        select(Condominio).where(Condominio.id == id)
+    )
+    condo = result.scalar_one_or_none()
+    if not condo:
+        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+
+    from app.models.concessionaria import Concessionaria as ConcModel
+    res_conc = await db.execute(
+        select(ConcModel).where(ConcModel.id == concessionaria_id)
+    )
+    conc = res_conc.scalar_one_or_none()
+    if not conc:
+        raise HTTPException(status_code=404, detail="Concessionária não encontrada")
+
+    # 2. Construir nome da Label (Padrão: Datacron/XXXX - Nome)
+    numero_pad = str(condo.numero).zfill(4)
+    label_name = f"Datacron/{numero_pad} - {condo.nome}"
+
+    # 3. Chamar função de busca IMAP
+    from app.services.email_monitor import get_gmail_history
+    history = get_gmail_history(label_name, conc.instalacao)
+    
+    return history
+
+
 @router.post("/{id}/ata-eleicao")
 async def upload_ata_eleicao(
     id: uuid.UUID,

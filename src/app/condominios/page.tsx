@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History, Upload, FileSignature } from 'lucide-react';
+import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -155,9 +155,30 @@ export default function CondominiosPage() {
     setHistoryConc(conc);
     try {
       setLoadingHistory(true);
-      // Fetch faturas filtered by both condominio and concessionária directly from API
-      const faturas = await api.getFaturasByCondominio(detailsCondo.id, conc.id);
-      setHistoryFaturas(faturas);
+      // Busca faturas do Banco de Dados
+      const dbFaturas = await api.getFaturasByCondominio(detailsCondo.id, conc.id);
+      
+      // Busca faturas diretamente do Gmail
+      const gmailFaturas = await api.getGmailHistory(detailsCondo.id, conc.id);
+      
+      // Mescla as listas removendo duplicatas (pelo Message-ID)
+      const merged = [...dbFaturas];
+      const dbMessageIds = new Set(dbFaturas.map(f => f.gmail_message_id).filter(id => !!id));
+      
+      gmailFaturas.forEach(gf => {
+        if (!dbMessageIds.has(gf.id)) {
+          merged.push(gf);
+        }
+      });
+
+      // Ordena por data (mais recente primeiro)
+      merged.sort((a, b) => {
+        const dateA = new Date(a.created_at || a.vencimento);
+        const dateB = new Date(b.created_at || b.vencimento);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      setHistoryFaturas(merged);
     } catch (err) {
       console.error(err);
       setHistoryFaturas([]);
@@ -536,30 +557,46 @@ export default function CondominiosPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {historyFaturas.map(f => (
-                          <tr key={f.id}>
-                            <td><span className="dc-cell-primary">{f.referencia || '—'}</span></td>
-                            <td>{f.vencimento ? format(new Date(f.vencimento), 'dd/MM/yyyy') : '—'}</td>
-                            <td><span className="dc-cell-primary">{formatCurrencyCeil(f.valor || 0)}</span></td>
-                            <td>
-                              <span className={`dc-badge ${f.status === 'processada' ? 'dc-badge-green' : 'dc-badge-amber'}`}>
-                                {(f.status || 'pendente').charAt(0).toUpperCase() + (f.status || 'pendente').slice(1)}
-                              </span>
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                <button
-                                  className="dc-btn dc-btn-secondary"
-                                  style={{ height: 30, padding: '0 10px', fontSize: '0.75rem', gap: 4 }}
-                                  disabled={!f.pdf_path}
-                                  onClick={() => handleDownloadFatura(f.id, f.pdf_nome_original || `fatura_${f.id}.pdf`)}
-                                >
-                                  <Download size={12} /> Baixar
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                        {historyFaturas.map(f => {
+                          const isGmail = f.status === 'gmail_archive';
+                          return (
+                            <tr key={f.id}>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  {isGmail ? <Mail size={14} color="#64748b" /> : <Database size={14} color="#3b82f6" />}
+                                  <span className="dc-cell-primary" style={{ fontSize: '0.75rem', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {f.referencia || '—'}
+                                  </span>
+                                </div>
+                              </td>
+                              <td>{f.vencimento ? (isGmail ? f.vencimento.split(' ').slice(0, 4).join(' ') : format(new Date(f.vencimento), 'dd/MM/yyyy')) : '—'}</td>
+                              <td><span className="dc-cell-primary">{f.valor > 0 ? formatCurrencyCeil(f.valor) : '—'}</span></td>
+                              <td>
+                                <span className={`dc-badge ${isGmail ? 'dc-badge-amber' : f.status === 'processada' ? 'dc-badge-green' : 'dc-badge-amber'}`} style={{ fontSize: '0.7rem' }}>
+                                  {isGmail ? 'Gmail' : (f.status || 'pendente').toUpperCase()}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                  <button
+                                    className={`dc-btn ${isGmail ? 'dc-btn-secondary' : 'dc-btn-secondary'}`}
+                                    style={{ height: 30, padding: '0 10px', fontSize: '0.75rem', gap: 4, opacity: isGmail ? 0.6 : 1 }}
+                                    disabled={!isGmail && !f.pdf_path}
+                                    onClick={() => {
+                                      if (isGmail) {
+                                        alert('Esta fatura está no Gmail. Aguarde a próxima varredura automática para processamento ou use a Central de Recebimento.');
+                                      } else {
+                                        handleDownloadFatura(f.id, f.pdf_nome_original || `fatura_${f.id}.pdf`);
+                                      }
+                                    }}
+                                  >
+                                    <Download size={12} /> {isGmail ? 'No Gmail' : 'Baixar'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   )}
