@@ -173,8 +173,8 @@ export default function CondominiosPage() {
 
       // Ordena por data (mais recente primeiro)
       merged.sort((a, b) => {
-        const dateA = new Date(a.created_at || a.vencimento);
-        const dateB = new Date(b.created_at || b.vencimento);
+        const dateA = new Date(a.created_at || a.vencimento || 0);
+        const dateB = new Date(b.created_at || b.vencimento || 0);
         return dateB.getTime() - dateA.getTime();
       });
 
