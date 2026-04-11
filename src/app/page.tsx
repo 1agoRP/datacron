@@ -73,14 +73,14 @@ export default function LandingPage() {
 
     // 60-second absolute timeout for cold starts on free tiers
     const timeout = setTimeout(() => {
-      setError('Tempo limite excedido (60s). Verifique sua conexão e tente novamente.');
+      setError('Tempo limite excedido. Verifique sua conexão e tente novamente.');
       setIsLoading(false);
     }, 60000);
 
     // 5-second gentle warning
     const warningTimeout = setTimeout(() => {
-      setError('O servidor está acordando (Render Free). Isso pode levar até 50 segundos. Por favor, aguarde...');
-    }, 5000);
+      setError('Por favor, aguarde...');
+    }, 10000);
 
     try {
       await login({ email, senha: password });
@@ -91,7 +91,7 @@ export default function LandingPage() {
       clearTimeout(timeout);
       clearTimeout(warningTimeout);
       const errorMsg = err instanceof Error ? err.message : 'Falha na autenticação';
-      if (errorMsg.toLowerCase().includes('failed to fetch')) {
+      if (errorMsg.toLowerCase().includes('falha ao buscar')) {
         setError('Servidor indisponível. Verifique sua conexão e tente novamente.');
       } else {
         setError(errorMsg);
@@ -102,7 +102,7 @@ export default function LandingPage() {
 
   const fadeUp: Variants = {
     hidden: { opacity: 0, y: 28 },
-    visible: (i = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22,1,0.36,1], delay: i * 0.1 } })
+    visible: (i = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: i * 0.1 } })
   };
 
   const marqueeItems = [
@@ -135,10 +135,6 @@ export default function LandingPage() {
             DATACRON
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <span className="lp-tag" style={{ display: 'flex' }}>
-              <span className="lp-tag-dot" />
-              v2 ONLINE
-            </span>
             <button className="lp-btn-primary" onClick={() => setIsLoginView(true)}>
               <Lock size={14} /> Acesso Restrito
             </button>
@@ -208,7 +204,7 @@ export default function LandingPage() {
           </motion.div>
 
           {/* Right — dashboard mockup */}
-          <motion.div initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.3, ease: [0.22,1,0.36,1] }}
+          <motion.div initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
             style={{ position: 'relative' }}>
             <div style={{
               background: 'var(--white)', border: '1px solid var(--slate-200)', borderRadius: 20,
@@ -217,7 +213,7 @@ export default function LandingPage() {
             }}>
               {/* Mockup header */}
               <div style={{ background: 'var(--slate-900)', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {['#ef4444','#f59e0b','#22c55e'].map(c => (
+                {['#ef4444', '#f59e0b', '#22c55e'].map(c => (
                   <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c }} />
                 ))}
                 <div style={{ marginLeft: 8, background: 'rgba(255,255,255,0.07)', borderRadius: 6, padding: '0.25rem 0.75rem', flex: 1, maxWidth: 200 }}>
@@ -234,7 +230,7 @@ export default function LandingPage() {
                 </div>
                 {/* Fake chart bars */}
                 <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80, marginBottom: '1rem' }}>
-                  {[40,65,50,80,70,90,85,100,78,92,88,95].map((h, i) => (
+                  {[40, 65, 50, 80, 70, 90, 85, 100, 78, 92, 88, 95].map((h, i) => (
                     <div key={i} style={{
                       flex: 1, height: `${h}%`, borderRadius: 4,
                       background: `linear-gradient(to top, #2563eb, #60a5fa)`,
@@ -654,7 +650,7 @@ export default function LandingPage() {
                     )}
 
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <label className="lp-form-label">E-mail Corporativo</label>
+                      <label className="lp-form-label">E-mail</label>
                       <input type="email" className="lp-form-input" value={email} onChange={e => setEmail(e.target.value)} placeholder="seuemail@empresa.com" required />
                     </div>
 
@@ -686,7 +682,7 @@ export default function LandingPage() {
 
                   <div style={{ textAlign: 'center', marginTop: '1.25rem' }}>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--slate-300)' }}>
-                      Acesso monitorado · Datacron RPA v2
+                      Acesso monitorado · Datacron RPA
                     </span>
                   </div>
                 </div>
