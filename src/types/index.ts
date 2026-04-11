@@ -39,6 +39,7 @@ export interface Fatura {
   pdf_desbloqueado?: boolean;
   email_remetente?: string | null;
   email_assunto?: string | null;
+  gmail_message_id?: string | null;
   dados_extraidos?: Record<string, any> | null;
   variacao_percentual?: number | null;
   created_at: string;
