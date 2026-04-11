@@ -333,12 +333,21 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
     body_text = re.sub(r'<[^>]+>', ' ', raw_body)
     body_text = re.sub(r'\s+', ' ', body_text)
     
-    existing = await db.execute(
+    existing_log = await db.execute(
         select(EmailLog).where(EmailLog.gmail_message_id == msg_id)
     )
-    if existing.scalar_one_or_none():
-        logger.info(f"Email {msg_id} already processed, skipping")
-        return None  # already processed, skip
+    email_log_record = existing_log.scalar_one_or_none()
+    if email_log_record:
+        logger.info(f"Email {msg_id} already processed, skipping processing but determining label")
+        if email_log_record.condominio_id:
+            condo_result = await db.execute(
+                select(Condominio).where(Condominio.id == email_log_record.condominio_id)
+            )
+            condo = condo_result.scalar_one_or_none()
+            if condo:
+                numero_pad = str(condo.numero).zfill(4)
+                return f"{numero_pad} - {condo.nome}"
+        return None  # already processed, no condo -> goes to unidentified
 
     email_log = EmailLog(
         gmail_message_id=msg_id,
