@@ -361,7 +361,9 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         )
         condo = condo_result.scalar_one_or_none()
         if condo:
-            condo_name = condo.nome
+            # Padding length exactly 4 digits
+            numero_pad = str(condo.numero).zfill(4)
+            condo_name = f"{numero_pad} - {condo.nome}"
         password = conc.gerar_senha_pdf(condo.cnpj_digits if condo else "")
     
     body_data = {}
@@ -475,7 +477,7 @@ async def run_email_scan():
             return
 
         # Ensure the "not identified" label exists
-        ensure_gmail_label(mail, "Datacron/E-mails não identificados")
+        ensure_gmail_label(mail, "Datacron/E-mails nao identificados")
 
         # Process in reverse order (newest first) to handle EXPUNGE correctly
         # We collect results first, then move in reverse
@@ -510,7 +512,7 @@ async def run_email_scan():
             if condo_name:
                 label = f"Datacron/{condo_name}"
             else:
-                label = "Datacron/E-mails não identificados"
+                label = "Datacron/E-mails nao identificados"
             move_email_to_label(mail, m_id, label)
 
         # Expunge all deleted messages at once

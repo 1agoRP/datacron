@@ -98,18 +98,19 @@ async def create_condominio(
     await db.refresh(condominio)
 
     # Create Gmail label in background
-    background_tasks.add_task(_create_gmail_label_for_condo, condominio.nome)
+    background_tasks.add_task(_create_gmail_label_for_condo, condominio.nome, condominio.numero)
 
     return condominio
 
 
-def _create_gmail_label_for_condo(condo_nome: str):
-    """Background task: creates Gmail label Datacron/{condo_nome}."""
+def _create_gmail_label_for_condo(condo_nome: str, condo_numero: str):
+    """Background task: creates Gmail label Datacron/{condo_numero} - {condo_nome}."""
     try:
         from app.services.email_monitor import get_imap_connection, ensure_gmail_label
         mail = get_imap_connection()
         if mail:
-            label_name = f"Datacron/{condo_nome}"
+            numero_pad = str(condo_numero).zfill(4)
+            label_name = f"Datacron/{numero_pad} - {condo_nome}"
             ensure_gmail_label(mail, label_name)
             try:
                 mail.logout()

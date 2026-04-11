@@ -494,8 +494,12 @@ class ApiClient {
   }
 
   // Faturas by condominio (for history)
-  async getFaturasByCondominio(condominioId: string) {
-    return this.request<Fatura[]>(`/faturas?condominio_id=${condominioId}&limit=100`);
+  async getFaturasByCondominio(condominioId: string, concessionariaId?: string) {
+    let url = `/faturas?condominio_id=${condominioId}&limit=100`;
+    if (concessionariaId) {
+      url += `&concessionaria_id=${concessionariaId}`;
+    }
+    return this.request<Fatura[]>(url);
   }
 
   // Contratos

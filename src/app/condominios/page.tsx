@@ -155,10 +155,9 @@ export default function CondominiosPage() {
     setHistoryConc(conc);
     try {
       setLoadingHistory(true);
-      const faturas = await api.getFaturasByCondominio(detailsCondo.id);
-      // Filter faturas for this specific concessionária
-      const concFaturas = faturas.filter((f: any) => f.concessionaria_id === conc.id);
-      setHistoryFaturas(concFaturas);
+      // Fetch faturas filtered by both condominio and concessionária directly from API
+      const faturas = await api.getFaturasByCondominio(detailsCondo.id, conc.id);
+      setHistoryFaturas(faturas);
     } catch (err) {
       console.error(err);
       setHistoryFaturas([]);
