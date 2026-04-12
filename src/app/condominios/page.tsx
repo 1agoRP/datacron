@@ -155,30 +155,17 @@ export default function CondominiosPage() {
     setHistoryConc(conc);
     try {
       setLoadingHistory(true);
-      // Busca faturas do Banco de Dados
+      // Busca faturas exclusivamente do Banco de Dados
       const dbFaturas = await api.getFaturasByCondominio(detailsCondo.id, conc.id);
-      
-      // Busca faturas diretamente do Gmail
-      const gmailFaturas = await api.getGmailHistory(detailsCondo.id, conc.id);
-      
-      // Mescla as listas removendo duplicatas (pelo Message-ID)
-      const merged = [...dbFaturas];
-      const dbMessageIds = new Set(dbFaturas.map(f => f.gmail_message_id).filter(id => !!id));
-      
-      gmailFaturas.forEach(gf => {
-        if (!dbMessageIds.has(gf.id)) {
-          merged.push(gf);
-        }
-      });
 
       // Ordena por data (mais recente primeiro)
-      merged.sort((a, b) => {
+      dbFaturas.sort((a: any, b: any) => {
         const dateA = new Date(a.created_at || a.vencimento || 0);
         const dateB = new Date(b.created_at || b.vencimento || 0);
         return dateB.getTime() - dateA.getTime();
       });
 
-      setHistoryFaturas(merged);
+      setHistoryFaturas(dbFaturas);
     } catch (err) {
       console.error(err);
       setHistoryFaturas([]);
