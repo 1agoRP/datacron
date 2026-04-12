@@ -592,7 +592,8 @@ def get_gmail_history(label_name: str, filter_text: str) -> list[dict]:
                         "status": "gmail_archive",
                         "valor": 0.0, # Valor não extraído em tempo real para performance
                         "pdf_nome_original": subject,
-                        "created_at": date_str
+                        "created_at": date_str,
+                        "_parsed_date": parsedate_to_datetime(date_str) if date_str else datetime.min.replace(tzinfo=timezone.utc)
                     })
             except:
                 continue
@@ -605,5 +606,12 @@ def get_gmail_history(label_name: str, filter_text: str) -> list[dict]:
             mail.logout()
         except:
             pass
+
+    # Organizar por mais recentes primeiro (usando a data real do cabeçalho)
+    history.sort(key=lambda x: x["_parsed_date"], reverse=True)
+    
+    # Remover o campo temporário antes de enviar ao frontend
+    for item in history:
+        item.pop("_parsed_date", None)
 
     return history
