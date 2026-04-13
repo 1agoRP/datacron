@@ -383,6 +383,7 @@ export default function Dashboard() {
           >
             Monitorando e-mails a cada 5 minutos
           </div>
+          </div>
         </div>
       </div>
     </Shell>

@@ -304,7 +304,6 @@ export default function ContratosPage() {
             Gerencie contratos recorrentes dos condomínios com leitura inteligente de PDFs.
           </p>
         </div>
-        </div>
         {!readOnly && (
           <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
             <Plus size={16} /> Novo Contrato
