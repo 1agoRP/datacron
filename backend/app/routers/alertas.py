@@ -51,7 +51,7 @@ async def mark_as_read(
     result = await db.execute(select(Alerta).where(Alerta.id == id))
     a = result.scalar_one_or_none()
     if not a:
-        raise HTTPException(status_code=404, detail="Alerta não encontrado")
+        raise HTTPException(status_code=404, detail="Alerta nao encontrado")
     
     # RBAC Check
     if allowed_condo_ids is not None and a.condominio_id and a.condominio_id not in allowed_condo_ids:
@@ -72,7 +72,7 @@ async def resolve_alerta(
     result = await db.execute(select(Alerta).where(Alerta.id == id))
     a = result.scalar_one_or_none()
     if not a:
-        raise HTTPException(status_code=404, detail="Alerta não encontrado")
+        raise HTTPException(status_code=404, detail="Alerta nao encontrado")
     
     # RBAC Check
     if allowed_condo_ids is not None and a.condominio_id and a.condominio_id not in allowed_condo_ids:
@@ -103,7 +103,7 @@ async def resolve_alerta(
 
 def _send_resolution_email(recipient: str, original_subject: str):
     """
-    Sends a professional HTML reply email informing that the concessionária
+    Sends a professional HTML reply email informing that the concessionaria
     was not found in the system and needs review.
     """
 
@@ -135,7 +135,7 @@ def _send_resolution_email(recipient: str, original_subject: str):
     code_match = re.search(r"(\d{6,})", original_subject)
     code = code_match.group(1) if code_match else "N/D"
 
-    subject = f"{tipo_label} – {codigo_label} {code} – não reconhecida no cadastro"
+    subject = f"{tipo_label} - {codigo_label} {code} - nao reconhecida no cadastro"
 
     body_html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -152,11 +152,11 @@ def _send_resolution_email(recipient: str, original_subject: str):
     <!-- Body -->
     <div style="padding: 32px;">
       <h2 style="color: #0f172a; font-size: 18px; font-weight: 800; margin: 0 0 16px;">
-        ⚠️ Concessionária Não Identificada
+        Aviso: Concessionaria Nao Identificada
       </h2>
       
       <p style="color: #475569; font-size: 14px; line-height: 1.7; margin: 0 0 20px;">
-        Prezado(a), informamos que o e-mail recebido <strong>não foi identificado</strong> como uma concessionária cadastrada em nosso sistema Datacron.
+        Prezado(a), informamos que o e-mail recebido nao foi identificado como uma concessionaria cadastrada em nosso sistema Datacron.
       </p>
 
       <!-- Info Table -->
@@ -176,18 +176,18 @@ def _send_resolution_email(recipient: str, original_subject: str):
       </div>
 
       <p style="color: #475569; font-size: 14px; line-height: 1.7; margin: 0 0 8px;">
-        <strong>Ação necessária:</strong> Será necessária uma revisão para verificar se esta concessionária deve ser cadastrada no sistema.
+        Acao necessaria: Sera necessaria uma revisao para verificar se esta concessionaria deve ser cadastrada no sistema.
       </p>
       
       <p style="color: #64748b; font-size: 13px; line-height: 1.6; margin: 0;">
-        Caso tenha dúvidas, entre em contato com a administração.
+        Caso tenha duvidas, entre em contato com a administracao.
       </p>
     </div>
 
     <!-- Footer -->
     <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 32px; text-align: center;">
       <p style="color: #94a3b8; font-size: 12px; margin: 0; font-weight: 600;">
-        Datacron · Gestão Inteligente de Faturas · E-mail enviado automaticamente
+        Datacron - Gestao Inteligente de Faturas - E-mail enviado automaticamente
       </p>
     </div>
   </div>
@@ -215,7 +215,7 @@ async def delete_alerta(
     result = await db.execute(select(Alerta).where(Alerta.id == id))
     a = result.scalar_one_or_none()
     if not a:
-        raise HTTPException(status_code=404, detail="Alerta não encontrado")
+        raise HTTPException(status_code=404, detail="Alerta nao encontrado")
     
     # RBAC Check
     if allowed_condo_ids is not None and a.condominio_id and a.condominio_id not in allowed_condo_ids:

@@ -43,7 +43,7 @@ async def get_reajuste(
     result = await db.execute(select(ReajusteMercado).where(ReajusteMercado.id == id))
     r = result.scalar_one_or_none()
     if not r:
-        raise HTTPException(status_code=404, detail="Reajuste não encontrado")
+        raise HTTPException(status_code=404, detail="Reajuste nao encontrado")
     return r
 
 
@@ -95,7 +95,7 @@ async def delete_reajuste(
     result = await db.execute(select(ReajusteMercado).where(ReajusteMercado.id == id))
     r = result.scalar_one_or_none()
     if not r:
-        raise HTTPException(status_code=404, detail="Reajuste não encontrado")
+        raise HTTPException(status_code=404, detail="Reajuste nao encontrado")
     
     await db.delete(r)
     await db.commit()
@@ -112,10 +112,10 @@ async def download_documento_reajuste(
     r = result.scalar_one_or_none()
     
     if not r:
-        raise HTTPException(status_code=404, detail="Reajuste não encontrado")
+        raise HTTPException(status_code=404, detail="Reajuste nao encontrado")
         
     if not r.documento_base64:
-        raise HTTPException(status_code=404, detail="Este reajuste não possui documento anexo")
+        raise HTTPException(status_code=404, detail="Este reajuste nao possui documento anexo")
 
     pdf_bytes = base64.b64decode(r.documento_base64)
     return StreamingResponse(

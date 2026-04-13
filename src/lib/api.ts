@@ -156,7 +156,7 @@ class ApiClient {
 
   async updateProfile(data: { nome: string; role: string }) {
     return this.request('/auth/me', {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   }

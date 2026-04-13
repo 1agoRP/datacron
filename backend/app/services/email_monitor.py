@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 def get_imap_connection():
     """Authenticates with Gmail via IMAP using App Password."""
     if not settings.GMAIL_USER or not settings.GMAIL_PASSWORD:
-        logger.error("Credenciais do Gmail (GMAIL_USER/GMAIL_APP_PASSWORD) não configuradas.")
+        logger.error("Credenciais do Gmail (GMAIL_USER/GMAIL_APP_PASSWORD) nao configuradas.")
         return None
     try:
         mail = imaplib.IMAP4_SSL("imap.gmail.com")
@@ -356,7 +356,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         db.add(Alerta(
             tipo="email_nao_identificado",
             gravidade="media",
-            mensagem=f"E-mail recebido de '{sender}' com assunto '{subject}' não foi identificado como concessionária cadastrada.",
+            mensagem=f"E-mail recebido de '{sender}' com assunto '{subject}' nao foi identificado como concessionaria cadastrada.",
         ))
 
     password = ""
