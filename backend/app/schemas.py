@@ -18,6 +18,7 @@ class UserInToken(BaseModel):
     nome: str
     email: str
     role: str
+    condominios_ids: list[str] = []
     model_config = {"from_attributes": True}
 
 

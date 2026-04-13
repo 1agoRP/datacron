@@ -6,15 +6,23 @@ import {
   User, Shield, Bell, Globe, Database, Mail, Smartphone, ArrowRight, Check, Key, Link as LinkIcon, LogOut, Trash2, Copy, Plus, Activity, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 
-const navItems = [
-  { icon: User,       label: 'Perfil & Conta' },
-  { icon: Shield,     label: 'Privacidade & Segurança' },
-  { icon: Bell,       label: 'Notificações' },
-  { icon: Mail,       label: 'Conexão Gmail' },
+import { isReadOnly } from '@/types';
+
+const allNavItems = [
+  { icon: User,       label: 'Perfil & Conta',            adminOnly: false },
+  { icon: Shield,     label: 'Privacidade & Segurança',    adminOnly: false },
+  { icon: Bell,       label: 'Notificações',               adminOnly: true },
+  { icon: Mail,       label: 'Conexão Gmail',              adminOnly: true },
 ];
 
 export default function ConfiguracoesPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const readOnly = isReadOnly(user);
+  const navItems = isAdmin ? allNavItems : allNavItems.filter(i => !i.adminOnly);
+
   const [active, setActive] = useState('Perfil & Conta');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -162,6 +170,7 @@ export default function ConfiguracoesPage() {
                   <input 
                     className="dc-form-input" 
                     type="text" 
+                    disabled={readOnly}
                     value={form.nome}
                     onChange={(e) => setForm({ ...form, nome: e.target.value })} 
                   />
@@ -171,6 +180,7 @@ export default function ConfiguracoesPage() {
                   <input 
                     className="dc-form-input" 
                     type="email" 
+                    disabled
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })} 
                   />
@@ -183,6 +193,7 @@ export default function ConfiguracoesPage() {
                   <label className="dc-form-label">Cargo</label>
                   <select 
                     className="dc-form-select"
+                    disabled={!isAdmin}
                     value={form.cargo}
                     onChange={(e) => setForm({ ...form, cargo: e.target.value })}
                   >
@@ -234,16 +245,18 @@ export default function ConfiguracoesPage() {
               </div>
             </div>
 
-            <div className="dc-card dc-card-p" style={{ border: '1px solid #fecaca', background: '#fff5f5' }}>
-              <div style={{ fontWeight: 800, fontSize: '1rem', color: '#dc2626', marginBottom: 6 }}>Zona de Perigo</div>
-              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 20 }}>
-                Ações irreversíveis relacionadas à conta Datacron e backups de faturas.
+            {isAdmin && (
+              <div className="dc-card dc-card-p" style={{ border: '1px solid #fecaca', background: '#fff5f5' }}>
+                <div style={{ fontWeight: 800, fontSize: '1rem', color: '#dc2626', marginBottom: 6 }}>Zona de Perigo</div>
+                <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 20 }}>
+                  Ações irreversíveis relacionadas à conta Datacron e backups de faturas.
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                  <button className="dc-btn dc-btn-danger" onClick={() => confirm('Tem certeza que deseja desativar a conta?')}>Desativar Conta</button>
+                  <button className="dc-btn dc-btn-danger" onClick={() => confirm('Isto irá limpar todo o histórico de processamento. Continuar?')}>Limpar Histórico de Processamento</button>
+                </div>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                <button className="dc-btn dc-btn-danger" onClick={() => confirm('Tem certeza que deseja desativar a conta?')}>Desativar Conta</button>
-                <button className="dc-btn dc-btn-danger" onClick={() => confirm('Isto irá limpar todo o histórico de processamento. Continuar?')}>Limpar Histórico de Processamento</button>
-              </div>
-            </div>
+            )}
           </>
         );
 

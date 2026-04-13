@@ -1,4 +1,5 @@
 from app.models.user import User
+from app.models.user_condominio import UserCondominio
 from app.models.condominio import Condominio
 from app.models.concessionaria import Concessionaria
 from app.models.contrato import Contrato
@@ -10,7 +11,7 @@ from app.models.reajuste_concessionaria import ReajusteConcessionaria
 from app.models.reajuste_mercado import ReajusteMercado
 
 __all__ = [
-    "User", "Condominio", "Concessionaria", "Fatura", "Alerta",
+    "User", "UserCondominio", "Condominio", "Concessionaria", "Fatura", "Alerta",
     "RelatorioGerado", "Contrato", "ContractFile",
     "ReajusteConcessionaria", "ReajusteMercado",
 ]

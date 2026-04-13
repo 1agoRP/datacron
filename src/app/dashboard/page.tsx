@@ -352,22 +352,23 @@ export default function Dashboard() {
                   <div className="dc-pending-desc">Status: Online · Varrendo Gmail</div>
                 </div>
               </div>
-              <button 
-                className="dc-btn dc-btn-ghost" 
-                style={{ height: 32, padding: '0 12px', fontSize: '0.78rem' }}
-                onClick={async () => {
-                   try {
-                     await api.forceEmailScan();
-                     alert("Varredura forçada enviada!");
-                   } catch (err: any) {
-                     alert(err.message || "Erro ao forçar varredura");
-                   }
-                }}
-              >
-                Forçar Varredura
-              </button>
+              {user?.role === 'admin' && (
+                <button 
+                  className="dc-btn dc-btn-ghost" 
+                  style={{ height: 32, padding: '0 12px', fontSize: '0.78rem' }}
+                  onClick={async () => {
+                    try {
+                      await api.forceEmailScan();
+                      alert("Varredura forçada enviada!");
+                    } catch (err: any) {
+                      alert(err.message || "Erro ao forçar varredura");
+                    }
+                  }}
+                >
+                  Forçar Varredura
+                </button>
+              )}
             </div>
-          </div>
           <div
             style={{
               marginTop: 24,

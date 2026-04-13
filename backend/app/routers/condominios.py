@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_write, get_user_condo_ids
 from app.models.user import User
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
@@ -34,7 +34,8 @@ async def list_condominios(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, le=200),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Lists all condominios with optional search and pagination."""
     stmt = (
@@ -42,6 +43,9 @@ async def list_condominios(
         .options(selectinload(Condominio.concessionarias))
         .where(Condominio.ativo == ativo)
     )
+    # RBAC: filter by user's assigned condominios
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Condominio.id.in_(allowed_condo_ids))
     if search:
         safe = _escape_like(search)
         stmt = stmt.where(
@@ -80,7 +84,7 @@ async def create_condominio(
     body: CondominioCreate,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
 ):
     """Creates a new condominio and its Gmail label."""
     # Check unique constraints
@@ -126,8 +130,11 @@ async def get_condominio(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Returns a single condominio by ID."""
+    if allowed_condo_ids is not None and id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
     result = await db.execute(
         select(Condominio)
         .options(selectinload(Condominio.concessionarias))
@@ -144,9 +151,13 @@ async def update_condominio(
     id: uuid.UUID,
     body: CondominioUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Updates a condominio's data."""
+    if allowed_condo_ids is not None and id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
+    
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     c = result.scalar_one_or_none()
     if not c:
@@ -164,9 +175,12 @@ async def update_condominio(
 async def delete_condominio(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Soft-deletes a condominio (sets ativo=False)."""
+    if allowed_condo_ids is not None and id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     c = result.scalar_one_or_none()
     if not c:
@@ -181,8 +195,11 @@ async def get_condominio_faturas(
     referencia: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Returns all faturas for a specific condominio."""
+    if allowed_condo_ids is not None and id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
     stmt = select(Fatura).where(Fatura.condominio_id == id)
     if referencia:
         stmt = stmt.where(Fatura.referencia == referencia)
@@ -231,7 +248,7 @@ async def upload_ata_eleicao(
     id: uuid.UUID,
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
 ):
     """Uploads and saves the ATA de Eleição PDF in base64."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))

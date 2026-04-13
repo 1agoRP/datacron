@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_write, get_user_condo_ids
 from app.models.user import User
 from app.models.contrato import Contrato
 from app.models.condominio import Condominio
@@ -60,6 +60,7 @@ def _compute_status(data_fim: Optional[date]) -> str:
 async def contratos_stats(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Returns KPI stats for contracts using SQL aggregation (no full table load)."""
     today = date.today()
@@ -67,29 +68,31 @@ async def contratos_stats(
     from datetime import timedelta
     sixty_days_from_now = today + timedelta(days=60)
 
-    result = await db.execute(
-        select(
-            func.count(Contrato.id).label("total"),
-            func.count(
-                case(
-                    (or_(Contrato.data_fim.is_(None), Contrato.data_fim >= sixty_days_from_now), Contrato.id),
-                    else_=None,
-                )
-            ).label("ativos"),
-            func.count(
-                case(
-                    (Contrato.data_fim.isnot(None) & (Contrato.data_fim >= today) & (Contrato.data_fim < sixty_days_from_now), Contrato.id),
-                    else_=None,
-                )
-            ).label("a_vencer"),
-            func.count(
-                case(
-                    (Contrato.data_fim.isnot(None) & (Contrato.data_fim < today), Contrato.id),
-                    else_=None,
-                )
-            ).label("vencidos"),
-        )
+    stmt = select(
+        func.count(Contrato.id).label("total"),
+        func.count(
+            case(
+                (or_(Contrato.data_fim.is_(None), Contrato.data_fim >= sixty_days_from_now), Contrato.id),
+                else_=None,
+            )
+        ).label("ativos"),
+        func.count(
+            case(
+                (Contrato.data_fim.isnot(None) & (Contrato.data_fim >= today) & (Contrato.data_fim < sixty_days_from_now), Contrato.id),
+                else_=None,
+            )
+        ).label("a_vencer"),
+        func.count(
+            case(
+                (Contrato.data_fim.isnot(None) & (Contrato.data_fim < today), Contrato.id),
+                else_=None,
+            )
+        ).label("vencidos"),
     )
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Contrato.condominio_id.in_(allowed_condo_ids))
+
+    result = await db.execute(stmt)
     row = result.one()
 
     return {
@@ -109,12 +112,16 @@ async def list_contratos(
     search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     stmt = (
         select(Contrato)
         .options(selectinload(Contrato.condominio))
         .join(Condominio, Contrato.condominio_id == Condominio.id)
     )
+    # RBAC: filter by user's assigned condominios
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Contrato.condominio_id.in_(allowed_condo_ids))
 
     if condominio_id:
         stmt = stmt.where(Contrato.condominio_id == condominio_id)
@@ -154,7 +161,7 @@ async def list_contratos(
 async def create_contrato(
     body: ContratoCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
 ):
     # Validate condominio exists
     result = await db.execute(select(Condominio).where(Condominio.id == body.condominio_id))
@@ -178,11 +185,16 @@ async def get_contrato(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Contrato).where(Contrato.id == id))
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Contrato não encontrado")
+    
+    # RBAC Check
+    if allowed_condo_ids is not None and c.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este contrato")
 
     condo_result = await db.execute(select(Condominio.nome).where(Condominio.id == c.condominio_id))
     condo_nome = condo_result.scalar_one_or_none()
@@ -198,12 +210,17 @@ async def update_contrato(
     id: uuid.UUID,
     body: ContratoUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Contrato).where(Contrato.id == id))
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Contrato não encontrado")
+
+    # RBAC Check
+    if allowed_condo_ids is not None and c.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este contrato")
 
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(c, field, value)
@@ -223,12 +240,17 @@ async def update_contrato(
 async def delete_contrato(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Contrato).where(Contrato.id == id))
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Contrato não encontrado")
+    
+    # RBAC Check
+    if allowed_condo_ids is not None and c.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este contrato")
     await db.delete(c)
     await db.commit()
 
@@ -251,7 +273,7 @@ async def upload_contrato_arquivo(
     id: uuid.UUID,
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
 ):
     """Upload and save the contract PDF file."""
     result = await db.execute(select(Contrato).where(Contrato.id == id))

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_write, get_user_condo_ids
 from app.models.user import User
 from app.models.concessionaria import Concessionaria
 from app.models.condominio import Condominio
@@ -29,6 +29,7 @@ async def list_concessionarias(
     ativo: bool = True,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     stmt = (
         select(Concessionaria)
@@ -39,6 +40,9 @@ async def list_concessionarias(
         stmt = stmt.where(Concessionaria.condominio_id == condominio_id)
     if tipo:
         stmt = stmt.where(Concessionaria.tipo == tipo)
+    # RBAC: filter by user's assigned condominios
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Concessionaria.condominio_id.in_(allowed_condo_ids))
     result = await db.execute(stmt.order_by(Concessionaria.tipo))
     return result.scalars().all()
 
@@ -47,7 +51,7 @@ async def list_concessionarias(
 async def create_concessionaria(
     body: ConcessionariaCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
 ):
     # Validate condominio exists and capture it
     result = await db.execute(select(Condominio).where(Condominio.id == body.condominio_id))
@@ -70,6 +74,7 @@ async def get_concessionaria(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(
         select(Concessionaria)
@@ -79,6 +84,11 @@ async def get_concessionaria(
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Concessionária não encontrada")
+    
+    # RBAC Check
+    if allowed_condo_ids is not None and c.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a esta concessionária")
+    
     return c
 
 
@@ -87,7 +97,8 @@ async def update_concessionaria(
     id: uuid.UUID,
     body: ConcessionariaUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(
         select(Concessionaria)
@@ -97,6 +108,10 @@ async def update_concessionaria(
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Concessionária não encontrada")
+
+    # RBAC Check
+    if allowed_condo_ids is not None and c.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a esta concessionária")
 
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(c, field, value)
@@ -114,12 +129,17 @@ async def update_concessionaria(
 async def delete_concessionaria(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Concessionaria).where(Concessionaria.id == id))
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Concessionária não encontrada")
+    
+    # RBAC Check
+    if allowed_condo_ids is not None and c.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a esta concessionária")
     c.ativo = False
     await db.commit()
 
@@ -130,12 +150,17 @@ async def test_password_rule(
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Tests the password rule against an uploaded PDF."""
     result = await db.execute(select(Concessionaria).where(Concessionaria.id == id))
     conc = result.scalar_one_or_none()
     if not conc:
         raise HTTPException(status_code=404, detail="Concessionária não encontrada")
+
+    # RBAC Check
+    if allowed_condo_ids is not None and conc.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a esta concessionária")
 
     # Get condominio CNPJ
     condo_result = await db.execute(select(Condominio).where(Condominio.id == conc.condominio_id))

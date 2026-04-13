@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_user_condo_ids
 from app.models.user import User
 from app.models.condominio import Condominio
 from app.models.concessionaria import Concessionaria
@@ -22,6 +22,7 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 async def dashboard_stats(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """
     Returns consolidated KPI stats for the dashboard using SQL COUNT.
@@ -29,26 +30,25 @@ async def dashboard_stats(
     """
     today = date.today()
 
-    # Run all counts in parallel via a single compound query
-    result = await db.execute(
-        select(
-            func.count(Condominio.id).label("condominios_count"),
-        )
-    )
+    # Condominios count
+    condo_stmt = select(func.count(Condominio.id))
+    if allowed_condo_ids is not None:
+        condo_stmt = condo_stmt.where(Condominio.id.in_(allowed_condo_ids))
+    result = await db.execute(condo_stmt)
     condominios_count = result.scalar_one()
 
     # Faturas received today
-    result = await db.execute(
-        select(func.count(Fatura.id)).where(
-            func.date(Fatura.created_at) == today
-        )
-    )
+    fatura_stmt = select(func.count(Fatura.id)).where(func.date(Fatura.created_at) == today)
+    if allowed_condo_ids is not None:
+        fatura_stmt = fatura_stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
+    result = await db.execute(fatura_stmt)
     recebidas_hoje = result.scalar_one()
 
     # Active (unresolved) alerts count
-    result = await db.execute(
-        select(func.count(Alerta.id)).where(Alerta.resolvido == False)
-    )
+    alert_stmt = select(func.count(Alerta.id)).where(Alerta.resolvido == False)
+    if allowed_condo_ids is not None:
+        alert_stmt = alert_stmt.where(Alerta.condominio_id.in_(allowed_condo_ids))
+    result = await db.execute(alert_stmt)
     active_alerts = result.scalar_one()
 
     return {
@@ -63,15 +63,18 @@ async def contas_esperadas(
     mes: Optional[str] = Query(None, description="Formato: YYYY-MM"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """
     Returns the total expected accounts (concessionárias ativas) 
     and how many have been received in the given month.
     """
     # Total expected = active concessionárias
-    total_result = await db.execute(
-        select(func.count(Concessionaria.id)).where(Concessionaria.ativo == True)
-    )
+    total_stmt = select(func.count(Concessionaria.id)).where(Concessionaria.ativo == True)
+    if allowed_condo_ids is not None:
+        total_stmt = total_stmt.where(Concessionaria.condominio_id.in_(allowed_condo_ids))
+    
+    total_result = await db.execute(total_stmt)
     total = total_result.scalar_one()
 
     # Received in month = faturas created in that month
@@ -84,12 +87,14 @@ async def contas_esperadas(
     else:
         y, m = datetime.now().year, datetime.now().month
 
-    recebidas_result = await db.execute(
-        select(func.count(Fatura.id)).where(
-            extract("year", Fatura.created_at) == y,
-            extract("month", Fatura.created_at) == m,
-        )
+    recebidas_stmt = select(func.count(Fatura.id)).where(
+        extract("year", Fatura.created_at) == y,
+        extract("month", Fatura.created_at) == m,
     )
+    if allowed_condo_ids is not None:
+        recebidas_stmt = recebidas_stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
+
+    recebidas_result = await db.execute(recebidas_stmt)
     recebidas = recebidas_result.scalar_one()
 
     return {
@@ -105,6 +110,7 @@ async def chart_data(
     agrupar: str = Query("mes", pattern="^(mes|concessionaria|condominio)$"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """
     Returns chart data using SQL GROUP BY + SUM aggregation.
@@ -125,9 +131,11 @@ async def chart_data(
                 func.sum(Fatura.valor).label("total"),
             )
             .where(Fatura.created_at >= start_date)
-            .group_by("yr", "mn")
-            .order_by("yr", "mn")
         )
+        if allowed_condo_ids is not None:
+            stmt = stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
+            
+        stmt = stmt.group_by("yr", "mn").order_by("yr", "mn")
 
         result = await db.execute(stmt)
         rows = result.all()
@@ -155,9 +163,11 @@ async def chart_data(
             )
             .join(Concessionaria, Fatura.concessionaria_id == Concessionaria.id, isouter=True)
             .where(Fatura.created_at >= start_date)
-            .group_by("name")
-            .order_by(func.sum(Fatura.valor).desc())
         )
+        if allowed_condo_ids is not None:
+            stmt = stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
+            
+        stmt = stmt.group_by("name").order_by(func.sum(Fatura.valor).desc())
 
         result = await db.execute(stmt)
         return [{"name": row.name, "valor": round(float(row.total or 0), 2)} for row in result.all()]
@@ -171,10 +181,11 @@ async def chart_data(
             )
             .join(Condominio, Fatura.condominio_id == Condominio.id, isouter=True)
             .where(Fatura.created_at >= start_date)
-            .group_by("name")
-            .order_by(func.sum(Fatura.valor).desc())
-            .limit(15)
         )
+        if allowed_condo_ids is not None:
+            stmt = stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
+            
+        stmt = stmt.group_by("name").order_by(func.sum(Fatura.valor).desc()).limit(15)
 
         result = await db.execute(stmt)
         return [{"name": row.name, "valor": round(float(row.total or 0), 2)} for row in result.all()]

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_module
 from app.models.user import User
 from app.models.relatorio import RelatorioGerado
 from app.schemas import RelatorioGeradoCreate, RelatorioGeradoResponse
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/relatorios", tags=["Relatórios"])
 async def listar_historico(
     limit: int = Query(30, le=100),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_module("relatorios")),
 ):
     """Returns the latest generated reports from the database."""
     stmt = (
@@ -34,7 +34,7 @@ async def listar_historico(
 async def registrar_relatorio(
     body: RelatorioGeradoCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_module("relatorios")),
 ):
     """Records a new report generation event in the history."""
     relatorio = RelatorioGerado(

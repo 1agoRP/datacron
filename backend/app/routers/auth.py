@@ -14,6 +14,7 @@ from app.models.user import User
 from app.schemas import LoginRequest, TokenResponse, UserResponse, UserInToken, PasswordUpdate
 from app.config import settings
 from app.limiter import limiter
+from app.models.user_condominio import UserCondominio
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -50,8 +51,17 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
     if not user.ativo:
         raise HTTPException(status_code=403, detail="Conta desativada")
 
+    # Fetch assigned condominio IDs for the user
+    condo_ids = []
+    if user.role != "admin":
+        from sqlalchemy.orm import selectinload
+        result_uc = await db.execute(
+            select(UserCondominio.condominio_id).where(UserCondominio.user_id == user.id)
+        )
+        condo_ids = [str(cid) for cid in result_uc.scalars().all()]
+
     token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user.role, "nome": user.nome},
+        data={"sub": str(user.id), "email": user.email, "role": user.role, "nome": user.nome, "condominios_ids": condo_ids},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     return TokenResponse(
@@ -62,6 +72,7 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
             nome=user.nome,
             email=user.email,
             role=user.role,
+            condominios_ids=condo_ids,
         ),
     )
 

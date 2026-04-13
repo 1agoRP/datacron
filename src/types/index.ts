@@ -67,8 +67,16 @@ export interface User {
   nome: string;
   email: string;
   role: string;
+  condominios_ids?: string[];
   created_at: string;
 }
+
+// Helper to check if user role is read-only
+export const READ_ONLY_ROLES = new Set(['contabilidade', 'financeiro', 'providencias', 'geral']);
+export const isReadOnly = (user: User | null): boolean => {
+  if (!user) return true;
+  return READ_ONLY_ROLES.has(user.role);
+};
 
 export interface DashboardStats {
   condominiosCount: number;

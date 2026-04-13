@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 import Select from 'react-select';
 import useSWR from 'swr';
 import { formatCurrency } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 
 const CONTRACT_TYPES = [
   'Elevadores',
@@ -95,6 +96,9 @@ export default function ContratosPage() {
     () => api.getContratosStats(),
     { revalidateOnFocus: true }
   );
+
+  const { user } = useAuth();
+  const readOnly = isReadOnly(user);
 
 
   const [tab, setTab] = useState('Todos');
@@ -300,9 +304,12 @@ export default function ContratosPage() {
             Gerencie contratos recorrentes dos condomínios com leitura inteligente de PDFs.
           </p>
         </div>
-        <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
-          <Plus size={16} /> Novo Contrato
-        </button>
+        </div>
+        {!readOnly && (
+          <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
+            <Plus size={16} /> Novo Contrato
+          </button>
+        )}
       </div>
 
       {/* KPI Cards */}
@@ -462,7 +469,7 @@ export default function ContratosPage() {
                           style={{ height: 34, padding: '0 14px', fontSize: '0.78rem', gap: 6 }}
                           onClick={() => handleOpenEdit(c)}
                         >
-                          <Eye size={14} /> Gerenciar
+                          <Eye size={14} /> {readOnly ? 'Ver Detalhes' : 'Gerenciar'}
                         </button>
                       </div>
                     </td>
@@ -497,7 +504,7 @@ export default function ContratosPage() {
         <div className="dc-modal-overlay">
           <div className="dc-modal-content" style={{ maxWidth: 640 }}>
             <div className="dc-modal-header">
-              <h2 className="dc-modal-title">{editingId ? 'Editar Contrato' : 'Novo Contrato'}</h2>
+              <h2 className="dc-modal-title">{readOnly ? 'Detalhes do Contrato' : editingId ? 'Editar Contrato' : 'Novo Contrato'}</h2>
               <button className="dc-modal-close" onClick={handleCloseModal}><X size={20} /></button>
             </div>
 
@@ -575,6 +582,7 @@ export default function ContratosPage() {
                   <input
                     className="dc-form-input"
                     required
+                    disabled={readOnly}
                     value={form.empresa}
                     onChange={e => setForm({ ...form, empresa: e.target.value })}
                     placeholder="Ex: ThyssenKrupp Elevadores"
@@ -586,6 +594,7 @@ export default function ContratosPage() {
                     <label>Razão Social</label>
                     <input
                       className="dc-form-input"
+                      disabled={readOnly}
                       value={form.razao_social}
                       onChange={e => setForm({ ...form, razao_social: e.target.value })}
                       placeholder="..."
@@ -595,6 +604,7 @@ export default function ContratosPage() {
                     <label>CNPJ Empresa</label>
                     <input
                       className="dc-form-input"
+                      disabled={readOnly}
                       value={form.cnpj_empresa}
                       onChange={e => setForm({ ...form, cnpj_empresa: e.target.value })}
                       placeholder="00.000.000/0000-00"
@@ -608,6 +618,7 @@ export default function ContratosPage() {
                     <input
                       className="dc-form-input"
                       type="email"
+                      disabled={readOnly}
                       value={form.email_contato}
                       onChange={e => setForm({ ...form, email_contato: e.target.value })}
                       placeholder="financeiro@empresa.com.br"
@@ -617,6 +628,7 @@ export default function ContratosPage() {
                     <label>Celular/Telefone</label>
                     <input
                       className="dc-form-input"
+                      disabled={readOnly}
                       value={form.telefone_contato}
                       onChange={e => setForm({ ...form, telefone_contato: e.target.value })}
                       placeholder="(00) 00000-0000"
@@ -633,6 +645,7 @@ export default function ContratosPage() {
                       onChange={(option: any) => setForm({ ...form, tipo_contrato: option?.value || 'Outros' })}
                       styles={selectStyles}
                       isSearchable
+                      isDisabled={readOnly}
                       noOptionsMessage={() => "Nenhum tipo encontrado"}
                     />
                   </div>
@@ -641,6 +654,7 @@ export default function ContratosPage() {
                       <label>Especifique o Tipo</label>
                       <input
                         className="dc-form-input"
+                        disabled={readOnly}
                         value={form.tipo_personalizado}
                         onChange={e => setForm({ ...form, tipo_personalizado: e.target.value })}
                         placeholder="Ex: Jardinagem"
@@ -661,6 +675,7 @@ export default function ContratosPage() {
                       className="dc-form-input"
                       type="date"
                       required
+                      disabled={readOnly}
                       value={form.data_inicio}
                       onChange={e => setForm({ ...form, data_inicio: e.target.value })}
                     />
@@ -670,6 +685,7 @@ export default function ContratosPage() {
                     <input
                       className="dc-form-input"
                       type="date"
+                      disabled={readOnly}
                       value={form.data_fim}
                       onChange={e => setForm({ ...form, data_fim: e.target.value })}
                       placeholder="Deixe vazio para indeterminado"
@@ -691,6 +707,7 @@ export default function ContratosPage() {
                       type="number"
                       step="0.01"
                       required
+                      disabled={readOnly}
                       value={form.valor_inicial}
                       onChange={e => setForm({ ...form, valor_inicial: parseFloat(e.target.value) || 0 })}
                     />
@@ -701,6 +718,7 @@ export default function ContratosPage() {
                       className="dc-form-input"
                       type="number"
                       step="0.01"
+                      disabled={readOnly}
                       value={form.valor_atual}
                       onChange={e => setForm({ ...form, valor_atual: parseFloat(e.target.value) || 0 })}
                     />
@@ -716,13 +734,14 @@ export default function ContratosPage() {
                       onChange={(option: any) => setForm({ ...form, indice_reajuste: option?.value || '' })}
                       styles={selectStyles}
                       isSearchable
+                      isDisabled={readOnly}
                       placeholder="Selecine..."
                       noOptionsMessage={() => "Nenhum índice encontrado"}
                     />
                   </div>
                   <div className="dc-form-group">
                     <label>Data de Reajuste</label>
-                    <input className="dc-form-input" type="date" value={form.data_reajuste} onChange={e => setForm({ ...form, data_reajuste: e.target.value })} />
+                    <input className="dc-form-input" type="date" disabled={readOnly} value={form.data_reajuste} onChange={e => setForm({ ...form, data_reajuste: e.target.value })} />
                   </div>
                   <div className="dc-form-group">
                     <label>Periodicidade</label>
@@ -732,6 +751,7 @@ export default function ContratosPage() {
                       onChange={(option: any) => setForm({ ...form, periodicidade: option?.value || 'mensal' })}
                       styles={selectStyles}
                       isSearchable={false}
+                      isDisabled={readOnly}
                     />
                   </div>
                 </div>
@@ -741,6 +761,7 @@ export default function ContratosPage() {
                   <label>Observações</label>
                   <textarea
                     className="dc-form-input"
+                    disabled={readOnly}
                     value={form.observacoes}
                     onChange={e => setForm({ ...form, observacoes: e.target.value })}
                     placeholder="Notas adicionais sobre o contrato..."
@@ -751,7 +772,7 @@ export default function ContratosPage() {
               </div>
 
               <div className="dc-modal-footer" style={{ justifyContent: 'space-between' }}>
-                {editingId ? (
+                {editingId && !readOnly ? (
                   <button type="button" className="dc-btn dc-btn-danger" onClick={handleDelete} style={{ gap: 8 }}>
                     <Trash2 size={15} /> Excluir
                   </button>
@@ -759,11 +780,13 @@ export default function ContratosPage() {
                   <div></div>
                 )}
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button type="button" className="dc-btn dc-btn-secondary" onClick={handleCloseModal}>Cancelar</button>
-                  <button type="submit" className="dc-btn dc-btn-primary" disabled={saving} style={{ gap: 10 }}>
-                    {saving && <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} />}
-                    {saving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Cadastrar Contrato'}
-                  </button>
+                  <button type="button" className="dc-btn dc-btn-secondary" onClick={handleCloseModal}>{readOnly ? 'Fechar' : 'Cancelar'}</button>
+                  {!readOnly && (
+                    <button type="submit" className="dc-btn dc-btn-primary" disabled={saving} style={{ gap: 10 }}>
+                      {saving && <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} />}
+                      {saving ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Cadastrar Contrato'}
+                    </button>
+                  )}
                 </div>
               </div>
             </form>

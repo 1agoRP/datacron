@@ -37,6 +37,7 @@ function decodeJwtPayload(token: string): Partial<User> | null {
       email: payload.email,
       role: payload.role,
       nome: payload.nome || payload.email?.split('@')[0] || 'Usuário',
+      condominios_ids: payload.condominios_ids || [],
     };
   } catch (error) {
     console.error('JWT Decode Error:', error);

@@ -8,6 +8,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import useSWR from 'swr';
 import { formatCurrencyCeil } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
+import { isReadOnly } from '@/types';
 
 type SortField = 'nome' | 'numero';
 type SortDir = 'asc' | 'desc';
@@ -15,6 +17,8 @@ type SortDir = 'asc' | 'desc';
 export default function CondominiosPage() {
   const { data: fetchCondos, isLoading: loading, mutate } = useSWR('condominios', () => api.getCondominios());
   const condos = fetchCondos || [];
+  const { user } = useAuth();
+  const readOnly = isReadOnly(user);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -251,9 +255,11 @@ export default function CondominiosPage() {
           <h1 className="dc-page-title">Condomínios</h1>
           <p className="dc-page-subtitle">Gerencie sua base de clientes e acompanhe o status de cada unidade.</p>
         </div>
-        <button className="dc-btn dc-btn-primary" onClick={() => setIsModalOpen(true)}>
-          <Plus size={16} /> Adicionar Condomínio
-        </button>
+        {!readOnly && (
+          <button className="dc-btn dc-btn-primary" onClick={() => setIsModalOpen(true)}>
+            <Plus size={16} /> Adicionar Condomínio
+          </button>
+        )}
       </div>
 
       {/* Filter bar */}
@@ -371,8 +377,11 @@ export default function CondominiosPage() {
                             <FileSignature size={15} />
                           </button>
                         )}
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                         <button className="dc-icon-action" title="Abrir detalhes" onClick={() => handleOpenDetails(condo)}><ExternalLink size={15} /></button>
-                        <button className="dc-icon-action" title="Mais opções" onClick={() => handleOpenEdit(condo)}><MoreVertical size={15} /></button>
+                        {!readOnly && (
+                          <button className="dc-icon-action" title="Editar / Opções" onClick={() => handleOpenEdit(condo)}><MoreVertical size={15} /></button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -412,30 +421,30 @@ export default function CondominiosPage() {
             <form onSubmit={handleCreate} className="dc-modal-body dc-space-y-4">
               <div className="dc-form-group">
                 <label>Nome do Condomínio</label>
-                <input required value={newCondo.nome} onChange={e => setNewCondo({...newCondo, nome: e.target.value})} placeholder="Ex: Edifício Horizonte" />
+                <input required disabled={readOnly} value={newCondo.nome} onChange={e => setNewCondo({...newCondo, nome: e.target.value})} placeholder="Ex: Edifício Horizonte" />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="dc-form-group">
                   <label>Número/ID</label>
-                  <input required value={newCondo.numero} onChange={e => setNewCondo({...newCondo, numero: e.target.value})} placeholder="Ex: 101" />
+                  <input required disabled={readOnly} value={newCondo.numero} onChange={e => setNewCondo({...newCondo, numero: e.target.value})} placeholder="Ex: 101" />
                 </div>
                 <div className="dc-form-group">
                   <label>CNPJ</label>
-                  <input required value={newCondo.cnpj} onChange={e => setNewCondo({...newCondo, cnpj: e.target.value})} placeholder="00.000.000/0000-00" />
+                  <input required disabled={readOnly} value={newCondo.cnpj} onChange={e => setNewCondo({...newCondo, cnpj: e.target.value})} placeholder="00.000.000/0000-00" />
                 </div>
               </div>
               <div className="dc-form-group">
                 <label>Endereço Completo</label>
-                <input required value={newCondo.endereco} onChange={e => setNewCondo({...newCondo, endereco: e.target.value})} placeholder="Rua, Número, Bairro, Cidade - UF" />
+                <input required disabled={readOnly} value={newCondo.endereco} onChange={e => setNewCondo({...newCondo, endereco: e.target.value})} placeholder="Rua, Número, Bairro, Cidade - UF" />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="dc-form-group">
                   <label>Nome do Síndico</label>
-                  <input required value={newCondo.sindico} onChange={e => setNewCondo({...newCondo, sindico: e.target.value})} placeholder="Nome completo" />
+                  <input required disabled={readOnly} value={newCondo.sindico} onChange={e => setNewCondo({...newCondo, sindico: e.target.value})} placeholder="Nome completo" />
                 </div>
                 <div className="dc-form-group">
                   <label>CPF do Síndico</label>
-                  <input value={newCondo.cpf_sindico} onChange={e => setNewCondo({...newCondo, cpf_sindico: e.target.value})} placeholder="000.000.000-00" />
+                  <input disabled={readOnly} value={newCondo.cpf_sindico} onChange={e => setNewCondo({...newCondo, cpf_sindico: e.target.value})} placeholder="000.000.000-00" />
                 </div>
               </div>
               <div className="dc-modal-footer">
@@ -461,20 +470,20 @@ export default function CondominiosPage() {
             <form onSubmit={handleUpdate} className="dc-modal-body dc-space-y-4">
               <div className="dc-form-group">
                 <label>Nome do Condomínio</label>
-                <input required value={editCondo.nome} onChange={e => setEditCondo({...editCondo, nome: e.target.value})} className="dc-form-input" />
+                <input required disabled={readOnly} value={editCondo.nome} onChange={e => setEditCondo({...editCondo, nome: e.target.value})} className="dc-form-input" />
               </div>
               <div className="dc-form-group">
                 <label>Endereço Completo</label>
-                <input required value={editCondo.endereco} onChange={e => setEditCondo({...editCondo, endereco: e.target.value})} className="dc-form-input" />
+                <input required disabled={readOnly} value={editCondo.endereco} onChange={e => setEditCondo({...editCondo, endereco: e.target.value})} className="dc-form-input" />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="dc-form-group">
                   <label>Nome do Síndico</label>
-                  <input required value={editCondo.sindico} onChange={e => setEditCondo({...editCondo, sindico: e.target.value})} className="dc-form-input" />
+                  <input required disabled={readOnly} value={editCondo.sindico} onChange={e => setEditCondo({...editCondo, sindico: e.target.value})} className="dc-form-input" />
                 </div>
                 <div className="dc-form-group">
                   <label>CPF do Síndico</label>
-                  <input value={editCondo.cpf_sindico || ''} onChange={e => setEditCondo({...editCondo, cpf_sindico: e.target.value})} className="dc-form-input" />
+                  <input disabled={readOnly} value={editCondo.cpf_sindico || ''} onChange={e => setEditCondo({...editCondo, cpf_sindico: e.target.value})} className="dc-form-input" />
                 </div>
               </div>
               
@@ -640,11 +649,13 @@ export default function CondominiosPage() {
                             <Download size={14} /> Baixar
                           </button>
                         )}
-                        <label className="dc-btn dc-btn-primary" style={{ cursor: 'pointer' }}>
-                          {uploadingAta ? <div className="dc-loading-spinner" /> : <Upload size={14} />} 
-                          {detailsCondo.ata_eleicao_nome ? 'Substituir' : 'Enviar Documento'}
-                          <input type="file" accept="application/pdf" style={{ display: 'none' }} disabled={uploadingAta} onChange={(e) => handleUploadAta(detailsCondo.id, e)} />
-                        </label>
+                        {!readOnly && (
+                          <label className="dc-btn dc-btn-primary" style={{ cursor: 'pointer' }}>
+                            {uploadingAta ? <div className="dc-loading-spinner" /> : <Upload size={14} />} 
+                            {detailsCondo.ata_eleicao_nome ? 'Substituir' : 'Enviar Documento'}
+                            <input type="file" accept="application/pdf" style={{ display: 'none' }} disabled={uploadingAta} onChange={(e) => handleUploadAta(detailsCondo.id, e)} />
+                          </label>
+                        )}
                       </div>
                     </div>
                   </div>

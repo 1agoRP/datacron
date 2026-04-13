@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_write, get_user_condo_ids
 from app.models.user import User
 from app.models.fatura import Fatura
 from app.schemas import FaturaCreate, FaturaStatusUpdate, FaturaResponse
@@ -29,6 +29,7 @@ async def list_faturas(
     limit: int = Query(50, le=200),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     stmt = select(Fatura).options(
         selectinload(Fatura.condominio),
@@ -42,6 +43,9 @@ async def list_faturas(
         stmt = stmt.where(Fatura.status == status)
     if referencia:
         stmt = stmt.where(Fatura.referencia == referencia)
+    # RBAC: filter by user's assigned condominios
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
 
     stmt = stmt.order_by(Fatura.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(stmt)
@@ -57,6 +61,7 @@ async def export_faturas(
     formato: str = Query("excel", pattern="^(excel|csv|pdf)$"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Exports faturas as Excel, CSV or PDF."""
     import openpyxl
@@ -83,6 +88,9 @@ async def export_faturas(
             stmt = stmt.where(Fatura.created_at <= fim)
         except ValueError:
             pass
+
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
 
     result = await db.execute(stmt.order_by(Fatura.created_at.desc()))
     faturas = result.scalars().all()
@@ -212,7 +220,7 @@ async def update_fatura_status(
     id: uuid.UUID,
     body: FaturaStatusUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
 ):
     if body.status not in VALID_STATUSES:
         raise HTTPException(status_code=422, detail=f"Status inválido. Use: {VALID_STATUSES}")

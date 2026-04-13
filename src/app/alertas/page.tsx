@@ -6,6 +6,8 @@ import { AlertCircle, Clock, CheckCircle2, ArrowUpRight, Trash2, Shield, XCircle
 import { api } from '@/lib/api';
 import { format } from 'date-fns';
 import useSWR from 'swr';
+import { useAuth } from '@/context/AuthContext';
+import { isReadOnly } from '@/types';
 
 export default function AlertasPage() {
   const { data: alertas = [], isLoading: loading, mutate } = useSWR(
@@ -18,6 +20,9 @@ export default function AlertasPage() {
   const [discarding, setDiscarding] = useState<string | null>(null);
   const [bulkResolving, setBulkResolving] = useState(false);
   const [bulkDiscarding, setBulkDiscarding] = useState(false);
+
+  const { user } = useAuth();
+  const readOnly = isReadOnly(user);
 
   const handleResolve = async (alerta: any) => {
     try {
@@ -155,35 +160,37 @@ export default function AlertasPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Shield size={20} color="#92400e" />
             <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#92400e' }}>
-              {alertas.length} alerta(s) ativo(s)
+              {alertas.length} alerta{alertas.length !== 1 ? 's' : ''} ativo{alertas.length !== 1 ? 's' : ''}
             </span>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              className="dc-btn dc-btn-primary"
-              style={{ height: 38, fontSize: '0.82rem', gap: 7, padding: '0 16px' }}
-              onClick={handleResolveAll}
-              disabled={bulkResolving || bulkDiscarding}
-            >
-              {bulkResolving ? (
-                <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} /> Resolvendo...</>
-              ) : (
-                <><ArrowUpRight size={15} /> Resolver Todas as Pendências</>
-              )}
-            </button>
-            <button
-              className="dc-btn dc-btn-danger"
-              style={{ height: 38, fontSize: '0.82rem', gap: 7, padding: '0 16px' }}
-              onClick={handleDiscardAll}
-              disabled={bulkResolving || bulkDiscarding}
-            >
-              {bulkDiscarding ? (
-                <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2 }} /> Descartando...</>
-              ) : (
-                <><XCircle size={15} /> Descartar Todos</>
-              )}
-            </button>
-          </div>
+          {!readOnly && (
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                className="dc-btn dc-btn-primary"
+                style={{ height: 38, fontSize: '0.82rem', gap: 7, padding: '0 16px' }}
+                onClick={handleResolveAll}
+                disabled={bulkResolving || bulkDiscarding}
+              >
+                {bulkResolving ? (
+                  <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} /> Resolvendo...</>
+                ) : (
+                  <><ArrowUpRight size={15} /> Resolver Todas as Pendências</>
+                )}
+              </button>
+              <button
+                className="dc-btn dc-btn-danger"
+                style={{ height: 38, fontSize: '0.82rem', gap: 7, padding: '0 16px' }}
+                onClick={handleDiscardAll}
+                disabled={bulkResolving || bulkDiscarding}
+              >
+                {bulkDiscarding ? (
+                  <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2 }} /> Descartando...</>
+                ) : (
+                  <><XCircle size={15} /> Descartar Todos</>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -229,32 +236,34 @@ export default function AlertasPage() {
                 <div className="dc-full-alert-time">
                   <Clock size={12} /> {a.created_at ? format(new Date(a.created_at), "dd/MM 'às' HH:mm") : '—'}
                 </div>
-                <div className="dc-full-alert-actions">
-                  <button
-                    className="dc-btn dc-btn-primary"
-                    style={{ height: 34, padding: '0 14px', fontSize: '0.8rem', gap: 6 }}
-                    onClick={() => handleResolve(a)}
-                    disabled={isResolvingThis || bulkResolving}
-                  >
-                    {isResolvingThis ? (
-                      <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} /> Resolvendo...</>
-                    ) : (
-                      <><ArrowUpRight size={14} /> Resolver Pendência</>
-                    )}
-                  </button>
-                  <button
-                    className="dc-btn dc-btn-danger"
-                    style={{ height: 34, padding: '0 14px', fontSize: '0.8rem', gap: 6 }}
-                    onClick={() => handleDiscard(a.id)}
-                    disabled={isDiscardingThis || bulkDiscarding}
-                  >
-                    {isDiscardingThis ? (
-                      <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2 }} /> Descartando...</>
-                    ) : (
-                      <><Trash2 size={14} /> Descartar</>
-                    )}
-                  </button>
-                </div>
+                {!readOnly && (
+                  <div className="dc-full-alert-actions">
+                    <button
+                      className="dc-btn dc-btn-primary"
+                      style={{ height: 34, padding: '0 14px', fontSize: '0.8rem', gap: 6 }}
+                      onClick={() => handleResolve(a)}
+                      disabled={isResolvingThis || bulkResolving}
+                    >
+                      {isResolvingThis ? (
+                        <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} /> Resolvendo...</>
+                      ) : (
+                        <><ArrowUpRight size={14} /> Resolver Pendência</>
+                      )}
+                    </button>
+                    <button
+                      className="dc-btn dc-btn-danger"
+                      style={{ height: 34, padding: '0 14px', fontSize: '0.8rem', gap: 6 }}
+                      onClick={() => handleDiscard(a.id)}
+                      disabled={isDiscardingThis || bulkDiscarding}
+                    >
+                      {isDiscardingThis ? (
+                        <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2 }} /> Descartando...</>
+                      ) : (
+                        <><Trash2 size={14} /> Descartar</>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="dc-full-alert-meta">

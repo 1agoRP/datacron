@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_module
 from app.models.user import User
 from app.models.condominio import Condominio
 from app.models.concessionaria import Concessionaria
@@ -33,7 +33,7 @@ def _parse_excel_or_csv(content: bytes, filename: str) -> list[dict]:
 @router.get("/template/{tipo}")
 async def download_template(
     tipo: Literal["condominios", "concessionarias"],
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_module("importacoes")),
 ):
     """Returns a pre-formatted CSV template for the specified import type."""
     import csv as csv_mod
@@ -71,7 +71,7 @@ async def preview_import(
     tipo: Literal["condominios", "concessionarias"] = Form(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_module("importacoes")),
 ):
     """
     Validates the uploaded file and returns a preview of what will be
@@ -167,7 +167,7 @@ async def preview_import(
 async def confirm_import(
     payload: ImportConfirmRequest,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_module("importacoes")),
 ):
     """
     Commits the import to the database.

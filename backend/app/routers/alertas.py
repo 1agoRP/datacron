@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_write, get_user_condo_ids
 from app.models.user import User
 from app.models.alerta import Alerta, EmailLog
 from app.schemas import AlertaResponse, EmailLogResponse
@@ -24,8 +24,12 @@ async def list_alertas(
     limit: int = Query(50, le=200),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     stmt = select(Alerta).where(Alerta.resolvido == resolvido)
+    # RBAC: filter by user's assigned condominios
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Alerta.condominio_id.in_(allowed_condo_ids))
     if tipo:
         stmt = stmt.where(Alerta.tipo == tipo)
     if gravidade:
@@ -42,11 +46,16 @@ async def mark_as_read(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Alerta).where(Alerta.id == id))
     a = result.scalar_one_or_none()
     if not a:
         raise HTTPException(status_code=404, detail="Alerta não encontrado")
+    
+    # RBAC Check
+    if allowed_condo_ids is not None and a.condominio_id and a.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
     a.lido = True
     await db.commit()
     await db.refresh(a)
@@ -58,11 +67,16 @@ async def resolve_alerta(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Alerta).where(Alerta.id == id))
     a = result.scalar_one_or_none()
     if not a:
         raise HTTPException(status_code=404, detail="Alerta não encontrado")
+    
+    # RBAC Check
+    if allowed_condo_ids is not None and a.condominio_id and a.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
     
     # If it's an email_nao_identificado alert, try to send reply email
     if a.tipo == "email_nao_identificado":
@@ -88,10 +102,10 @@ async def resolve_alerta(
 
 
 def _send_resolution_email(recipient: str, original_subject: str):
-    """
+    \"\"\"
     Sends a professional HTML reply email informing that the concessionária
     was not found in the system and needs review.
-    """
+    \"\"\"
     import base64
     import re
     from email.mime.text import MIMEText
@@ -122,7 +136,7 @@ def _send_resolution_email(recipient: str, original_subject: str):
 
     subject = f"{tipo_label} – {codigo_label} {code} – não reconhecida no cadastro"
 
-    body_html = f"""<!DOCTYPE html>
+    body_html = f\"\"\"<!DOCTYPE html>
 <html lang="pt-BR">
 <head><meta charset="UTF-8"></head>
 <body style="font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background-color: #f1f5f9;">
@@ -177,7 +191,7 @@ def _send_resolution_email(recipient: str, original_subject: str):
     </div>
   </div>
 </body>
-</html>"""
+</html>\"\"\"
 
     message = MIMEText(body_html, "html", "utf-8")
     message["To"] = recipient
@@ -194,12 +208,17 @@ def _send_resolution_email(recipient: str, original_subject: str):
 async def delete_alerta(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Alerta).where(Alerta.id == id))
     a = result.scalar_one_or_none()
     if not a:
         raise HTTPException(status_code=404, detail="Alerta não encontrado")
+    
+    # RBAC Check
+    if allowed_condo_ids is not None and a.condominio_id and a.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
     await db.delete(a)
     await db.commit()
 
@@ -208,11 +227,12 @@ async def delete_alerta(
 async def count_alertas(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Returns unread alert count, useful for the notification badge."""
+    \"\"\"Returns unread alert count, useful for the notification badge.\"\"\"
     from sqlalchemy import func
-
-    result = await db.execute(
-        select(func.count(Alerta.id)).where(Alerta.lido == False, Alerta.resolvido == False)
-    )
+    stmt = select(func.count(Alerta.id)).where(Alerta.lido == False, Alerta.resolvido == False)
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Alerta.condominio_id.in_(allowed_condo_ids))
+    result = await db.execute(stmt)
     return {"nao_lidos": result.scalar_one()}

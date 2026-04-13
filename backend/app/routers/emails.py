@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_module
 from app.models.user import User
 from app.models.alerta import EmailLog
 from app.models.condominio import Condominio
@@ -20,7 +20,7 @@ async def get_email_logs(
     skip: int = 0,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_module("gmail")),
 ):
     """Returns recent email processing logs."""
     stmt = (
@@ -52,7 +52,7 @@ async def get_email_logs(
 @router.post("/forcar-varredura")
 async def force_scan(
     background_tasks: BackgroundTasks,
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_module("gmail")),
 ):
     """Triggers an immediate Gmail inbox scan in the background."""
     background_tasks.add_task(run_email_scan)
@@ -60,7 +60,7 @@ async def force_scan(
 
 
 @router.get("/status")
-async def get_agent_status(_: User = Depends(get_current_user)):
+async def get_agent_status(_: User = Depends(require_module("gmail"))):
     """Returns the current status of the background agent."""
     jobs = scheduler.get_jobs() if scheduler.running else []
     return {
@@ -77,7 +77,7 @@ async def get_agent_status(_: User = Depends(get_current_user)):
 
 
 @router.get("/inbox")
-async def get_inbox_status(_: User = Depends(get_current_user)):
+async def get_inbox_status(_: User = Depends(require_module("gmail"))):
     """Returns the current count of emails in the Gmail inbox."""
     from app.services.email_monitor import get_inbox_count
     count = get_inbox_count()
@@ -87,7 +87,7 @@ import os
 from app.config import settings
 
 @router.get("/gmail/status")
-async def get_gmail_status(_: User = Depends(get_current_user)):
+async def get_gmail_status(_: User = Depends(require_module("gmail"))):
     """Returns Gmail connection status."""
     is_connected = bool(settings.GMAIL_USER) and bool(settings.GMAIL_PASSWORD)
     return {
@@ -96,7 +96,7 @@ async def get_gmail_status(_: User = Depends(get_current_user)):
     }
 
 @router.get("/gmail/auth")
-async def get_gmail_auth_url(request: Request, _: User = Depends(get_current_user)):
+async def get_gmail_auth_url(request: Request, _: User = Depends(require_module("gmail"))):
     """Returns the Google OAuth login URL for the popup."""
     # Since we don't have google_auth_oauthlib installed or a valid credentials.json,
     # we return a simulated URL for the MVP, or attempt to use the library if available.

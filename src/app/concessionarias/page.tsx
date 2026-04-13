@@ -7,6 +7,8 @@ import { api } from '@/lib/api';
 import Select from 'react-select';
 import useSWR from 'swr';
 import { formatCurrencyCeil } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
+import { isReadOnly } from '@/types';
 
 const COLOR_MAP: Record<string, { bg: string; color: string }> = {
   enel:   { bg: '#eff6ff', color: '#2563eb' },
@@ -94,6 +96,9 @@ export default function ConcessionariasPage() {
     () => api.getConcessionarias(),
     { revalidateOnFocus: true }
   );
+
+  const { user } = useAuth();
+  const readOnly = isReadOnly(user);
 
   // SWR for condominios — needed for the create/edit modal dropdown
   const { data: condos = [] } = useSWR(
@@ -334,12 +339,16 @@ export default function ConcessionariasPage() {
           <button className="dc-btn dc-btn-secondary" onClick={() => setIsHistoricoModalOpen(true)}>
             <History size={16} /> Histórico
           </button>
-          <button className="dc-btn dc-btn-dark" onClick={() => setIsReajusteModalOpen(true)}>
-            <TrendingUp size={16} /> Aplicar Reajuste
-          </button>
-          <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
-            <Plus size={16} /> Vincular Nova
-          </button>
+          {!readOnly && (
+            <>
+              <button className="dc-btn dc-btn-dark" onClick={() => setIsReajusteModalOpen(true)}>
+                <TrendingUp size={16} /> Aplicar Reajuste
+              </button>
+              <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
+                <Plus size={16} /> Vincular Nova
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -448,13 +457,24 @@ export default function ConcessionariasPage() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <button
-                          className="dc-btn dc-btn-dark"
-                          style={{ height: 34, padding: '0 14px', fontSize: '0.78rem', gap: 6 }}
-                          onClick={() => handleOpenEdit(conc)}
-                        >
-                          <ShieldCheck size={14} /> Gerenciar Regras
-                        </button>
+                        {!readOnly && (
+                          <button
+                            className="dc-btn dc-btn-dark"
+                            style={{ height: 34, padding: '0 14px', fontSize: '0.78rem', gap: 6 }}
+                            onClick={() => handleOpenEdit(conc)}
+                          >
+                            <ShieldCheck size={14} /> Gerenciar Regras
+                          </button>
+                        )}
+                        {readOnly && (
+                          <button
+                            className="dc-btn dc-btn-dark"
+                            style={{ height: 34, padding: '0 14px', fontSize: '0.78rem', gap: 6 }}
+                            onClick={() => handleOpenEdit(conc)}
+                          >
+                            <Eye size={14} /> Ver Detalhes
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -487,7 +507,7 @@ export default function ConcessionariasPage() {
         <div className="dc-modal-overlay">
           <div className="dc-modal-content" style={{ maxWidth: 540 }}>
             <div className="dc-modal-header">
-              <h2 className="dc-modal-title">{editingId ? 'Gerenciar Regras' : 'Vincular Concessionária'}</h2>
+              <h2 className="dc-modal-title">{readOnly ? 'Detalhes da Concessionária' : editingId ? 'Gerenciar Regras' : 'Vincular Concessionária'}</h2>
               <button className="dc-modal-close" onClick={handleCloseModal}><X size={20} /></button>
             </div>
 
@@ -514,7 +534,7 @@ export default function ConcessionariasPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>Tipo</label>
-                    <select value={formConc.tipo} onChange={e => setFormConc({...formConc, tipo: e.target.value})} className="dc-input dc-form-select">
+                    <select disabled={readOnly} value={formConc.tipo} onChange={e => setFormConc({...formConc, tipo: e.target.value})} className="dc-input dc-form-select">
                       <option value="Enel">Enel</option>
                       <option value="Sabesp">Sabesp</option>
                       <option value="Comgás">Comgás</option>
@@ -527,18 +547,18 @@ export default function ConcessionariasPage() {
                   {formConc.tipo === 'Outros' ? (
                     <div className="dc-form-group">
                       <label>Nome da Concessionária</label>
-                      <input className="dc-form-input" required value={formConc.nome_personalizado || ''} onChange={e => setFormConc({...formConc, nome_personalizado: e.target.value})} placeholder="Ex: Sanasa" disabled={!!editingId} />
+                      <input className="dc-form-input" required value={formConc.nome_personalizado || ''} onChange={e => setFormConc({...formConc, nome_personalizado: e.target.value})} placeholder="Ex: Sanasa" disabled={!!editingId || readOnly} />
                     </div>
                   ) : null}
                   <div className="dc-form-group">
                     <label>{getCodigoLabel(formConc.tipo)}</label>
-                    <input className="dc-form-input" required value={formConc.instalacao} onChange={e => setFormConc({...formConc, instalacao: e.target.value})} placeholder="Ex: 82736412" disabled={!!editingId} />
+                    <input className="dc-form-input" required value={formConc.instalacao} onChange={e => setFormConc({...formConc, instalacao: e.target.value})} placeholder="Ex: 82736412" disabled={!!editingId || readOnly} />
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>Regra de Senha PDF</label>
-                    <select value={formConc.regra_senha} onChange={e => setFormConc({...formConc, regra_senha: e.target.value})} className="dc-input dc-form-select">
+                    <select disabled={readOnly} value={formConc.regra_senha} onChange={e => setFormConc({...formConc, regra_senha: e.target.value})} className="dc-input dc-form-select">
                       <option value="5_primeiros_cnpj">5 Primeiros CNPJ (Enel)</option>
                       <option value="3_primeiros_cnpj">3 Primeiros CNPJ (Sabesp/Comgas)</option>
                       <option value="cnpj_completo">CNPJ Completo</option>
@@ -547,7 +567,7 @@ export default function ConcessionariasPage() {
                   </div>
                   <div className="dc-form-group">
                     <label>Dia de Vencimento</label>
-                    <input className="dc-form-input" type="number" required value={formConc.dia_vencimento} onChange={e => setFormConc({...formConc, dia_vencimento: parseInt(e.target.value)})} placeholder="Ex: 10" />
+                    <input className="dc-form-input" type="number" required disabled={readOnly} value={formConc.dia_vencimento} onChange={e => setFormConc({...formConc, dia_vencimento: parseInt(e.target.value)})} placeholder="Ex: 10" />
                   </div>
                 </div>
 
@@ -560,6 +580,7 @@ export default function ConcessionariasPage() {
                         className="dc-form-input"
                         type={showPassword ? 'text' : 'password'}
                         required
+                        disabled={readOnly}
                         value={formConc.senha_manual}
                         onChange={e => setFormConc({...formConc, senha_manual: e.target.value})}
                         placeholder="Digite a senha do arquivo"
@@ -603,17 +624,17 @@ export default function ConcessionariasPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>E-mail do Remetente (Opcional)</label>
-                    <input className="dc-form-input" value={formConc.email_esperado} onChange={e => setFormConc({...formConc, email_esperado: e.target.value})} placeholder="Ex: fatura@enel.com.br" />
+                    <input className="dc-form-input" disabled={readOnly} value={formConc.email_esperado} onChange={e => setFormConc({...formConc, email_esperado: e.target.value})} placeholder="Ex: fatura@enel.com.br" />
                   </div>
                   <div className="dc-form-group">
                     <label>Valor Médio Mensal (R$)</label>
-                    <input className="dc-form-input" type="number" step="0.01" required value={formConc.valor_medio} onChange={e => setFormConc({...formConc, valor_medio: parseFloat(e.target.value) || 0})} placeholder="Ex: 500.50" />
+                    <input className="dc-form-input" type="number" step="0.01" required disabled={readOnly} value={formConc.valor_medio} onChange={e => setFormConc({...formConc, valor_medio: parseFloat(e.target.value) || 0})} placeholder="Ex: 500.50" />
                   </div>
                 </div>
               </div>
               
               <div className="dc-modal-footer" style={{ justifyContent: 'space-between' }}>
-                {editingId ? (
+                {editingId && !readOnly ? (
                   <button type="button" className="dc-btn dc-btn-danger" onClick={handleDelete} style={{ gap: 8 }}>
                     <Trash2 size={15} /> Excluir
                   </button>
@@ -621,11 +642,13 @@ export default function ConcessionariasPage() {
                   <div></div>
                 )}
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <button type="button" className="dc-btn dc-btn-secondary" onClick={handleCloseModal}>Cancelar</button>
-                  <button type="submit" className="dc-btn dc-btn-primary" disabled={creating} style={{ gap: 10 }}>
-                    {creating && <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} />}
-                    {creating ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Confirmar Inclusão'}
-                  </button>
+                  <button type="button" className="dc-btn dc-btn-secondary" onClick={handleCloseModal}>{readOnly ? 'Fechar' : 'Cancelar'}</button>
+                  {!readOnly && (
+                    <button type="submit" className="dc-btn dc-btn-primary" disabled={creating} style={{ gap: 10 }}>
+                      {creating && <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} />}
+                      {creating ? 'Salvando...' : editingId ? 'Salvar Alterações' : 'Confirmar Inclusão'}
+                    </button>
+                  )}
                 </div>
               </div>
             </form>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -11,19 +11,31 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import '@/styles/app.css';
 
-const nav = [
-  { href: '/dashboard',      icon: BarChart3,    label: 'Dashboard' },
-  { href: '/condominios',    icon: Building2,    label: 'Condomínios' },
-  { href: '/concessionarias',icon: Zap,          label: 'Concessionárias' },
-  { href: '/contratos',      icon: FileSignature,label: 'Contratos' },
-  { href: '/reajustes',      icon: TrendingUp,   label: 'Reajustes' },
-  { href: '/recebimentos',   icon: Mail,         label: 'Recebimentos' },
-  { href: '/faturas',        icon: FileText,     label: 'Faturas' },
-  { href: '/alertas',        icon: AlertCircle,  label: 'Alertas' },
-  { href: '/relatorios',     icon: BarChart2,    label: 'Relatórios' },
-  { href: '/importacoes',    icon: Download,     label: 'Importações' },
-  { href: '/configuracoes',  icon: Settings,     label: 'Configurações' },
+const allNav = [
+  { href: '/dashboard',      icon: BarChart3,    label: 'Dashboard',        module: null },
+  { href: '/condominios',    icon: Building2,    label: 'Condomínios',      module: null },
+  { href: '/concessionarias',icon: Zap,          label: 'Concessionárias',  module: null },
+  { href: '/contratos',      icon: FileSignature,label: 'Contratos',        module: null },
+  { href: '/reajustes',      icon: TrendingUp,   label: 'Reajustes',        module: null },
+  { href: '/recebimentos',   icon: Mail,         label: 'Recebimentos',     module: 'gmail' },
+  { href: '/faturas',        icon: FileText,     label: 'Faturas',          module: null },
+  { href: '/alertas',        icon: AlertCircle,  label: 'Alertas',          module: null },
+  { href: '/relatorios',     icon: BarChart2,    label: 'Relatórios',       module: 'relatorios' },
+  { href: '/importacoes',    icon: Download,     label: 'Importações',      module: 'importacoes' },
+  { href: '/configuracoes',  icon: Settings,     label: 'Configurações',    module: null },
 ];
+
+const ADMIN_ONLY_MODULES = new Set(['relatorios', 'importacoes', 'notificacoes', 'gmail']);
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Administrador',
+  gerencia: 'Gerência',
+  assistente: 'Assistente',
+  contabilidade: 'Contabilidade',
+  financeiro: 'Financeiro',
+  providencias: 'Providências',
+  geral: 'Geral',
+};
 
 interface ShellProps {
   children: React.ReactNode;
@@ -36,6 +48,17 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuth();
+
+  const nav = useMemo(() => {
+    const role = user?.role || 'geral';
+    if (role === 'admin') return allNav;
+    return allNav.filter(item => {
+      if (item.module && ADMIN_ONLY_MODULES.has(item.module)) return false;
+      return true;
+    });
+  }, [user?.role]);
+
+  const roleLabel = ROLE_LABELS[user?.role || 'geral'] || user?.role || 'Usuário';
 
   return (
     <div className="dc-app">
@@ -75,7 +98,7 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
               {!collapsed && (
                 <div className="dc-user-text">
                   <div className="dc-user-name">{user?.nome || 'Usuário'}</div>
-                  <div className="dc-user-role">Administrador</div>
+                  <div className="dc-user-role">{roleLabel}</div>
                 </div>
               )}
             </div>

@@ -88,3 +88,38 @@ def require_role(*roles: str):
             raise HTTPException(status_code=403, detail="Permissão insuficiente")
         return user
     return _check
+
+
+def require_write():
+    """Dependency that blocks read-only roles from write operations."""
+    async def _check(user: User = Depends(get_current_user)) -> User:
+        if user.is_read_only:
+            raise HTTPException(status_code=403, detail="Seu perfil não permite edições")
+        return user
+    return _check
+
+
+def require_module(module: str):
+    """Dependency that blocks non-admin roles from restricted modules."""
+    async def _check(user: User = Depends(get_current_user)) -> User:
+        if not user.has_module_access(module):
+            raise HTTPException(status_code=403, detail=f"Acesso ao módulo '{module}' restrito ao administrador")
+        return user
+    return _check
+
+
+async def get_user_condo_ids(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[uuid.UUID] | None:
+    """Returns list of condominio IDs the user can access.
+    Returns None if the user is admin (unrestricted access)."""
+    if user.is_admin:
+        return None  # No filter needed
+
+    from app.models.user_condominio import UserCondominio
+    result = await db.execute(
+        select(UserCondominio.condominio_id).where(UserCondominio.user_id == user.id)
+    )
+    ids = list(result.scalars().all())
+    return ids

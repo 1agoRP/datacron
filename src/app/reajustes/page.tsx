@@ -5,6 +5,7 @@ import Shell from '@/components/layout/Shell';
 import { Plus, Search, Trash2, ArrowUpDown, TrendingUp, Download, Eye, FileText, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import useSWR from 'swr';
+import { useAuth } from '@/context/AuthContext';
 import { ReajusteMercado } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -17,6 +18,9 @@ export default function ReajustesPage() {
     () => api.getReajustesMercado(),
     { revalidateOnFocus: true }
   );
+
+  const { user } = useAuth();
+  const readOnly = isReadOnly(user);
 
   const [tab, setTab] = useState('Todos');
   const [searchTerm, setSearchTerm] = useState('');
@@ -150,9 +154,11 @@ export default function ReajustesPage() {
           <h1 className="dc-page-title">Reajustes de Mercado</h1>
           <p className="dc-page-subtitle">Acompanhe os índices de mercado, reajustes trabalhistas e outros.</p>
         </div>
-        <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
-          <Plus size={16} /> Novo Registro
-        </button>
+        {!readOnly && (
+          <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
+            <Plus size={16} /> Novo Registro
+          </button>
+        )}
       </div>
 
       <div className="dc-filter-bar">
@@ -243,11 +249,13 @@ export default function ReajustesPage() {
                     )}
                   </td>
                   <td>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                      <button className="dc-icon-action" style={{ color: '#ef4444', background: '#fef2f2' }} title="Excluir" onClick={() => handleDelete(r.id)}>
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
+                    {!readOnly && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                        <button className="dc-icon-action" style={{ color: '#ef4444', background: '#fef2f2' }} title="Excluir" onClick={() => handleDelete(r.id)}>
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
