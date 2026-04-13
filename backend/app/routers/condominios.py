@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import get_current_user, require_write, get_user_condo_ids
+from app.dependencies import get_current_user, require_write, get_user_condo_ids, require_role
 from app.models.user import User
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
@@ -151,7 +151,7 @@ async def update_condominio(
     id: uuid.UUID,
     body: CondominioUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_write()),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Updates a condominio's data."""
