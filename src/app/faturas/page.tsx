@@ -264,7 +264,7 @@ export default function FaturasPage() {
               boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 100, minWidth: 260
             }}>
               <div style={{ marginBottom: 12 }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, collection: '#64748b', marginBottom: 4 }}>ANO</label>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: 4 }}>ANO</label>
                 <select 
                   value={selectedYear} 
                   onChange={(e) => setSelectedYear(e.target.value)}
@@ -275,7 +275,7 @@ export default function FaturasPage() {
                 </select>
               </div>
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, collection: '#64748b', marginBottom: 4 }}>MÊS</label>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: 4 }}>MÊS</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                   {monthsList.map(m => (
                     <button
