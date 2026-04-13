@@ -142,7 +142,16 @@ class CondominioMini(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ConcessionariaMini(BaseModel):
+    """Minimal concessionaria data for nested responses."""
+    id: uuid.UUID
+    tipo: str
+    instalacao: str
+    model_config = {"from_attributes": True}
+
+
 class ConcessionariaResponse(BaseModel):
+
     id: uuid.UUID
     condominio_id: uuid.UUID
     tipo: str
@@ -191,7 +200,13 @@ class FaturaResponse(BaseModel):
     variacao_percentual: Optional[float]
     created_at: datetime
     updated_at: datetime
+
+    # Nested data
+    condominio: Optional[CondominioMini] = None
+    concessionaria: Optional[ConcessionariaMini] = None
+
     model_config = {"from_attributes": True}
+
 
 
 # ─── Alerta ───────────────────────────────────────────────────

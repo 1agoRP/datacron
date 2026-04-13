@@ -4,8 +4,9 @@ import React, { useState, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
   Search, Download, Printer, TrendingDown, TrendingUp, Calendar, Eye, X,
-  FileText, Mail, Clock, DollarSign, AlertCircle, CheckCircle2, Hash, Zap
+  FileText, Mail, Clock, DollarSign, AlertCircle, CheckCircle2, Hash, Zap, ChevronDown, ChevronUp, ChevronRight
 } from 'lucide-react';
+
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -18,36 +19,124 @@ export default function FaturasPage() {
     { revalidateOnFocus: true }
   );
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('');
-  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [selectedYear, setSelectedYear] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(''); // e.g., "01", "02", ...
+  const [showFilterPicker, setShowFilterPicker] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'created_at', direction: 'desc' });
   const [selectedFatura, setSelectedFatura] = useState<any | null>(null);
 
-  const filtered = useMemo(() => {
-    return faturas.filter(f => {
+  const monthsList = [
+    { value: '01', label: 'Janeiro' }, { value: '02', label: 'Fevereiro' }, { value: '03', label: 'Março' },
+    { value: '04', label: 'Abril' }, { value: '05', label: 'Maio' }, { value: '06', label: 'Junho' },
+    { value: '07', label: 'Julho' }, { value: '08', label: 'Agosto' }, { value: '09', label: 'Setembro' },
+    { value: '10', label: 'Outubro' }, { value: '11', label: 'Novembro' }, { value: '12', label: 'Dezembro' }
+  ];
+
+  const formatReferencia = (ref: string) => {
+    if (!ref) return '—';
+    // If format is 03/2026
+    const parts = ref.split('/');
+    if (parts.length === 2 && !isNaN(Number(parts[0]))) {
+      const m = parseInt(parts[0], 10);
+      const mLabel = monthsList.find(i => parseInt(i.value, 10) === m)?.label || parts[0];
+      return `${mLabel}/${parts[1]}`;
+    }
+    return ref;
+  };
+
+
+  const filteredAndSorted = useMemo(() => {
+    let result = faturas.filter(f => {
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         const match = (
           (f.referencia || '').toLowerCase().includes(q) ||
+          (f.condominio?.nome || '').toLowerCase().includes(q) ||
+          (f.condominio?.numero || '').toLowerCase().includes(q) ||
+          (f.concessionaria?.tipo || '').toLowerCase().includes(q) ||
           (f.email_remetente || '').toLowerCase().includes(q) ||
-          (f.email_assunto || '').toLowerCase().includes(q) ||
-          (f.pdf_nome_original || '').toLowerCase().includes(q) ||
           String(f.valor || '').includes(q)
         );
         if (!match) return false;
       }
-      if (selectedMonth && f.created_at) {
-        const faturaDate = new Date(f.created_at);
-        const faturaMonth = `${faturaDate.getFullYear()}-${String(faturaDate.getMonth() + 1).padStart(2, '0')}`;
-        if (faturaMonth !== selectedMonth) return false;
+      
+      if (selectedYear || selectedMonth) {
+        // Prioritize Referência for year/month filtering
+        let refMonth = '';
+        let refYear = '';
+        if (f.referencia && f.referencia.includes('/')) {
+          const parts = f.referencia.split('/');
+          refMonth = parts[0].padStart(2, '0');
+          refYear = parts[1];
+        } else if (f.created_at) {
+          const d = new Date(f.created_at);
+          refMonth = (d.getMonth() + 1).toString().padStart(2, '0');
+          refYear = d.getFullYear().toString();
+        }
+
+        if (selectedYear && refYear !== selectedYear) return false;
+        if (selectedMonth && refMonth !== selectedMonth) return false;
       }
+
       return true;
     });
-  }, [faturas, searchTerm, selectedMonth]);
+
+    if (sortConfig) {
+      result.sort((a, b) => {
+        let valA: any;
+        let valB: any;
+
+        switch (sortConfig.key) {
+          case 'condominio': valA = a.condominio?.nome || ''; valB = b.condominio?.nome || ''; break;
+          case 'numero': valA = a.condominio?.numero || ''; valB = b.condominio?.numero || ''; break;
+          case 'tipo': valA = a.concessionaria?.tipo || ''; valB = b.concessionaria?.tipo || ''; break;
+          case 'valor': valA = a.valor || 0; valB = b.valor || 0; break;
+          case 'vencimento': valA = a.vencimento || ''; valB = b.vencimento || ''; break;
+          case 'referencia': valA = a.referencia || ''; valB = b.referencia || ''; break;
+          case 'status': valA = a.status || ''; valB = b.status || ''; break;
+          default: valA = a.created_at || ''; valB = b.created_at || '';
+        }
+
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [faturas, searchTerm, selectedYear, selectedMonth, sortConfig]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    
+    // Always include current and next year for convenience
+    const currentYear = new Date().getFullYear();
+    years.add(currentYear.toString());
+    years.add((currentYear + 1).toString());
+    years.add((currentYear - 1).toString());
+
+    faturas.forEach((f: any) => {
+      // From Referência (e.g., "03/2026")
+      if (f.referencia && f.referencia.includes('/')) {
+        const parts = f.referencia.split('/');
+        const y = parts[parts.length - 1];
+        if (y && y.length === 4) years.add(y);
+      }
+      // From created_at as fallback
+      if (f.created_at) {
+        years.add(new Date(f.created_at).getFullYear().toString());
+      }
+    });
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [faturas]);
+
+
 
   const stats = useMemo(() => {
-    const total = filtered.reduce((acc: number, f: any) => acc + (f.valor || 0), 0);
-    return { total, count: filtered.length };
-  }, [filtered]);
+    const total = filteredAndSorted.reduce((acc: number, f: any) => acc + (f.valor || 0), 0);
+    return { total, count: filteredAndSorted.length };
+  }, [filteredAndSorted]);
+
 
   const handleExportExcel = async () => {
     try {
@@ -81,12 +170,26 @@ export default function FaturasPage() {
       alert('❌ ' + (err.message || 'Erro ao baixar fatura'));
     });
   };
+  const filterLabel = useMemo(() => {
+    if (!selectedYear && !selectedMonth) return 'Todos os meses';
+    const mLabel = monthsList.find(m => m.value === selectedMonth)?.label || '';
+    return `${mLabel}${mLabel && selectedYear ? '/' : ''}${selectedYear}`;
+  }, [selectedYear, selectedMonth]);
 
-  const monthLabel = selectedMonth ? (() => {
-    const [year, month] = selectedMonth.split('-');
-    const d = new Date(Number(year), Number(month) - 1);
-    return format(d, 'MMMM/yyyy', { locale: ptBR });
-  })() : 'Todos os meses';
+  const handleSort = (key: string) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev?.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortConfig?.key !== column) return <ChevronDown size={14} style={{ opacity: 0.2 }} />;
+    return sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
+  };
+
+
+
 
   return (
     <Shell>
@@ -149,36 +252,68 @@ export default function FaturasPage() {
         <div style={{ position: 'relative' }}>
           <button
             className="dc-btn dc-btn-secondary"
-            style={{ height: 40, padding: '0 14px', fontSize: '0.85rem' }}
-            onClick={() => setShowMonthPicker(!showMonthPicker)}
+            style={{ height: 40, padding: '0 14px', fontSize: '0.85rem', minWidth: 160 }}
+            onClick={() => setShowFilterPicker(!showFilterPicker)}
           >
-            <Calendar size={15} /> {monthLabel}
+            <Calendar size={15} /> {filterLabel}
           </button>
-          {showMonthPicker && (
+          {showFilterPicker && (
             <div style={{
               position: 'absolute', right: 0, top: 44, background: '#fff',
-              border: '1px solid #e2e8f0', borderRadius: 10, padding: 12,
-              boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 50, minWidth: 200
+              border: '1px solid #e2e8f0', borderRadius: 12, padding: 16,
+              boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 100, minWidth: 260
             }}>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => { setSelectedMonth(e.target.value); setShowMonthPicker(false); }}
-                style={{
-                  width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0',
-                  borderRadius: 8, fontSize: '0.9rem', fontFamily: 'inherit'
-                }}
-              />
-              <button
-                className="dc-btn dc-btn-secondary"
-                style={{ width: '100%', marginTop: 8, height: 34, fontSize: '0.82rem', justifyContent: 'center' }}
-                onClick={() => { setSelectedMonth(''); setShowMonthPicker(false); }}
-              >
-                Mostrar Todos
-              </button>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, collection: '#64748b', marginBottom: 4 }}>ANO</label>
+                <select 
+                  value={selectedYear} 
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid #e2e8f0' }}
+                >
+                  <option value="">Todos os anos</option>
+                  {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, collection: '#64748b', marginBottom: 4 }}>MÊS</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {monthsList.map(m => (
+                    <button
+                      key={m.value}
+                      onClick={() => setSelectedMonth(m.value)}
+                      style={{
+                        padding: '6px', borderRadius: 6, fontSize: '0.8rem',
+                        border: '1px solid',
+                        borderColor: selectedMonth === m.value ? '#2563eb' : '#e2e8f0',
+                        background: selectedMonth === m.value ? '#eff6ff' : '#fff',
+                        color: selectedMonth === m.value ? '#2563eb' : '#1e293b'
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="dc-btn dc-btn-primary"
+                  style={{ flex: 1, height: 34, fontSize: '0.82rem', justifyContent: 'center' }}
+                  onClick={() => setShowFilterPicker(false)}
+                >
+                  Aplicar
+                </button>
+                <button
+                  className="dc-btn dc-btn-secondary"
+                  style={{ flex: 1, height: 34, fontSize: '0.82rem', justifyContent: 'center' }}
+                  onClick={() => { setSelectedMonth(''); setSelectedYear(''); setShowFilterPicker(false); }}
+                >
+                  Limpar
+                </button>
+              </div>
             </div>
           )}
         </div>
+
       </div>
 
       {/* Table */}
@@ -187,61 +322,73 @@ export default function FaturasPage() {
           <table className="dc-table">
             <thead>
               <tr>
-                <th>Condomínio / Concessionária</th>
-                <th>Referência</th>
-                <th>Vencimento</th>
-                <th>Valor</th>
-                <th>Status IA</th>
+                <th onClick={() => handleSort('condominio')} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Condomínio <SortIcon column="condominio" /></div>
+                </th>
+                <th onClick={() => handleSort('numero')} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Nº <SortIcon column="numero" /></div>
+                </th>
+                <th onClick={() => handleSort('tipo')} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Tipo <SortIcon column="tipo" /></div>
+                </th>
+                <th onClick={() => handleSort('referencia')} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Referência <SortIcon column="referencia" /></div>
+                </th>
+                <th onClick={() => handleSort('vencimento')} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Vencimento <SortIcon column="vencimento" /></div>
+                </th>
+                <th onClick={() => handleSort('valor')} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Valor <SortIcon column="valor" /></div>
+                </th>
+                <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Status IA <SortIcon column="status" /></div>
+                </th>
                 <th style={{ textAlign: 'right' }}>Ações</th>
               </tr>
             </thead>
+
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
-              ) : filtered.map((f: any) => {
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
+              ) : filteredAndSorted.map((f: any) => {
                 const isOk = f.status === 'processada';
                 return (
                   <tr key={f.id}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div
                           className="dc-type-badge dc-type-E"
-                          style={{ width: 40, height: 40, borderRadius: 10, fontSize: '1rem' }}
+                          style={{ width: 32, height: 32, borderRadius: 8, fontSize: '0.85rem', flexShrink: 0 }}
                         >
-                          {(f.email_assunto || f.referencia || 'F').charAt(0).toUpperCase()}
+                          {(f.condominio?.nome || 'C').charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                          <div className="dc-cell-primary">
-                            {f.email_assunto
-                              ? f.email_assunto.substring(0, 50) + (f.email_assunto.length > 50 ? '...' : '')
-                              : 'Fatura Processada'}
-                          </div>
-                          <div className="dc-cell-secondary">
-                             {f.email_remetente || 'Remetente desconhecido'}
-                          </div>
-                        </div>
+                        <div className="dc-cell-primary" style={{ fontSize: '0.85rem' }}>{f.condominio?.nome || 'Desconhecido'}</div>
                       </div>
                     </td>
                     <td>
-                      <div className="dc-cell-primary">{f.referencia}</div>
-                      <div className="dc-cell-secondary">{f.pdf_nome_original || 'Digitalizado via IA'}</div>
+                      <div className="dc-cell-secondary" style={{ fontWeight: 600 }}>{f.condominio?.numero || '—'}</div>
+                    </td>
+                    <td>
+                       <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', background: '#f1f5f9', padding: '2px 8px', borderRadius: 4 }}>
+                          {f.concessionaria?.tipo || 'Outros'}
+                       </span>
+                    </td>
+                    <td>
+                      <div className="dc-cell-primary" style={{ fontWeight: 600 }}>{formatReferencia(f.referencia)}</div>
                     </td>
                     <td>
                       <div className="dc-cell-primary">{f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}</div>
-                      <div className="dc-cell-secondary">Ciclo Mensal</div>
                     </td>
                     <td>
-                      <div className="dc-cell-primary">R$ {(Math.ceil((f.valor || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="dc-cell-primary" style={{ fontWeight: 700 }}>R$ {(Math.ceil((f.valor || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                     </td>
                     <td>
-                      <span className={`dc-badge ${isOk ? 'dc-badge-green' : f.status === 'erro' ? 'dc-badge-red' : 'dc-badge-amber'}`}>
+                      <span className={`dc-badge ${isOk ? 'dc-badge-green' : f.status === 'erro' ? 'dc-badge-red' : 'dc-badge-amber'}`} style={{ fontSize: '0.72rem' }}>
                         <span className="dc-badge-dot" />
                         {f.status ? f.status.charAt(0).toUpperCase() + f.status.slice(1) : 'Pendente'}
                       </span>
-                      <div className="dc-cell-secondary" style={{ marginTop: 4 }}>
-                        {f.created_at ? format(new Date(f.created_at), "dd/MM 'às' HH:mm") : '—'}
-                      </div>
                     </td>
+
                     <td>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                         {f.pdf_desbloqueado && (
@@ -265,13 +412,14 @@ export default function FaturasPage() {
                   </tr>
                 );
               })}
-              {!loading && filtered.length === 0 && (
+              {!loading && filteredAndSorted.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
                      Nenhuma fatura encontrada.
                   </td>
                 </tr>
               )}
+
             </tbody>
           </table>
         </div>
