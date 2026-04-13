@@ -50,5 +50,5 @@ venv/
 env/
 .env
 bin/
-lib/
+/lib/
 include/
