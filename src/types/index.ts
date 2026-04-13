@@ -25,6 +25,7 @@ export interface Concessionaria {
   valor_medio: number | null;
   nome_personalizado?: string | null;
   leitura_individualizada?: boolean;
+  created_by_id?: string;
   created_at: string;
   
   condominio?: Condominio;

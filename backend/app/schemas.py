@@ -176,6 +176,7 @@ class ConcessionariaResponse(BaseModel):
     valor_medio: float
     nome_personalizado: Optional[str] = None
     leitura_individualizada: bool = False
+    created_by_id: Optional[uuid.UUID] = None
     ativo: bool
     created_at: datetime
     condominio: Optional[CondominioMini] = None

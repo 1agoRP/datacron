@@ -51,7 +51,7 @@ async def list_concessionarias(
 async def create_concessionaria(
     body: ConcessionariaCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_role("admin")),
+    current_user: User = Depends(require_write()),
 ):
     # Validate condominio exists and capture it
     result = await db.execute(select(Condominio).where(Condominio.id == body.condominio_id))
@@ -59,12 +59,16 @@ async def create_concessionaria(
     if not condo:
         raise HTTPException(status_code=404, detail="Condomínio não encontrado")
 
-    conc = Concessionaria(**body.model_dump())
+    # Create concessionaria
+    conc = Concessionaria(
+        **body.model_dump(),
+        created_by_id=current_user.id
+    )
     db.add(conc)
     await db.commit()
     await db.refresh(conc)
     
-    # Attach relationship explicitly to prevent Pydantic MissingGreenlet error
+    # Reload with condominio for response
     conc.condominio = condo
     return conc
 
@@ -97,7 +101,7 @@ async def update_concessionaria(
     id: uuid.UUID,
     body: ConcessionariaUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_role("admin")),
+    _: User = Depends(require_write()),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(
@@ -129,7 +133,7 @@ async def update_concessionaria(
 async def delete_concessionaria(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_role("admin")),
+    _: User = Depends(require_write()),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Concessionaria).where(Concessionaria.id == id))

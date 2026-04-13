@@ -10,6 +10,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.condominio import Condominio
     from app.models.fatura import Fatura
+    from app.models.user import User
 
 
 class Concessionaria(Base):
@@ -31,6 +32,9 @@ class Concessionaria(Base):
     valor_medio: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     nome_personalizado: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     leitura_individualizada: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
     ativo: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -42,6 +46,7 @@ class Concessionaria(Base):
     # Relationships
     condominio: Mapped["Condominio"] = relationship("Condominio", back_populates="concessionarias")
     faturas: Mapped[list["Fatura"]] = relationship("Fatura", back_populates="concessionaria")
+    created_by: Mapped[Optional["User"]] = relationship("User")
 
     def gerar_senha_pdf(self, cnpj_digits: str) -> str:
         """
