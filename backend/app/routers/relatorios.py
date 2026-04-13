@@ -34,14 +34,14 @@ async def listar_historico(
 async def registrar_relatorio(
     body: RelatorioGeradoCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_module("relatorios")),
+    current_user: User = Depends(require_module("relatorios")),
 ):
     """Records a new report generation event in the history."""
     relatorio = RelatorioGerado(
         nome=body.nome,
         tipo_relatorio=body.tipo_relatorio,
         formato=body.formato,
-        usuario=body.usuario,
+        usuario=current_user.nome,
     )
     db.add(relatorio)
     await db.commit()

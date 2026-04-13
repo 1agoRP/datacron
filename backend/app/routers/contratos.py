@@ -161,7 +161,7 @@ async def list_contratos(
 async def create_contrato(
     body: ContratoCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_write()),
 ):
     # Validate condominio exists
     result = await db.execute(select(Condominio).where(Condominio.id == body.condominio_id))
@@ -169,7 +169,9 @@ async def create_contrato(
     if not condo:
         raise HTTPException(status_code=404, detail="Condomínio não encontrado")
 
-    contrato = Contrato(**body.model_dump())
+    data = body.model_dump()
+    data["created_by_id"] = current_user.id
+    contrato = Contrato(**data)
     db.add(contrato)
     await db.commit()
     await db.refresh(contrato)

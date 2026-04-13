@@ -13,12 +13,14 @@ from sqlalchemy import (
     Uuid as UUID,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import Optional, TYPE_CHECKING, List
 
 from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.condominio import Condominio
     from app.models.contract_file import ContractFile
+    from app.models.user import User
 
 
 class Contrato(Base):
@@ -55,6 +57,9 @@ class Contrato(Base):
     pagamento_recebido: Mapped[bool] = mapped_column(default=False)
     arquivo_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     observacoes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -69,6 +74,7 @@ class Contrato(Base):
     arquivos: Mapped[list["ContractFile"]] = relationship(
         "ContractFile", back_populates="contrato", cascade="all, delete-orphan"
     )
+    created_by: Mapped[Optional["User"]] = relationship("User")
 
     @property
     def status(self) -> str:

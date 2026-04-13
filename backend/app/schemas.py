@@ -18,6 +18,7 @@ class UserInToken(BaseModel):
     nome: str
     email: str
     role: str
+    codigo_usuario: Optional[int] = None
     condominios_ids: list[str] = []
     model_config = {"from_attributes": True}
 
@@ -34,6 +35,7 @@ class UserResponse(BaseModel):
     nome: str
     email: str
     role: str
+    codigo_usuario: Optional[int] = None
     created_at: datetime
     model_config = {"from_attributes": True}
 
@@ -397,6 +399,7 @@ class ContratoResponse(BaseModel):
     observacoes: Optional[str] = None
     status: str = "ativo"
     condominio_nome: Optional[str] = None
+    created_by_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
     model_config = {"from_attributes": True}

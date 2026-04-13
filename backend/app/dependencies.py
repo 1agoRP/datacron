@@ -117,6 +117,35 @@ async def get_user_condo_ids(
     if user.is_admin:
         return None  # No filter needed
 
+    from sqlalchemy import text
+    from app.models.condominio import Condominio
+
+    # 1. Tentar buscar da tabela database_usuarios (Fonte de verdade da carteira)
+    if user.codigo_usuario:
+        try:
+            # Query database_usuarios for the comma-separated list of codes
+            res = await db.execute(
+                text("SELECT \"codigoCondominio\" FROM database_usuarios WHERE \"codigoUsuario\" = :code"),
+                {"code": user.codigo_usuario}
+            )
+            codigo_str = res.scalar_one_or_none()
+            
+            if codigo_str:
+                # Particionar os códigos (ex: "39, 48, 70")
+                codes = [c.strip() for c in codigo_str.split(",") if c.strip()]
+                if codes:
+                    # Buscar os UUIDs na tabela condominios baseando-se no campo 'numero'
+                    condo_res = await db.execute(
+                        select(Condominio.id).where(Condominio.numero.in_(codes))
+                    )
+                    ids = list(condo_res.scalars().all())
+                    if ids:
+                        return ids
+        except Exception as e:
+            from app.routers.condominios import logger
+            logger.error(f"Erro ao buscar carteira em database_usuarios: {e}")
+
+    # 2. Fallback: Tabela user_condominios (Relacionamentos manuais/novos)
     from app.models.user_condominio import UserCondominio
     result = await db.execute(
         select(UserCondominio.condominio_id).where(UserCondominio.user_id == user.id)

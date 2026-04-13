@@ -73,6 +73,7 @@ export interface User {
   nome: string;
   email: string;
   role: string;
+  codigo_usuario?: number | null;
   condominios_ids?: string[];
   created_at: string;
 }
@@ -115,6 +116,7 @@ export interface Contrato {
   observacoes: string | null;
   status: string;
   condominio_nome: string | null;
+  created_by_id?: string | null;
   created_at: string;
   updated_at: string;
 }
