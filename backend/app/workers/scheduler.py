@@ -1,6 +1,18 @@
 import logging
 import os
-import fcntl
+import tempfile
+import sys
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -11,6 +23,7 @@ from app.services.alert_manager import check_missing_bills
 from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
+
 
 scheduler = AsyncIOScheduler(timezone="America/Sao_Paulo")
 
@@ -38,20 +51,28 @@ async def _run_missing_bills_check():
 def start_scheduler():
     """
     Registers all background jobs and starts the scheduler.
-    Uses fcntl to ensure only ONE worker process runs the scheduler
+    Uses file locking to ensure only ONE worker process runs the scheduler
     if multiple workers are active (e.g., Gunicorn/Uvicorn).
     """
     global _scheduler_lock_fd
     
-    lock_file = "/tmp/datacron_scheduler.lock"
+    lock_file = os.path.join(tempfile.gettempdir(), "datacron_scheduler.lock")
     try:
         # Create lock file if it doesn't exist
         if not os.path.exists(lock_file):
             open(lock_file, "w").close()
             
         _scheduler_lock_fd = open(lock_file, "r+")
-        # Try to acquire an exclusive lock without blocking
-        fcntl.flock(_scheduler_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        
+        if fcntl:
+            # Unix-like locking
+            fcntl.flock(_scheduler_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        elif msvcrt:
+            # Windows locking
+            msvcrt.locking(_scheduler_lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            logger.warning("No file locking mechanism available on this platform.")
+            
     except (IOError, OSError):
         logger.info("Scheduler already running in another worker. Skipping start in this process.")
         if _scheduler_lock_fd:
@@ -61,6 +82,7 @@ def start_scheduler():
                 pass
             _scheduler_lock_fd = None
         return
+
 
     # If we got here, we own the lock
     # Email scan — 3 times a day (08:00, 14:00, 20:00)
@@ -97,8 +119,13 @@ def stop_scheduler():
     
     if _scheduler_lock_fd:
         try:
-            fcntl.flock(_scheduler_lock_fd, fcntl.LOCK_UN)
+            if fcntl:
+                fcntl.flock(_scheduler_lock_fd, fcntl.LOCK_UN)
+            elif msvcrt:
+                # On Windows, just closing the file releases the lock if it was acquired via locking()
+                pass
             _scheduler_lock_fd.close()
         except:
             pass
         _scheduler_lock_fd = None
+

@@ -102,10 +102,10 @@ async def resolve_alerta(
 
 
 def _send_resolution_email(recipient: str, original_subject: str):
-    \"\"\"
+    """
     Sends a professional HTML reply email informing that the concessionária
     was not found in the system and needs review.
-    \"\"\"
+    """
     import base64
     import re
     from email.mime.text import MIMEText
@@ -136,7 +136,7 @@ def _send_resolution_email(recipient: str, original_subject: str):
 
     subject = f"{tipo_label} – {codigo_label} {code} – não reconhecida no cadastro"
 
-    body_html = f\"\"\"<!DOCTYPE html>
+    body_html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head><meta charset="UTF-8"></head>
 <body style="font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background-color: #f1f5f9;">
@@ -191,7 +191,7 @@ def _send_resolution_email(recipient: str, original_subject: str):
     </div>
   </div>
 </body>
-</html>\"\"\"
+</html>"""
 
     message = MIMEText(body_html, "html", "utf-8")
     message["To"] = recipient
@@ -229,7 +229,7 @@ async def count_alertas(
     _: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    \"\"\"Returns unread alert count, useful for the notification badge.\"\"\"
+    """Returns unread alert count, useful for the notification badge."""
     from sqlalchemy import func
     stmt = select(func.count(Alerta.id)).where(Alerta.lido == False, Alerta.resolvido == False)
     if allowed_condo_ids is not None:
