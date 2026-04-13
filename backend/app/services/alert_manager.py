@@ -17,6 +17,7 @@ from app.config import settings
 from app.models.alerta import Alerta
 from app.models.concessionaria import Concessionaria
 from app.models.fatura import Fatura
+from app.models.condominio import Condominio
 from app.services.email_sender import send_notification_email
 
 logger = logging.getLogger(__name__)
@@ -256,4 +257,72 @@ async def _dispatch_alert_emails(alerts: list[Alerta], fatura: Fatura, conc: Con
         logger.info(f"E-mail de alerta enviado para {recipient} (Thread: {msg_id})")
     else:
         logger.error(f"Falha ao enviar e-mail de alerta para {recipient}")
+
+
+async def check_mandate_expirations(db: AsyncSession) -> None:
+    """
+    Scheduled job: checks for mandate expirations (60, 30, 15 days before).
+    """
+    from datetime import date, timedelta
+    
+    today = date.today()
+    intervals = [60, 30, 15]
+    
+    # 1. Fetch all condominios with mandates
+    result = await db.execute(
+        select(Condominio)
+        .where(Condominio.mandato_fim.is_not(None), Condominio.ativo == True)
+    )
+    condos = result.scalars().all()
+    
+    for condo in condos:
+        days_left = (condo.mandato_fim.date() - today).days
+        
+        if days_left in intervals:
+            # Generate alert
+            msg = f"O mandato do síndico(a) do condomínio {condo.nome} vence em {days_left} dias ({condo.mandato_fim.strftime('%d/%m/%Y')})."
+            
+            # Check if alert already exists for this mandate and interval
+            existing = await db.execute(
+                select(Alerta).where(
+                    Alerta.condominio_id == condo.id,
+                    Alerta.tipo == "mandato_vencimento",
+                    Alerta.mensagem.ilike(f"%vence em {days_left} dias%")
+                )
+            )
+            if existing.scalar_one_or_none():
+                continue
+
+            alert = Alerta(
+                condominio_id=condo.id,
+                tipo="mandato_vencimento",
+                gravidade="media" if days_left > 15 else "alta",
+                mensagem=msg
+            )
+            db.add(alert)
+            
+            # Send Email to all concessionaire contacts
+            # Fetch email recipients from related concessionaires
+            conc_result = await db.execute(
+                select(Concessionaria.email_esperado)
+                .where(Concessionaria.condominio_id == condo.id, Concessionaria.email_esperado.is_not(None))
+            )
+            recipients = set(conc_result.scalars().all())
+            
+            if recipients:
+                subject = f"ALERTA: Vencimento de Mandato - {condo.nome}"
+                email_body = (
+                    f"Olá,\n\n"
+                    f"Este é um lembrete automático sobre o vencimento do mandato no condomínio {condo.nome}.\n\n"
+                    f"Mensagem: {msg}\n"
+                    f"Data de Vencimento: {condo.mandato_fim.strftime('%d/%m/%Y')}\n\n"
+                    "Por favor, providencie a documentação necessária para a nova eleição ou renovação.\n\n"
+                    "Atenciosamente,\n"
+                    "Equipe Datacron"
+                )
+                for rcpt in recipients:
+                    send_notification_email(to=rcpt, subject=subject, message_text=email_body)
+                    logger.info(f"Mandate alert ({days_left} days) sent to {rcpt} for condo {condo.id}")
+
+    await db.commit()
 

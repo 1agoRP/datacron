@@ -30,6 +30,7 @@ class Concessionaria(Base):
     dia_vencimento: Mapped[int] = mapped_column(Integer, nullable=False)
     valor_medio: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     nome_personalizado: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    leitura_individualizada: Mapped[bool] = mapped_column(Boolean, default=False)
     ativo: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

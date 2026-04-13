@@ -53,6 +53,9 @@ class CondominioCreate(BaseModel):
     cnpj: str
     sindico: str
     cpf_sindico: Optional[str] = None
+    mandato_inicio: Optional[datetime] = None
+    mandato_fim: Optional[datetime] = None
+    leitura_individualizada_ativa: Optional[bool] = False
 
     @field_validator("cnpj")
     @classmethod
@@ -83,6 +86,9 @@ class CondominioUpdate(BaseModel):
     endereco: Optional[str] = None
     sindico: Optional[str] = None
     cpf_sindico: Optional[str] = None
+    mandato_inicio: Optional[datetime] = None
+    mandato_fim: Optional[datetime] = None
+    leitura_individualizada_ativa: Optional[bool] = None
     ata_eleicao_base64: Optional[str] = None
     ata_eleicao_nome: Optional[str] = None
     ativo: Optional[bool] = None
@@ -96,6 +102,9 @@ class CondominioResponse(BaseModel):
     cnpj: str
     sindico: str
     cpf_sindico: Optional[str]
+    mandato_inicio: Optional[datetime] = None
+    mandato_fim: Optional[datetime] = None
+    leitura_individualizada_ativa: bool = False
     ata_eleicao_nome: Optional[str] = None
     ativo: bool
     created_at: datetime
@@ -119,6 +128,7 @@ class ConcessionariaCreate(BaseModel):
     dia_vencimento: int
     valor_medio: float = 0.0
     nome_personalizado: Optional[str] = None
+    leitura_individualizada: bool = False
 
 
 class ConcessionariaUpdate(BaseModel):
@@ -129,6 +139,7 @@ class ConcessionariaUpdate(BaseModel):
     dia_vencimento: Optional[int] = None
     valor_medio: Optional[float] = None
     nome_personalizado: Optional[str] = None
+    leitura_individualizada: Optional[bool] = None
     ativo: Optional[bool] = None
 
 
@@ -162,6 +173,7 @@ class ConcessionariaResponse(BaseModel):
     dia_vencimento: int
     valor_medio: float
     nome_personalizado: Optional[str] = None
+    leitura_individualizada: bool = False
     ativo: bool
     created_at: datetime
     condominio: Optional[CondominioMini] = None

@@ -25,7 +25,11 @@ class RegisterRequest(BaseModel):
     nome: str
     email: EmailStr
     senha: str
-    role: str = "operador"
+    role: str = "geral"
+
+class UserUpdate(BaseModel):
+    nome: Optional[str] = None
+    role: Optional[str] = None
 
 
 def _validate_password(senha: str) -> None:
@@ -103,6 +107,33 @@ async def update_password(
     await db.commit()
     
     return {"message": "Senha atualizada com sucesso"}
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_profile(
+    body: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Updates the user's profile information. Only admin can change name and role."""
+    update_data = body.model_dump(exclude_none=True)
+    
+    if not current_user.is_admin:
+        # Non-admins cannot change their name or role
+        if "nome" in update_data or "role" in update_data:
+            raise HTTPException(
+                status_code=403,
+                detail="Apenas administradores podem alterar o Nome ou o Cargo."
+            )
+    
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
+    
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+    
+    return current_user
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)

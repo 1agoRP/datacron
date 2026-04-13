@@ -84,7 +84,7 @@ async def create_condominio(
     body: CondominioCreate,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_role("admin")),
 ):
     """Creates a new condominio and its Gmail label."""
     # Check unique constraints
@@ -162,8 +162,19 @@ async def update_condominio(
     c = result.scalar_one_or_none()
     if not c:
         raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    
+    # RBAC: Only admin can edit core fields
+    update_data = body.model_dump(exclude_none=True)
+    if not current_user.is_admin:
+        restricted = {"nome", "endereco", "cnpj", "numero", "ativo"}
+        attempted_restricted = set(update_data.keys()) & restricted
+        if attempted_restricted:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Permissão insuficiente para editar os campos: {', '.join(attempted_restricted)}. Contate o administrador."
+            )
 
-    for field, value in body.model_dump(exclude_none=True).items():
+    for field, value in update_data.items():
         setattr(c, field, value)
 
     await db.commit()
@@ -175,7 +186,7 @@ async def update_condominio(
 async def delete_condominio(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_role("admin")),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Soft-deletes a condominio (sets ativo=False)."""

@@ -20,6 +20,7 @@ export default function ReajustesPage() {
   );
 
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const readOnly = isReadOnly(user);
 
   const [tab, setTab] = useState('Todos');
@@ -154,7 +155,7 @@ export default function ReajustesPage() {
           <h1 className="dc-page-title">Reajustes de Mercado</h1>
           <p className="dc-page-subtitle">Acompanhe os índices de mercado, reajustes trabalhistas e outros.</p>
         </div>
-        {!readOnly && (
+        {isAdmin && (
           <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
             <Plus size={16} /> Novo Registro
           </button>
@@ -249,7 +250,7 @@ export default function ReajustesPage() {
                     )}
                   </td>
                   <td>
-                    {!readOnly && (
+                    {isAdmin && (
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                         <button className="dc-icon-action" style={{ color: '#ef4444', background: '#fef2f2' }} title="Excluir" onClick={() => handleDelete(r.id)}>
                           <Trash2 size={15} />

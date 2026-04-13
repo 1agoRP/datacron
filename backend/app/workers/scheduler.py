@@ -19,7 +19,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import settings
 from app.services.email_monitor import run_email_scan
-from app.services.alert_manager import check_missing_bills
+from app.services.alert_manager import check_missing_bills, check_mandate_expirations
 from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,15 @@ async def _run_missing_bills_check():
             await check_missing_bills(db)
     except Exception as e:
         logger.error(f"Missing bills check failed: {e}")
+
+
+async def _run_mandate_check():
+    """Wrapper for the mandate expiration check."""
+    try:
+        async with AsyncSessionLocal() as db:
+            await check_mandate_expirations(db)
+    except Exception as e:
+        logger.error(f"Mandate check failed: {e}")
 
 
 def start_scheduler():
@@ -101,6 +110,15 @@ def start_scheduler():
         trigger=CronTrigger(hour=8, minute=0),
         id="missing_bills_check",
         name="Missing Bills Daily Check",
+        replace_existing=True,
+    )
+
+    # Mandate check — daily at 08:00 BRT
+    scheduler.add_job(
+        _run_mandate_check,
+        trigger=CronTrigger(hour=8, minute=5), # Run 5 mins after missing bills
+        id="mandate_check",
+        name="Mandate Expiration Check",
         replace_existing=True,
     )
 

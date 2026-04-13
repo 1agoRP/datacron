@@ -98,6 +98,7 @@ export default function ConcessionariasPage() {
   );
 
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const readOnly = isReadOnly(user);
 
   // SWR for condominios — needed for the create/edit modal dropdown
@@ -121,7 +122,8 @@ export default function ConcessionariasPage() {
     email_esperado: '',
     senha_manual: '',
     valor_medio: 0,
-    nome_personalizado: ''
+    nome_personalizado: '',
+    leitura_individualizada: false
   };
 
   const [formConc, setFormConc] = useState<any>({ ...defaultConc });
@@ -252,7 +254,8 @@ export default function ConcessionariasPage() {
       email_esperado: conc.email_esperado || '',
       senha_manual: conc.senha_manual || '',
       valor_medio: conc.valor_medio || 0,
-      nome_personalizado: conc.nome_personalizado || ''
+      nome_personalizado: conc.nome_personalizado || '',
+      leitura_individualizada: conc.leitura_individualizada || false
     });
     setEditingId(conc.id);
     setShowPassword(false);
@@ -339,15 +342,15 @@ export default function ConcessionariasPage() {
           <button className="dc-btn dc-btn-secondary" onClick={() => setIsHistoricoModalOpen(true)}>
             <History size={16} /> Histórico
           </button>
+          {isAdmin && (
+            <button className="dc-btn dc-btn-dark" onClick={() => setIsReajusteModalOpen(true)}>
+              <TrendingUp size={16} /> Aplicar Reajuste
+            </button>
+          )}
           {!readOnly && (
-            <>
-              <button className="dc-btn dc-btn-dark" onClick={() => setIsReajusteModalOpen(true)}>
-                <TrendingUp size={16} /> Aplicar Reajuste
-              </button>
-              <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
-                <Plus size={16} /> Vincular Nova
-              </button>
-            </>
+            <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
+              <Plus size={16} /> Vincular Nova
+            </button>
           )}
         </div>
       </div>
@@ -631,10 +634,20 @@ export default function ConcessionariasPage() {
                     <input className="dc-form-input" type="number" step="0.01" required disabled={readOnly} value={formConc.valor_medio} onChange={e => setFormConc({...formConc, valor_medio: parseFloat(e.target.value) || 0})} placeholder="Ex: 500.50" />
                   </div>
                 </div>
+
+                <div className="dc-form-group">
+                  <label className="dc-checkbox-wrapper">
+                    <input type="checkbox" checked={formConc.leitura_individualizada} onChange={e => setFormConc({...formConc, leitura_individualizada: e.target.checked})} disabled={readOnly} />
+                    <span>Esta conta possui Individualização de Leitura? (Leitura Individualizada)</span>
+                  </label>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4, marginLeft: 26 }}>
+                    Se ativado, as faturas processadas serão automaticamente encaminhadas para o setor de individualização.
+                  </p>
+                </div>
               </div>
               
               <div className="dc-modal-footer" style={{ justifyContent: 'space-between' }}>
-                {editingId && !readOnly ? (
+                {editingId && isAdmin ? (
                   <button type="button" className="dc-btn dc-btn-danger" onClick={handleDelete} style={{ gap: 8 }}>
                     <Trash2 size={15} /> Excluir
                   </button>

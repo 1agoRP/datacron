@@ -7,6 +7,9 @@ export interface Condominio {
   sindico: string;
   cpf_sindico: string;
   ata_eleicao_nome?: string | null;
+  mandato_inicio?: string | null;
+  mandato_fim?: string | null;
+  leitura_individualizada_ativa?: boolean;
   created_at: string;
 }
 
@@ -21,6 +24,7 @@ export interface Concessionaria {
   dia_vencimento: number;
   valor_medio: number | null;
   nome_personalizado?: string | null;
+  leitura_individualizada?: boolean;
   created_at: string;
   
   condominio?: Condominio;

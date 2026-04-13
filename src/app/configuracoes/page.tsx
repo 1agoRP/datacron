@@ -28,10 +28,20 @@ export default function ConfiguracoesPage() {
 
   // States for 'Perfil & Conta'
   const [form, setForm] = useState({
-    nome: 'Iago Prado Man',
-    email: 'iago@datacron.com.br',
-    cargo: 'Administrador Global'
+    nome: '',
+    email: '',
+    cargo: ''
   });
+
+  React.useEffect(() => {
+    if (user) {
+      setForm({
+        nome: user.nome,
+        email: user.email,
+        cargo: user.role
+      });
+    }
+  }, [user]);
 
   const [pwForm, setPwForm] = useState({
     senhaAtual: '',
@@ -69,12 +79,20 @@ export default function ConfiguracoesPage() {
     }
   };
 
-  const handleSaveProfile = () => {
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+  const handleSaveProfile = async () => {
+    try {
+      setIsSaving(true);
+      await api.updateProfile({
+        nome: form.nome,
+        role: form.cargo
+      });
       alert('Perfil atualizado com sucesso!');
-    }, 1000);
+    } catch (err: any) {
+      alert(err.message || 'Falha ao atualizar perfil');
+    } finally {
+      setIsSaving(true); // Small delay feel
+      setTimeout(() => setIsSaving(false), 500);
+    }
   };
 
   // Status Gmail
@@ -170,7 +188,7 @@ export default function ConfiguracoesPage() {
                   <input 
                     className="dc-form-input" 
                     type="text" 
-                    disabled={readOnly}
+                    disabled={!isAdmin}
                     value={form.nome}
                     onChange={(e) => setForm({ ...form, nome: e.target.value })} 
                   />
@@ -197,10 +215,13 @@ export default function ConfiguracoesPage() {
                     value={form.cargo}
                     onChange={(e) => setForm({ ...form, cargo: e.target.value })}
                   >
-                    <option>Administrador Global</option>
-                    <option>Operador Pleno</option>
-                    <option>Supervisor</option>
-                    <option>Somente Leitura</option>
+                    <option value="admin">Administrador Global</option>
+                    <option value="operador">Operador Pleno</option>
+                    <option value="supervisor">Supervisor</option>
+                    <option value="contabilidade">Contabilidade (Somente Leitura)</option>
+                    <option value="financeiro">Financeiro (Somente Leitura)</option>
+                    <option value="providencias">Providências (Somente Leitura)</option>
+                    <option value="geral">Geral (Somente Leitura)</option>
                   </select>
                 </div>
               </div>

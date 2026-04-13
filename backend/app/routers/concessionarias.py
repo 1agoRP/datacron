@@ -51,7 +51,7 @@ async def list_concessionarias(
 async def create_concessionaria(
     body: ConcessionariaCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    _: User = Depends(require_role("admin")),
 ):
     # Validate condominio exists and capture it
     result = await db.execute(select(Condominio).where(Condominio.id == body.condominio_id))
@@ -97,7 +97,7 @@ async def update_concessionaria(
     id: uuid.UUID,
     body: ConcessionariaUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    _: User = Depends(require_role("admin")),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(
@@ -129,7 +129,7 @@ async def update_concessionaria(
 async def delete_concessionaria(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    _: User = Depends(require_role("admin")),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Concessionaria).where(Concessionaria.id == id))
@@ -222,7 +222,7 @@ async def aplicar_reajuste(
     mes_aplicacao: str = Form(...),
     pdf_file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_role("admin")),
 ):
     """Applies a rate percentage increase to all concessionárias of a given type."""
     

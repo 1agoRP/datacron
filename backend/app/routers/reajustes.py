@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
-from app.dependencies import get_current_user, require_write
+from app.dependencies import get_current_user, require_write, require_role
 from app.models.reajuste_mercado import ReajusteMercado
 from app.schemas import ReajusteMercadoCreate, ReajusteMercadoResponse
 
@@ -56,7 +56,7 @@ async def create_reajuste(
     categoria_personalizada: Optional[str] = Form(None),
     pdf_file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write),
+    _: User = Depends(require_role("admin")),
 ):
     """Creates a new market rate adjustment with optional PDF."""
     
@@ -89,7 +89,7 @@ async def create_reajuste(
 async def delete_reajuste(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write),
+    _: User = Depends(require_role("admin")),
 ):
     """Deletes a reajuste."""
     result = await db.execute(select(ReajusteMercado).where(ReajusteMercado.id == id))

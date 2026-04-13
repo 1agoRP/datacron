@@ -31,6 +31,9 @@ class Condominio(Base):
     gerente_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     assistente_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     administradora: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    mandato_inicio: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    mandato_fim: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    leitura_individualizada_ativa: Mapped[bool] = mapped_column(default=False)
     ativo: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

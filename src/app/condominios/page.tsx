@@ -18,6 +18,7 @@ export default function CondominiosPage() {
   const { data: fetchCondos, isLoading: loading, mutate } = useSWR('condominios', () => api.getCondominios());
   const condos = fetchCondos || [];
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const readOnly = isReadOnly(user);
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,7 +29,10 @@ export default function CondominiosPage() {
     endereco: '',
     cnpj: '',
     sindico: '',
-    cpf_sindico: ''
+    cpf_sindico: '',
+    mandato_inicio: '',
+    mandato_fim: '',
+    leitura_individualizada_ativa: false
   });
   const [creating, setCreating] = useState(false);
 
@@ -61,7 +65,7 @@ export default function CondominiosPage() {
       setCreating(true);
       await api.createCondominio(newCondo);
       setIsModalOpen(false);
-      setNewCondo({ nome: '', numero: '', endereco: '', cnpj: '', sindico: '', cpf_sindico: '' });
+      setNewCondo({ nome: '', numero: '', endereco: '', cnpj: '', sindico: '', cpf_sindico: '', mandato_inicio: '', mandato_fim: '', leitura_individualizada_ativa: false });
       mutate();
       setCreating(false);
     } catch (err: any) {
@@ -216,6 +220,9 @@ export default function CondominiosPage() {
         endereco: editCondo.endereco,
         sindico: editCondo.sindico,
         cpf_sindico: editCondo.cpf_sindico,
+        mandato_inicio: editCondo.mandato_inicio,
+        mandato_fim: editCondo.mandato_fim,
+        leitura_individualizada_ativa: editCondo.leitura_individualizada_ativa
       });
       setEditCondo(null);
       mutate();
@@ -255,7 +262,7 @@ export default function CondominiosPage() {
           <h1 className="dc-page-title">Condomínios</h1>
           <p className="dc-page-subtitle">Gerencie sua base de clientes e acompanhe o status de cada unidade.</p>
         </div>
-        {!readOnly && (
+        {isAdmin && (
           <button className="dc-btn dc-btn-primary" onClick={() => setIsModalOpen(true)}>
             <Plus size={16} /> Adicionar Condomínio
           </button>
@@ -441,12 +448,28 @@ export default function CondominiosPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="dc-form-group">
                   <label>Nome do Síndico</label>
-                  <input required disabled={readOnly} value={newCondo.sindico} onChange={e => setNewCondo({...newCondo, sindico: e.target.value})} placeholder="Nome completo" />
+                  <input required value={newCondo.sindico} onChange={e => setNewCondo({...newCondo, sindico: e.target.value})} placeholder="Nome completo" />
                 </div>
                 <div className="dc-form-group">
                   <label>CPF do Síndico</label>
-                  <input disabled={readOnly} value={newCondo.cpf_sindico} onChange={e => setNewCondo({...newCondo, cpf_sindico: e.target.value})} placeholder="000.000.000-00" />
+                  <input value={newCondo.cpf_sindico} onChange={e => setNewCondo({...newCondo, cpf_sindico: e.target.value})} placeholder="000.000.000-00" />
                 </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="dc-form-group">
+                  <label>Mandato Síndico (Início)</label>
+                  <input type="date" value={newCondo.mandato_inicio} onChange={e => setNewCondo({...newCondo, mandato_inicio: e.target.value})} />
+                </div>
+                <div className="dc-form-group">
+                  <label>Mandato Síndico (Fim)</label>
+                  <input type="date" value={newCondo.mandato_fim} onChange={e => setNewCondo({...newCondo, mandato_fim: e.target.value})} />
+                </div>
+              </div>
+              <div className="dc-form-group">
+                <label className="dc-checkbox-wrapper">
+                  <input type="checkbox" checked={newCondo.leitura_individualizada_ativa} onChange={e => setNewCondo({...newCondo, leitura_individualizada_ativa: e.target.checked})} />
+                  <span>Este condomínio possui Leitura Individualizada?</span>
+                </label>
               </div>
               <div className="dc-modal-footer">
                 <button type="button" className="dc-btn dc-btn-secondary" onClick={() => setIsModalOpen(false)}>Cancelar</button>
@@ -471,11 +494,27 @@ export default function CondominiosPage() {
             <form onSubmit={handleUpdate} className="dc-modal-body dc-space-y-4">
               <div className="dc-form-group">
                 <label>Nome do Condomínio</label>
-                <input required disabled={readOnly} value={editCondo.nome} onChange={e => setEditCondo({...editCondo, nome: e.target.value})} className="dc-form-input" />
+                <input required disabled={!isAdmin} value={editCondo.nome} onChange={e => setEditCondo({...editCondo, nome: e.target.value})} className="dc-form-input" />
               </div>
               <div className="dc-form-group">
                 <label>Endereço Completo</label>
-                <input required disabled={readOnly} value={editCondo.endereco} onChange={e => setEditCondo({...editCondo, endereco: e.target.value})} className="dc-form-input" />
+                <input required disabled={!isAdmin} value={editCondo.endereco} onChange={e => setEditCondo({...editCondo, endereco: e.target.value})} className="dc-form-input" />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="dc-form-group">
+                  <label>Mandato Síndico (Início)</label>
+                  <input type="date" value={editCondo.mandato_inicio || ''} onChange={e => setEditCondo({...editCondo, mandato_inicio: e.target.value})} className="dc-form-input" />
+                </div>
+                <div className="dc-form-group">
+                  <label>Mandato Síndico (Fim)</label>
+                  <input type="date" value={editCondo.mandato_fim || ''} onChange={e => setEditCondo({...editCondo, mandato_fim: e.target.value})} className="dc-form-input" />
+                </div>
+              </div>
+              <div className="dc-form-group">
+                 <label className="dc-checkbox-wrapper">
+                  <input type="checkbox" checked={editCondo.leitura_individualizada_ativa || false} onChange={e => setEditCondo({...editCondo, leitura_individualizada_ativa: e.target.checked})} />
+                  <span>Ativar Leitura Individualizada para este Condomínio</span>
+                </label>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="dc-form-group">
@@ -484,14 +523,18 @@ export default function CondominiosPage() {
                 </div>
                 <div className="dc-form-group">
                   <label>CPF do Síndico</label>
-                  <input disabled={readOnly} value={editCondo.cpf_sindico || ''} onChange={e => setEditCondo({...editCondo, cpf_sindico: e.target.value})} className="dc-form-input" />
+                  <input value={editCondo.cpf_sindico || ''} onChange={e => setEditCondo({...editCondo, cpf_sindico: e.target.value})} className="dc-form-input" />
                 </div>
               </div>
               
               <div className="dc-modal-footer" style={{ justifyContent: 'space-between', padding: '16px 0 0 0', marginTop: 10 }}>
-                <button type="button" className="dc-btn dc-btn-danger" style={{ gap: 8 }} onClick={() => handleDelete(editCondo.id)}>
-                  <Trash2 size={15} /> Excluir
-                </button>
+                <div>
+                  {isAdmin && (
+                    <button type="button" className="dc-btn dc-btn-danger" style={{ gap: 8 }} onClick={() => handleDelete(editCondo.id)}>
+                      <Trash2 size={15} /> Excluir
+                    </button>
+                  )}
+                </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button type="button" className="dc-btn dc-btn-secondary" onClick={() => setEditCondo(null)}>Cancelar</button>
                   <button type="submit" className="dc-btn dc-btn-primary" disabled={creating} style={{ minWidth: 140 }}>

@@ -388,7 +388,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         email_log.status = "processado"
         await db.commit()
         return condo_name
-
+    saved_paths = []
     for filename, pdf_bytes in attachments:
         unlocked_bytes = unlock_pdf(pdf_bytes, password)
         pdf_unlocked = unlocked_bytes is not None
@@ -400,6 +400,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             safe_filename = f"{msg_id.replace('<', '').replace('>', '')}_{filename}".replace("/", "_")
             
         pdf_path = save_pdf(final_bytes, safe_filename)
+        saved_paths.append(pdf_path)
 
         extracted = extract_data(final_bytes)
         for k, v in body_data.items():
@@ -443,6 +444,29 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
 
         if conc:
             await check_and_create_alerts(fatura, conc, db)
+            
+            # Forward if individualized reading is active
+            if conc.leitura_individualizada:
+                forward_to = "assistente.gerencia4@propstarter.com.br"
+                subject_fwd = f"ENCAMINHADO: Leitura Individualizada - {condo_name or 'N/A'}"
+                body_fwd = (
+                    f"Fatura com leitura individualizada identificada.\n\n"
+                    f"Condomínio: {condo_name or 'N/A'}\n"
+                    f"Concessionária: {conc.tipo}\n"
+                    f"Instalação: {conc.instalacao}\n"
+                    f"Referência: {referencia}\n\n"
+                    "Arquivo anexo para providências."
+                )
+                success_fwd = send_notification_email(
+                    to=forward_to,
+                    subject=subject_fwd,
+                    message_text=body_fwd,
+                    attachments=saved_paths # Forward all saved PDF paths
+                )
+                if success_fwd:
+                    logger.info(f"Fatura individualizada encaminhada para {forward_to}")
+                else:
+                    logger.error(f"Falha ao encaminhar fatura individualizada para {forward_to}")
 
     await db.commit()
     logger.info(f"Email {msg_id} processed successfully")
