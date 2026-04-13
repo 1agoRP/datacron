@@ -42,7 +42,9 @@ export interface Fatura {
   gmail_message_id?: string | null;
   dados_extraidos?: Record<string, any> | null;
   variacao_percentual?: number | null;
+  debito_automatico?: boolean;
   created_at: string;
+
 
   condominio?: Condominio;
   concessionaria?: Concessionaria;
