@@ -12,6 +12,7 @@ import Select from 'react-select';
 import useSWR from 'swr';
 import { formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { isReadOnly } from '@/types';
 
 const CONTRACT_TYPES = [
   'Elevadores',

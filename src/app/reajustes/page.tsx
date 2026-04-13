@@ -6,7 +6,7 @@ import { Plus, Search, Trash2, ArrowUpDown, TrendingUp, Download, Eye, FileText,
 import { api } from '@/lib/api';
 import useSWR from 'swr';
 import { useAuth } from '@/context/AuthContext';
-import { ReajusteMercado } from '@/types';
+import { ReajusteMercado, isReadOnly } from '@/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
