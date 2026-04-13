@@ -115,10 +115,9 @@ def get_inbox_count() -> int:
             pass
 
 # Removed send_notification_email (moved to email_sender.py)
-e
-
 
 def get_pdf_attachments(msg) -> list[tuple[str, bytes]]:
+
     """Downloads all PDF attachments from an email message."""
     attachments = []
     if msg.is_multipart():
@@ -148,6 +147,7 @@ def get_pdf_attachments(msg) -> list[tuple[str, bytes]]:
 
 
 async def find_concessionaria(
+
     sender: str, subject: str, body_text: str, db: AsyncSession
 ) -> tuple[Optional[Concessionaria], Optional[str]]:
     """Matches sender, subject, and body text to a registered concessionaria."""

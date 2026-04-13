@@ -106,6 +106,7 @@ def _send_resolution_email(recipient: str, original_subject: str):
     Sends a professional HTML reply email informing that the concessionária
     was not found in the system and needs review.
     """
+
     import base64
     import re
     from email.mime.text import MIMEText
