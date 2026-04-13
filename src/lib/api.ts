@@ -154,6 +154,13 @@ class ApiClient {
     return this.request<User>('/auth/me');
   }
 
+  async updateProfile(data: { nome: string; role: string }) {
+    return this.request('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Dashboard & Stats
   async getDashboardStats() {
     const [faturas, alertas, countAlertas] = await Promise.all([
