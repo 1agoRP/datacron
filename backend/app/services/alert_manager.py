@@ -17,8 +17,10 @@ from app.config import settings
 from app.models.alerta import Alerta
 from app.models.concessionaria import Concessionaria
 from app.models.fatura import Fatura
+from app.services.email_sender import send_notification_email
 
 logger = logging.getLogger(__name__)
+
 
 
 async def check_and_create_alerts(
@@ -30,15 +32,30 @@ async def check_and_create_alerts(
     Runs all alert checks for a newly processed fatura.
     Adds any generated alerts to the DB session (caller must commit).
     """
-    await _check_value_variation(fatura, conc, db)
-    await _check_pdf_failure(fatura, db)
+    alerts = []
+    
+    # 1. Check variation
+    var_alert = await _check_value_variation(fatura, conc, db)
+    if var_alert:
+        alerts.append(var_alert)
+        
+    # 2. Check PDF failure
+    pdf_alert = await _check_pdf_failure(fatura, db)
+    if pdf_alert:
+        alerts.append(pdf_alert)
+
+    # 3. Send emails for any new alerts
+    if alerts:
+        await _dispatch_alert_emails(alerts, fatura, conc)
+
 
 
 async def _check_value_variation(
     fatura: Fatura,
     conc: Concessionaria,
     db: AsyncSession,
-) -> None:
+) -> Optional[Alerta]:
+
     """
     Calculates the average of the last 6 faturas for this concessionaria.
     If the new fatura deviates more than the configured threshold (default 20%),
@@ -85,12 +102,19 @@ async def _check_value_variation(
         )
         db.add(alert)
         logger.info(f"Alert created: value variation {pct}% for fatura {fatura.id}")
+        
+        # Update labels/history
+        conc.valor_medio = round(avg_valor, 2)
+        return alert
 
     # Update the running average on the concessionaria record
     conc.valor_medio = round(avg_valor, 2)
+    return None
 
 
-async def _check_pdf_failure(fatura: Fatura, db: AsyncSession) -> None:
+
+async def _check_pdf_failure(fatura: Fatura, db: AsyncSession) -> Optional[Alerta]:
+
     """Creates an alert if the PDF could not be unlocked."""
     if not fatura.pdf_desbloqueado and fatura.pdf_path:
         alert = Alerta(
@@ -105,6 +129,9 @@ async def _check_pdf_failure(fatura: Fatura, db: AsyncSession) -> None:
         )
         db.add(alert)
         logger.info(f"Alert created: PDF unlock failure for fatura {fatura.id}")
+        return alert
+    return None
+
 
 
 async def check_missing_bills(db: AsyncSession) -> None:
@@ -171,3 +198,62 @@ async def check_missing_bills(db: AsyncSession) -> None:
         logger.info(f"Alert created: missing bill for concessionaria {conc.id}")
 
     await db.commit()
+
+
+async def _dispatch_alert_emails(alerts: list[Alerta], fatura: Fatura, conc: Concessionaria) -> None:
+    """Sends combined alert details via email to the expected recipient."""
+    # Use the expected email address registered with the concessionaire
+    recipient = conc.email_esperado
+    if not recipient:
+        logger.warning(f"Não foi possível enviar alerta por e-mail: Concessionária {conc.id} não possui 'email_esperado'.")
+        return
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.models.condominio import Condominio
+    
+    # Ensure condominio is loaded for the name
+    condo_name = conc.condominio.nome if conc.condominio else "N/A"
+    subject = f"ALERTA: Problema identificado na Fatura - {condo_name} ({fatura.referencia})"
+    
+    body_lines = [
+        f"Olá,",
+        f"",
+        f"Foram identificados os seguintes alertas para o condomínio {condo_name}:",
+        f"",
+    ]
+    
+    for alert in alerts:
+        body_lines.append(f"• [{alert.tipo.upper()}] {alert.mensagem}")
+    
+    body_lines.extend([
+        f"",
+        f"Detalhes da Fatura:",
+        f"- Concessionária: {conc.tipo} ({conc.instalacao})",
+        f"- Referência: {fatura.referencia}",
+        f"- Valor: R$ {fatura.valor:.2f}",
+        f"- Vencimento: {fatura.vencimento.strftime('%d/%m/%Y') if fatura.vencimento else 'N/A'}",
+        f"",
+        f"Por favor, verifique o painel do Datacron para mais detalhes.",
+        f"",
+        f"Atenciosamente,",
+        f"Equipe Datacron"
+    ])
+    
+    body = "\n".join(body_lines)
+    
+    # Thread back to the original email Message-ID
+    msg_id = fatura.gmail_message_id
+    
+    success = send_notification_email(
+        to=recipient,
+        subject=subject,
+        message_text=body,
+        in_reply_to=msg_id
+    )
+    
+    if success:
+        logger.info(f"E-mail de alerta enviado para {recipient} (Thread: {msg_id})")
+    else:
+        logger.error(f"Falha ao enviar e-mail de alerta para {recipient}")
+

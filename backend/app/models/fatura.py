@@ -49,7 +49,9 @@ class Fatura(Base):
 
     # Analysis
     variacao_percentual: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    debito_automatico: Mapped[bool] = mapped_column(Boolean, default=False)
     erro_msg: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

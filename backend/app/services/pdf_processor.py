@@ -73,9 +73,11 @@ def extract_data(pdf_bytes: bytes) -> Dict[str, Any]:
         "consumo_kwh": None,
         "referencia": None,
         "numero_instalacao": None,
+        "debito_automatico": False,
         "texto_completo": None,
         "metodo": "direto"
     }
+
 
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
@@ -183,17 +185,69 @@ def _parse_fields(text: str, result: Dict[str, Any]):
         "MAIO": "05", "JUNHO": "06", "JULHO": "07", "AGOSTO": "08", "SETEMBRO": "09", 
         "OUTUBRO": "10", "NOVEMBRO": "11", "DEZEMBRO": "12"
     }
-    month_names = "|".join(month_map.keys())
-    ref_match = re.search(rf"({month_names})[\s\/\-]+(\d{{4}})", text, re.IGNORECASE)
-    if ref_match:
-        m_name = ref_match.group(1).upper()
-        year = ref_match.group(2)
-        result["referencia"] = f"{m_name.capitalize()}/{year}"
-    else:
-        # Try numeric ref: mm/yyyy
-        numeric_ref = re.search(r"(\d{2})\/(\d{4})", text)
-        if numeric_ref:
-            result["referencia"] = f"{numeric_ref.group(1)}/{numeric_ref.group(2)}"
+    
+    # ─── Special Logic: Sabesp ───
+    if "SABESP" in text.upper() or "SANEAMENTO BASICO" in text.upper():
+        emission_match = re.search(r"DATA\s+EMISS[AÃ]O[:\s]*(\d{2})/(\d{2})/(\d{4})", text, re.IGNORECASE)
+        if emission_match:
+            day = int(emission_match.group(1))
+            month = int(emission_match.group(2))
+            year = int(emission_match.group(3))
+            
+            ref_month = month
+            ref_year = year
+            
+            if day <= 15:
+                ref_month = month - 1
+                if ref_month == 0:
+                    ref_month = 12
+                    ref_year = year - 1
+            
+            # Map back to month name
+            month_name_map = {int(v): k for k, v in month_map.items() if len(k) > 3}
+            # Fallback to Portuguese names
+            month_name = month_name_map.get(ref_month, "Janeiro").capitalize()
+            result["referencia"] = f"{month_name}/{ref_year}"
+            logger.info(f"Sabesp reference calculated: {result['referencia']} (Emission: {day}/{month}/{year})")
+            
+    # Standard extraction if Sabesp logic didn't trigger or failed
+    if not result["referencia"]:
+        month_names = "|".join(month_map.keys())
+        ref_match = re.search(rf"({month_names})[\s\/\-]+(\d{{4}})", text, re.IGNORECASE)
+        if ref_match:
+            m_name = ref_match.group(1).upper()
+            year = ref_match.group(2)
+            result["referencia"] = f"{m_name.capitalize()}/{year}"
+        else:
+            # Try numeric ref: mm/yyyy
+            numeric_ref = re.search(r"(\d{2})\/(\d{4})", text)
+            if numeric_ref:
+                result["referencia"] = f"{numeric_ref.group(1)}/{numeric_ref.group(2)}"
+
+    # ─── Débito Automático ────────────────────────────────────
+    # Look for "DÉBITO AUTOMÁTICO" and analyze context
+    if "DÉBITO AUTOMÁTICO" in text.upper():
+        # High-confidence indicators for "Passive/Inactive" (Invitation to register)
+        inactive_indicators = ["CADASTRE", "CADASTRAR", "USE O CÓDIGO", "PARA ADERIR"]
+        # High-confidence indicators for "Active" (Notice of payment)
+        active_indicators = ["CONSIDERAR ESTA FATURA QUITADA", "CADASTRADA EM DÉBITOautomático"]
+        
+        text_upper = text.upper()
+        is_active = False
+        
+        # If it specifically says to consider it paid, it's active
+        if any(ind in text_upper for ind in active_indicators):
+            is_active = True
+        # If it says "CADASTRE" or similar, and NOT the active indicators, it's likely inactive
+        elif any(ind in text_upper for ind in inactive_indicators):
+            is_active = False
+        else:
+            # Heuristic: if "Débito Automático" exists without invitation to join, we assume it's mention of status
+            # But let's be conservative. If we find "Quitada" near it, it's active.
+            is_active = False # Default to false for safety
+            
+        result["debito_automatico"] = is_active
+
 
     # ─── Número de Instalação ────────────────────────────────
     patterns_install = [

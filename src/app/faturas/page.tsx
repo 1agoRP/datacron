@@ -94,7 +94,9 @@ export default function FaturasPage() {
           case 'vencimento': valA = a.vencimento || ''; valB = b.vencimento || ''; break;
           case 'referencia': valA = a.referencia || ''; valB = b.referencia || ''; break;
           case 'status': valA = a.status || ''; valB = b.status || ''; break;
+          case 'debito': valA = a.debito_automatico ? 1 : 0; valB = b.debito_automatico ? 1 : 0; break;
           default: valA = a.created_at || ''; valB = b.created_at || '';
+
         }
 
         if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -343,14 +345,19 @@ export default function FaturasPage() {
                 <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Status IA <SortIcon column="status" /></div>
                 </th>
+                <th onClick={() => handleSort('debito')} style={{ cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Débito Automático <SortIcon column="debito" /></div>
+                </th>
                 <th style={{ textAlign: 'right' }}>Ações</th>
+
               </tr>
             </thead>
 
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
+                <tr><td colSpan={9} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
               ) : filteredAndSorted.map((f: any) => {
+
                 const isOk = f.status === 'processada';
                 return (
                   <tr key={f.id}>
@@ -388,6 +395,18 @@ export default function FaturasPage() {
                         {f.status ? f.status.charAt(0).toUpperCase() + f.status.slice(1) : 'Pendente'}
                       </span>
                     </td>
+                    <td>
+                      {f.debito_automatico ? (
+                        <span className="dc-badge dc-badge-green" style={{ fontSize: '0.72rem', background: '#ecfdf5', color: '#059669', borderColor: '#10b981' }}>
+                           <span className="dc-badge-dot" style={{ background: '#10b981' }} /> Ativo
+                        </span>
+                      ) : (
+                        <span className="dc-badge" style={{ fontSize: '0.72rem', background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' }}>
+                           Inativo
+                        </span>
+                      )}
+                    </td>
+
 
                     <td>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
@@ -414,7 +433,8 @@ export default function FaturasPage() {
               })}
               {!loading && filteredAndSorted.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+
                      Nenhuma fatura encontrada.
                   </td>
                 </tr>

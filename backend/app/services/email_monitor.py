@@ -16,11 +16,11 @@ from pathlib import Path
 from typing import Optional
 
 import imaplib
-import smtplib
 import email
-from email.message import EmailMessage
 from email.utils import parsedate_to_datetime
 from email.header import decode_header
+from app.services.email_sender import send_notification_email
+
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -114,26 +114,8 @@ def get_inbox_count() -> int:
         except:
             pass
 
-
-def send_notification_email(to: str, subject: str, message_text: str) -> bool:
-    """Sends an email using Gmail SMTP."""
-    if not settings.GMAIL_USER or not settings.GMAIL_PASSWORD:
-        logger.error("Credenciais do Gmail não configuradas para enviar e-mail.")
-        return False
-    try:
-        msg = EmailMessage()
-        msg.set_content(message_text)
-        msg["To"] = to
-        msg["From"] = settings.GMAIL_USER
-        msg["Subject"] = subject
-        
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(settings.GMAIL_USER, settings.GMAIL_PASSWORD)
-            server.send_message(msg)
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send email to {to}: {str(e)}")
-        return False
+# Removed send_notification_email (moved to email_sender.py)
+e
 
 
 def get_pdf_attachments(msg) -> list[tuple[str, bytes]]:
@@ -450,7 +432,9 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             pdf_desbloqueado=pdf_unlocked,
             pdf_nome_original=safe_filename,
             dados_extraidos=extracted,
+            debito_automatico=extracted.get("debito_automatico", False),
         )
+
         db.add(fatura)
         await db.flush()
 

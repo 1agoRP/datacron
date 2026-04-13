@@ -196,10 +196,11 @@ class FaturaResponse(BaseModel):
     email_remetente: Optional[str]
     email_assunto: Optional[str]
     pdf_desbloqueado: bool
-    dados_extraidos: Optional[dict[str, Any]]
     variacao_percentual: Optional[float]
+    debito_automatico: bool = False
     created_at: datetime
     updated_at: datetime
+
 
     # Nested data
     condominio: Optional[CondominioMini] = None
