@@ -15,7 +15,7 @@ type SortField = 'nome' | 'numero';
 type SortDir = 'asc' | 'desc';
 
 export default function CondominiosPage() {
-  const { data: fetchCondos, isLoading: loading, mutate } = useSWR('condominios', () => api.getCondominios({ limit: 1000 }));
+  const { data: fetchCondos, isLoading: loading, mutate } = useSWR(['condominios', 'full'], () => api.getCondominios({ limit: 1000 }));
   const condos = fetchCondos || [];
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
