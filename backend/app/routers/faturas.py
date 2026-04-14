@@ -26,7 +26,7 @@ async def list_faturas(
     status: Optional[str] = None,
     referencia: Optional[str] = None,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, le=200),
+    limit: int = Query(100, le=1000),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),

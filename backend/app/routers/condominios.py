@@ -32,7 +32,7 @@ async def list_condominios(
     search: Optional[str] = Query(None, description="Busca por nome, número ou CNPJ"),
     ativo: bool = Query(True),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, le=200),
+    limit: int = Query(500, le=1000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
