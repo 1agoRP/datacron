@@ -38,11 +38,9 @@ async def list_condominios(
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Lists all condominios with optional search and pagination."""
-    stmt = (
-        select(Condominio)
-        .options(selectinload(Condominio.concessionarias))
-        .where(Condominio.ativo == ativo)
-    )
+    from app.models.concessionaria import Concessionaria
+
+    stmt = select(Condominio).where(Condominio.ativo == ativo)
     # RBAC: filter by user's assigned condominios
     if allowed_condo_ids is not None:
         stmt = stmt.where(Condominio.id.in_(allowed_condo_ids))
@@ -57,11 +55,28 @@ async def list_condominios(
     result = await db.execute(stmt)
     condominios = result.scalars().all()
 
-    # Count faturas received THIS MONTH for all condominios in one query
+    if not condominios:
+        return []
+
+    condo_ids = [c.id for c in condominios]
+
+    # Count active concessionárias (contas_esperadas) per condo — scoped to result set
+    conc_counts_result = await db.execute(
+        select(Concessionaria.condominio_id, func.count(Concessionaria.id))
+        .where(
+            Concessionaria.condominio_id.in_(condo_ids),
+            Concessionaria.ativo == True,
+        )
+        .group_by(Concessionaria.condominio_id)
+    )
+    conc_counts = dict(conc_counts_result.all())
+
+    # Count faturas received THIS MONTH — scoped to result set
     now = datetime.now()
     fatura_counts_result = await db.execute(
         select(Fatura.condominio_id, func.count(Fatura.id))
         .where(
+            Fatura.condominio_id.in_(condo_ids),
             extract("year", Fatura.created_at) == now.year,
             extract("month", Fatura.created_at) == now.month,
         )
@@ -71,9 +86,8 @@ async def list_condominios(
 
     responses = []
     for c in condominios:
-        count_exp = len(c.concessionarias)
         resp = CondominioResponse.model_validate(c)
-        resp.contas_esperadas = count_exp
+        resp.contas_esperadas = conc_counts.get(c.id, 0)
         resp.contas_recebidas = fatura_counts.get(c.id, 0)
         responses.append(resp)
     return responses
