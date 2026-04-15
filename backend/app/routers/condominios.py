@@ -38,59 +38,87 @@ async def list_condominios(
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Lists all condominios with optional search and pagination."""
-    from app.models.concessionaria import Concessionaria
+    from sqlalchemy import text
 
-    stmt = select(Condominio).where(Condominio.ativo == ativo)
-    # RBAC: filter by user's assigned condominios
+    # Build filter conditions for the raw SQL
+    where_clauses = ["c.ativo = :ativo"]
+    params: dict = {"ativo": ativo, "skip": skip, "limit": limit}
+
     if allowed_condo_ids is not None:
-        stmt = stmt.where(Condominio.id.in_(allowed_condo_ids))
+        # Convert UUIDs to strings for the SQL IN clause
+        if not allowed_condo_ids:
+            return []  # No access to any condo
+        params["condo_ids"] = [str(cid) for cid in allowed_condo_ids]
+        where_clauses.append("c.id = ANY(:condo_ids::uuid[])")
+
     if search:
         safe = _escape_like(search)
-        stmt = stmt.where(
-            Condominio.nome.ilike(f"%{safe}%")
-            | Condominio.numero.ilike(f"%{safe}%")
-            | Condominio.cnpj.ilike(f"%{safe}%")
+        params["search"] = f"%{safe}%"
+        where_clauses.append(
+            "(c.nome ILIKE :search OR c.numero ILIKE :search OR c.cnpj ILIKE :search)"
         )
-    stmt = stmt.order_by(Condominio.nome).offset(skip).limit(limit)
-    result = await db.execute(stmt)
-    condominios = result.scalars().all()
 
-    if not condominios:
-        return []
-
-    condo_ids = [c.id for c in condominios]
-
-    # Count active concessionárias (contas_esperadas) per condo — scoped to result set
-    conc_counts_result = await db.execute(
-        select(Concessionaria.condominio_id, func.count(Concessionaria.id))
-        .where(
-            Concessionaria.condominio_id.in_(condo_ids),
-            Concessionaria.ativo == True,
-        )
-        .group_by(Concessionaria.condominio_id)
-    )
-    conc_counts = dict(conc_counts_result.all())
-
-    # Count faturas received THIS MONTH — scoped to result set
     now = datetime.now()
-    fatura_counts_result = await db.execute(
-        select(Fatura.condominio_id, func.count(Fatura.id))
-        .where(
-            Fatura.condominio_id.in_(condo_ids),
-            extract("year", Fatura.created_at) == now.year,
-            extract("month", Fatura.created_at) == now.month,
-        )
-        .group_by(Fatura.condominio_id)
-    )
-    fatura_counts = dict(fatura_counts_result.all())
+    params["year"] = now.year
+    params["month"] = now.month
+
+    where_sql = " AND ".join(where_clauses)
+
+    sql = text(f"""
+        SELECT
+            c.id, c.nome, c.numero, c.endereco, c.cnpj,
+            c.sindico, c.cpf_sindico,
+            c.ata_eleicao_nome,
+            c.mandato_inicio, c.mandato_fim,
+            c.leitura_individualizada_ativa, c.ativo,
+            c.created_at, c.updated_at,
+            COALESCE(cv.total, 0) AS contas_esperadas,
+            COALESCE(fv.total, 0) AS contas_recebidas
+        FROM condominios c
+        LEFT JOIN (
+            SELECT condominio_id, COUNT(id) AS total
+            FROM concessionarias_vinculadas
+            WHERE ativo = true
+            GROUP BY condominio_id
+        ) cv ON cv.condominio_id = c.id
+        LEFT JOIN (
+            SELECT condominio_id, COUNT(id) AS total
+            FROM faturas
+            WHERE EXTRACT(year FROM created_at) = :year
+              AND EXTRACT(month FROM created_at) = :month
+            GROUP BY condominio_id
+        ) fv ON fv.condominio_id = c.id
+        WHERE {where_sql}
+        ORDER BY c.nome
+        LIMIT :limit OFFSET :skip
+    """)
+
+    result = await db.execute(sql, params)
+    rows = result.mappings().all()
 
     responses = []
-    for c in condominios:
-        resp = CondominioResponse.model_validate(c)
-        resp.contas_esperadas = conc_counts.get(c.id, 0)
-        resp.contas_recebidas = fatura_counts.get(c.id, 0)
+    for row in rows:
+        resp = CondominioResponse(
+            id=row["id"],
+            nome=row["nome"],
+            numero=row["numero"],
+            endereco=row["endereco"],
+            cnpj=row["cnpj"],
+            sindico=row["sindico"],
+            cpf_sindico=row["cpf_sindico"],
+            ata_eleicao_nome=row["ata_eleicao_nome"],
+            mandato_inicio=row["mandato_inicio"],
+            mandato_fim=row["mandato_fim"],
+            leitura_individualizada_ativa=row["leitura_individualizada_ativa"],
+            ativo=row["ativo"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            contas_esperadas=row["contas_esperadas"],
+            contas_recebidas=row["contas_recebidas"],
+        )
         responses.append(resp)
     return responses
+
 
 
 @router.post("/", response_model=CondominioResponse, status_code=201)
