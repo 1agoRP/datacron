@@ -1,30 +1,38 @@
+import logging
+
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+
 # ─── Engine Configuration ─────────────────────────────────────
-# For Supabase / PgBouncer in transaction mode, we MUST:
-# 1. Disable the prepared statement cache (statement_cache_size=0)
-# 2. Use NullPool to avoid keeping connections open in the pooler
+# Supabase PgBouncer Transaction mode (port 6543) does NOT support
+# PREPARE statements, which asyncpg's set_type_codec requires internally.
+# Solution: Use Session mode (port 5432) which fully supports PREPARE.
+# With NullPool, each request creates/destroys its own connection, so
+# session mode works perfectly — server connections are released immediately.
 
 db_url = settings.DATABASE_URL
-# For Supabase / PgBouncer, ensure the URL has the correct driver
+
+# Ensure async driver
 if db_url.startswith("postgresql://"):
     db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-def _get_unnamed_statement():
-    return ""
+# Auto-switch from Transaction pooler (6543) to Session pooler (5432)
+if "pooler.supabase.com:6543" in db_url:
+    db_url = db_url.replace(
+        "pooler.supabase.com:6543",
+        "pooler.supabase.com:5432",
+    )
+    logger.info("Switched Supabase pooler from transaction mode (6543) to session mode (5432)")
 
 engine = create_async_engine(
     db_url,
     poolclass=NullPool,
     connect_args={
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
-        "prepared_statement_name_func": _get_unnamed_statement,
-        "max_cached_statement_lifetime": 0,
         "server_settings": {
             "application_name": "datacron_api",
         },
