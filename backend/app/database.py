@@ -25,7 +25,6 @@ engine = create_async_engine(
         "prepared_statement_cache_size": 0,
         "prepared_statement_name_func": _get_unnamed_statement,
         "max_cached_statement_lifetime": 0,
-        "command_timeout": 30,
         "server_settings": {
             "application_name": "datacron_api",
         },

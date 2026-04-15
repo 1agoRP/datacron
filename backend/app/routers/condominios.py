@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, U
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, and_, extract
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, defer
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_write, get_user_condo_ids, require_role
@@ -40,8 +40,12 @@ async def list_condominios(
     """Lists all condominios with optional search and pagination."""
     from app.models.concessionaria import Concessionaria
 
-    # Query 1: Fetch condominios (no eager loading)
-    stmt = select(Condominio).where(Condominio.ativo == ativo)
+    # Query 1: Fetch condominios (no eager loading, exclude heavy base64 column)
+    stmt = (
+        select(Condominio)
+        .options(defer(Condominio.ata_eleicao_base64))
+        .where(Condominio.ativo == ativo)
+    )
     if allowed_condo_ids is not None:
         stmt = stmt.where(Condominio.id.in_(allowed_condo_ids))
     if search:
