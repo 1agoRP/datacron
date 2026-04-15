@@ -38,84 +38,66 @@ async def list_condominios(
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Lists all condominios with optional search and pagination."""
-    from sqlalchemy import text
+    from app.models.concessionaria import Concessionaria
 
-    # Build filter conditions for the raw SQL
-    where_clauses = ["c.ativo = :ativo"]
-    params: dict = {"ativo": ativo, "skip": skip, "limit": limit}
-
+    # Query 1: Fetch condominios (no eager loading)
+    stmt = select(Condominio).where(Condominio.ativo == ativo)
     if allowed_condo_ids is not None:
-        # Convert UUIDs to strings for the SQL IN clause
-        if not allowed_condo_ids:
-            return []  # No access to any condo
-        params["condo_ids"] = [str(cid) for cid in allowed_condo_ids]
-        where_clauses.append("c.id = ANY(:condo_ids::uuid[])")
-
+        stmt = stmt.where(Condominio.id.in_(allowed_condo_ids))
     if search:
         safe = _escape_like(search)
-        params["search"] = f"%{safe}%"
-        where_clauses.append(
-            "(c.nome ILIKE :search OR c.numero ILIKE :search OR c.cnpj ILIKE :search)"
+        stmt = stmt.where(
+            Condominio.nome.ilike(f"%{safe}%")
+            | Condominio.numero.ilike(f"%{safe}%")
+            | Condominio.cnpj.ilike(f"%{safe}%")
         )
+    stmt = stmt.order_by(Condominio.nome).offset(skip).limit(limit)
+    result = await db.execute(stmt)
+    condominios = result.scalars().all()
 
-    now = datetime.now()
-    params["year"] = now.year
-    params["month"] = now.month
+    if not condominios:
+        return []
 
-    where_sql = " AND ".join(where_clauses)
+    condo_ids = [c.id for c in condominios]
 
-    sql = text(f"""
-        SELECT
-            c.id, c.nome, c.numero, c.endereco, c.cnpj,
-            c.sindico, c.cpf_sindico,
-            c.ata_eleicao_nome,
-            c.mandato_inicio, c.mandato_fim,
-            c.leitura_individualizada_ativa, c.ativo,
-            c.created_at, c.updated_at,
-            COALESCE(cv.total, 0) AS contas_esperadas,
-            COALESCE(fv.total, 0) AS contas_recebidas
-        FROM condominios c
-        LEFT JOIN (
-            SELECT condominio_id, COUNT(id) AS total
-            FROM concessionarias_vinculadas
-            WHERE ativo = true
-            GROUP BY condominio_id
-        ) cv ON cv.condominio_id = c.id
-        LEFT JOIN (
-            SELECT condominio_id, COUNT(id) AS total
-            FROM faturas
-            WHERE EXTRACT(year FROM created_at) = :year
-              AND EXTRACT(month FROM created_at) = :month
-            GROUP BY condominio_id
-        ) fv ON fv.condominio_id = c.id
-        WHERE {where_sql}
-        ORDER BY c.nome
-        LIMIT :limit OFFSET :skip
-    """)
+    # Query 2: Count active concessionárias per condo
+    try:
+        conc_result = await db.execute(
+            select(Concessionaria.condominio_id, func.count(Concessionaria.id))
+            .where(
+                Concessionaria.condominio_id.in_(condo_ids),
+                Concessionaria.ativo == True,
+            )
+            .group_by(Concessionaria.condominio_id)
+        )
+        conc_counts = dict(conc_result.all())
+    except Exception as e:
+        logger.warning(f"Failed to count concessionárias: {e}")
+        conc_counts = {}
 
-    result = await db.execute(sql, params)
-    rows = result.mappings().all()
+    # Query 3: Count faturas received this month per condo
+    try:
+        now = datetime.now()
+        fat_result = await db.execute(
+            select(Fatura.condominio_id, func.count(Fatura.id))
+            .where(
+                Fatura.condominio_id.in_(condo_ids),
+                extract("year", Fatura.created_at) == now.year,
+                extract("month", Fatura.created_at) == now.month,
+            )
+            .group_by(Fatura.condominio_id)
+        )
+        fat_counts = dict(fat_result.all())
+    except Exception as e:
+        logger.warning(f"Failed to count faturas: {e}")
+        fat_counts = {}
 
+    # Build responses
     responses = []
-    for row in rows:
-        resp = CondominioResponse(
-            id=row["id"],
-            nome=row["nome"],
-            numero=row["numero"],
-            endereco=row["endereco"],
-            cnpj=row["cnpj"],
-            sindico=row["sindico"],
-            cpf_sindico=row["cpf_sindico"],
-            ata_eleicao_nome=row["ata_eleicao_nome"],
-            mandato_inicio=row["mandato_inicio"],
-            mandato_fim=row["mandato_fim"],
-            leitura_individualizada_ativa=row["leitura_individualizada_ativa"],
-            ativo=row["ativo"],
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-            contas_esperadas=row["contas_esperadas"],
-            contas_recebidas=row["contas_recebidas"],
-        )
+    for c in condominios:
+        resp = CondominioResponse.model_validate(c)
+        resp.contas_esperadas = conc_counts.get(c.id, 0)
+        resp.contas_recebidas = fat_counts.get(c.id, 0)
         responses.append(resp)
     return responses
 
