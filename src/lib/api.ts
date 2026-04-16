@@ -577,6 +577,29 @@ class ApiClient {
     document.body.removeChild(a);
   }
 
+  // Fornecedores
+  async buscarFornecedorPorCnpj(cnpj: string) {
+    const digits = cnpj.replace(/\D/g, '');
+    return this.request<any>(`/fornecedores/buscar-cnpj?cnpj=${digits}`);
+  }
+
+  async criarFornecedor(data: {
+    documentoFornecedor: string;
+    nomeFornecedor: string;
+    emailFornecedor?: string;
+    whatsappFornecedor?: string;
+    categoriaFornecedor?: string;
+  }) {
+    return this.request<any>('/fornecedores/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getFornecedorCategorias() {
+    return this.request<string[]>('/fornecedores/categorias');
+  }
+
   // Reajustes Mercado
   async getReajustesMercado(categoria?: string) {
     const param = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';

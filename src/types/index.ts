@@ -74,6 +74,7 @@ export interface User {
   nome: string;
   email: string;
   role: string;
+  administradora?: string | null;
   codigo_usuario?: number | null;
   condominios_ids?: string[];
   created_at: string;

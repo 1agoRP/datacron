@@ -77,6 +77,7 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
             nome=user.nome,
             email=user.email,
             role=user.role,
+            administradora=user.administradora,
             condominios_ids=condo_ids,
         ),
     )
