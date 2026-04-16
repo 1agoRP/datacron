@@ -15,13 +15,13 @@ logger = logging.getLogger(__name__)
 # Fix: monkey-patch the codec setup to skip PREPARE entirely.
 # SQLAlchemy handles JSON serialization at the Python level, so this is safe.
 
-from sqlalchemy.dialects.postgresql.asyncpg import AsyncAdapt_asyncpg_connection
+from sqlalchemy.dialects.postgresql.asyncpg import PGDialect_asyncpg
 
 async def _noop_json_codec(self, conn):
     """Skip asyncpg JSON codec setup to avoid PREPARE on PgBouncer."""
     pass
 
-AsyncAdapt_asyncpg_connection.setup_asyncpg_json_codec = _noop_json_codec
+PGDialect_asyncpg.setup_asyncpg_json_codec = _noop_json_codec
 
 # ─── Engine Configuration ─────────────────────────────────────
 
