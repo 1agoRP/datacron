@@ -73,7 +73,10 @@ async def buscar_por_cnpj(
     if len(digits) != 14:
         raise HTTPException(status_code=400, detail="CNPJ deve ter 14 dígitos")
 
-    # Search with and without formatting variations
+    # Calculate formatted CNPJ for direct lookup
+    formatted = f"{digits[:2]}.{digits[2:5]}.{digits[5:8]}/{digits[8:12]}-{digits[12:]}"
+
+    # Search with exact formatting variations
     result = await db.execute(
         text("""
             SELECT
@@ -86,10 +89,11 @@ async def buscar_por_cnpj(
                 administradora,
                 status
             FROM database_fornecedores
-            WHERE regexp_replace("documentoFornecedor", '[^0-9]', '', 'g') = :digits
+            WHERE "documentoFornecedor" = :digits 
+               OR "documentoFornecedor" = :formatted
             LIMIT 1
         """),
-        {"digits": digits},
+        {"digits": digits, "formatted": formatted},
     )
     row = result.mappings().one_or_none()
 
@@ -144,13 +148,15 @@ async def criar_fornecedor(
 
     # Check if CNPJ already exists
     digits = _normalize_cnpj(body.documentoFornecedor)
+    formatted = f"{digits[:2]}.{digits[2:5]}.{digits[5:8]}/{digits[8:12]}-{digits[12:]}"
     existing = await db.execute(
         text("""
             SELECT id FROM database_fornecedores
-            WHERE regexp_replace("documentoFornecedor", '[^0-9]', '', 'g') = :digits
+            WHERE "documentoFornecedor" = :digits 
+               OR "documentoFornecedor" = :formatted
             LIMIT 1
         """),
-        {"digits": digits},
+        {"digits": digits, "formatted": formatted},
     )
     if existing.one_or_none():
         raise HTTPException(
