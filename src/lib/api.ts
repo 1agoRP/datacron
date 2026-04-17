@@ -244,6 +244,74 @@ class ApiClient {
     document.body.removeChild(a);
   }
 
+  async uploadAvcb(id: string, formData: FormData) {
+    return this.requestMultipart(`/condominios/${id}/avcb`, formData, { method: 'POST' });
+  }
+
+  async downloadAvcb(id: string) {
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/avcb`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Falha ao baixar AVCB');
+    }
+    const blob = await response.blob();
+    
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = `avcb_${id}.pdf`;
+    if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="(.+)"/);
+        if (matches && matches.length > 1) {
+            filename = matches[1];
+        }
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  async uploadApoliceSeguro(id: string, formData: FormData) {
+    return this.requestMultipart(`/condominios/${id}/apolice-seguro`, formData, { method: 'POST' });
+  }
+
+  async downloadApoliceSeguro(id: string) {
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/apolice-seguro`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Falha ao baixar Apólice de Seguro');
+    }
+    const blob = await response.blob();
+    
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = `apolice_seguro_${id}.pdf`;
+    if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="(.+)"/);
+        if (matches && matches.length > 1) {
+            filename = matches[1];
+        }
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
   // Concessionarias
   async getConcessionarias(params: Record<string, string | number> = {}) {
     const safeParams: Record<string, string> = {};
