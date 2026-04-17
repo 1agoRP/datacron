@@ -107,7 +107,7 @@ async def list_condominios(
 
 
 
-@router.post("/", response_model=CondominioResponse, status_code=201)
+@router.post("", response_model=CondominioResponse, status_code=201)
 async def create_condominio(
     body: CondominioCreate,
     background_tasks: BackgroundTasks,

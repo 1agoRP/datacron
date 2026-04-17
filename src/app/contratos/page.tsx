@@ -244,7 +244,8 @@ export default function ContratosPage() {
       setCnpjLookupError(null);
       setShowFornecedorPopup(false);
     } catch (err: any) {
-      alert(err.message || 'Erro ao cadastrar fornecedor');
+      console.error('Erro ao cadastrar fornecedor:', err);
+      alert(`${err.message || 'Erro ao cadastrar fornecedor'}${err.status ? ` (Status: ${err.status})` : ''}`);
     } finally {
       setSavingFornecedor(false);
     }

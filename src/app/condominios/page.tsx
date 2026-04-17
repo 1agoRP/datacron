@@ -5,7 +5,7 @@ import Shell from '@/components/layout/Shell';
 import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
-import { ShieldAlert, Flame } from 'lucide-react';
+import { ShieldAlert, Flame, ShieldCheck, HardHat } from 'lucide-react';
 import { ptBR } from 'date-fns/locale';
 import useSWR from 'swr';
 import { formatCurrencyCeil } from '@/lib/utils';
@@ -52,6 +52,8 @@ export default function CondominiosPage() {
   const [condoContratos, setCondoContratos] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [uploadingAta, setUploadingAta] = useState(false);
+  const [uploadingAvcb, setUploadingAvcb] = useState(false);
+  const [uploadingApolice, setUploadingApolice] = useState(false);
 
   // History modal
   const [historyConc, setHistoryConc] = useState<any>(null);
@@ -127,6 +129,50 @@ export default function CondominiosPage() {
       console.error(err);
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  const handleUploadAvcb = async (condoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingAvcb(true);
+      const formData = new FormData();
+      formData.append('pdf_file', file);
+      await api.uploadAvcb(condoId, formData);
+      alert('AVCB enviado com sucesso!');
+      mutate();
+      if (detailsCondo && detailsCondo.id === condoId) {
+        setDetailsCondo({ ...detailsCondo, avcb_url: 'uploaded' }); // Mark as uploaded to trigger UI change
+      }
+    } catch (err: any) {
+      alert(err.message || 'Erro ao enviar AVCB');
+    } finally {
+      setUploadingAvcb(false);
+      if (event.target) event.target.value = '';
+    }
+  };
+
+  const handleUploadApolice = async (condoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingApolice(true);
+      const formData = new FormData();
+      formData.append('pdf_file', file);
+      await api.uploadApoliceSeguro(condoId, formData);
+      alert('Apólice de Seguro enviada com sucesso!');
+      mutate();
+      if (detailsCondo && detailsCondo.id === condoId) {
+        setDetailsCondo({ ...detailsCondo, apolice_seguro_url: 'uploaded' }); // Mark as uploaded to trigger UI change
+      }
+    } catch (err: any) {
+      alert(err.message || 'Erro ao enviar Apólice');
+    } finally {
+      setUploadingApolice(false);
+      if (event.target) event.target.value = '';
     }
   };
 
@@ -719,7 +765,7 @@ export default function CondominiosPage() {
                     <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <FileSignature size={16} color="#3b82f6" /> Documentos Importantes
                     </h4>
-                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
                           <FileText size={20} />
@@ -739,9 +785,65 @@ export default function CondominiosPage() {
                         )}
                         {!readOnly && (
                           <label className="dc-btn dc-btn-primary" style={{ cursor: 'pointer' }}>
-                            {uploadingAta ? <div className="dc-loading-spinner" /> : <Upload size={14} />} 
-                            {detailsCondo.ata_eleicao_nome ? 'Substituir' : 'Enviar Documento'}
+                            {uploadingAta ? <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff' }} /> : <Upload size={14} />} 
+                            {detailsCondo.ata_eleicao_nome ? 'Substituir' : 'Vincular'}
                             <input type="file" accept="application/pdf" style={{ display: 'none' }} disabled={uploadingAta} onChange={(e) => handleUploadAta(detailsCondo.id, e)} />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0369a1' }}>
+                          <ShieldCheck size={20} />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>AVCB</div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                            {detailsCondo.avcb_url ? 'Documento vinculado' : 'Auto de Vistoria do Corpo de Bombeiros'}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        {detailsCondo.avcb_url && (
+                          <button className="dc-btn dc-btn-secondary" onClick={() => handleDownloadAvcb(detailsCondo.id)}>
+                            <Download size={14} /> Baixar
+                          </button>
+                        )}
+                        {!readOnly && (
+                          <label className="dc-btn dc-btn-primary" style={{ cursor: 'pointer' }}>
+                            {uploadingAvcb ? <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff' }} /> : <Upload size={14} />} 
+                            {detailsCondo.avcb_url ? 'Substituir' : 'Vincular'}
+                            <input type="file" accept="application/pdf" style={{ display: 'none' }} disabled={uploadingAvcb} onChange={(e) => handleUploadAvcb(detailsCondo.id, e)} />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 8, background: '#fdf2f8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#be185d' }}>
+                          <HardHat size={20} />
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>Apólice de Seguro</div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                            {detailsCondo.apolice_seguro_url ? 'Documento vinculado' : 'Seguro obrigatório do condomínio'}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        {detailsCondo.apolice_seguro_url && (
+                          <button className="dc-btn dc-btn-secondary" onClick={() => handleDownloadApolice(detailsCondo.id)}>
+                            <Download size={14} /> Baixar
+                          </button>
+                        )}
+                        {!readOnly && (
+                          <label className="dc-btn dc-btn-primary" style={{ cursor: 'pointer' }}>
+                            {uploadingApolice ? <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff' }} /> : <Upload size={14} />} 
+                            {detailsCondo.apolice_seguro_url ? 'Substituir' : 'Vincular'}
+                            <input type="file" accept="application/pdf" style={{ display: 'none' }} disabled={uploadingApolice} onChange={(e) => handleUploadApolice(detailsCondo.id, e)} />
                           </label>
                         )}
                       </div>

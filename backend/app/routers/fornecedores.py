@@ -130,7 +130,7 @@ async def listar_categorias(
     return sorted(codes)
 
 
-@router.post("/", status_code=201)
+@router.post("", status_code=201)
 async def criar_fornecedor(
     body: FornecedorCreate,
     db: AsyncSession = Depends(get_db),

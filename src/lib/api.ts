@@ -279,12 +279,12 @@ class ApiClient {
   }
 
   async uploadApoliceSeguro(id: string, formData: FormData) {
-    return this.requestMultipart(`/condominios/${id}/apolice-seguro`, formData, { method: 'POST' });
+    return this.requestMultipart(`/condominios/${id}/apolice`, formData, { method: 'POST' });
   }
 
   async downloadApoliceSeguro(id: string) {
     const token = this.getToken();
-    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/apolice-seguro`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/apolice`, {
       headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
     });
     if (!response.ok) {
@@ -658,7 +658,7 @@ class ApiClient {
     whatsappFornecedor?: string;
     categoriaFornecedor?: string;
   }) {
-    return this.request<any>('/fornecedores/', {
+    return this.request<any>('/fornecedores', {
       method: 'POST',
       body: JSON.stringify(data),
     });
