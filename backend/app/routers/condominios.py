@@ -194,12 +194,13 @@ async def update_condominio(
     # RBAC: Only admin can edit core fields
     update_data = body.model_dump(exclude_none=True)
     if not current_user.is_admin:
-        restricted = {"nome", "endereco", "cnpj", "numero", "ativo"}
-        attempted_restricted = set(update_data.keys()) & restricted
-        if attempted_restricted:
+        allowed_for_manager = {"mandato_inicio", "mandato_fim", "leitura_individualizada_ativa", "sindico", "cpf_sindico"}
+        attempted_to_edit = set(update_data.keys())
+        not_allowed = attempted_to_edit - allowed_for_manager
+        if not_allowed:
             raise HTTPException(
                 status_code=403, 
-                detail=f"Permissão insuficiente para editar os campos: {', '.join(attempted_restricted)}. Contate o administrador."
+                detail=f"Permissão insuficiente para editar os campos: {', '.join(not_allowed)}. Contate o administrador."
             )
 
     for field, value in update_data.items():
@@ -350,4 +351,106 @@ async def download_ata_eleicao(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{condo.ata_eleicao_nome}"'},
+    )
+
+
+@router.post("/{id}/avcb")
+async def upload_avcb(
+    id: uuid.UUID,
+    pdf_file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_write()),
+):
+    """Uploads and saves the AVCB PDF in base64."""
+    result = await db.execute(select(Condominio).where(Condominio.id == id))
+    condo = result.scalar_one_or_none()
+    if not condo:
+        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+
+    valid_pdf_mimes = ["application/pdf", "application/x-pdf", "binary/octet-stream"]
+    is_pdf_extension = (pdf_file.filename or "").lower().endswith(".pdf")
+    if pdf_file.content_type not in valid_pdf_mimes and not is_pdf_extension:
+        raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
+
+    import base64
+    pdf_bytes = await pdf_file.read()
+    b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
+    condo.avcb_url = b64_data
+    
+    await db.commit()
+    await db.refresh(condo)
+    return {"mensagem": "AVCB salvo com sucesso", "avcb_nome": pdf_file.filename}
+
+
+@router.get("/{id}/avcb")
+async def download_avcb(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Downloads the AVCB PDF."""
+    import io
+    import base64
+    result = await db.execute(select(Condominio).where(Condominio.id == id))
+    condo = result.scalar_one_or_none()
+    
+    if not condo or not condo.avcb_url:
+        raise HTTPException(status_code=404, detail="AVCB não encontrado")
+
+    pdf_bytes = base64.b64decode(condo.avcb_url)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="AVCB_{condo.nome}.pdf"'},
+    )
+
+
+@router.post("/{id}/apolice")
+async def upload_apolice(
+    id: uuid.UUID,
+    pdf_file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_write()),
+):
+    """Uploads and saves the Apolice PDF in base64."""
+    result = await db.execute(select(Condominio).where(Condominio.id == id))
+    condo = result.scalar_one_or_none()
+    if not condo:
+        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+
+    valid_pdf_mimes = ["application/pdf", "application/x-pdf", "binary/octet-stream"]
+    is_pdf_extension = (pdf_file.filename or "").lower().endswith(".pdf")
+    if pdf_file.content_type not in valid_pdf_mimes and not is_pdf_extension:
+        raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
+
+    import base64
+    pdf_bytes = await pdf_file.read()
+    b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
+    condo.apolice_seguro_url = b64_data
+    
+    await db.commit()
+    await db.refresh(condo)
+    return {"mensagem": "Apólice salva com sucesso", "apolice_nome": pdf_file.filename}
+
+
+@router.get("/{id}/apolice")
+async def download_apolice(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Downloads the Apolice PDF."""
+    import io
+    import base64
+    result = await db.execute(select(Condominio).where(Condominio.id == id))
+    condo = result.scalar_one_or_none()
+    
+    if not condo or not condo.apolice_seguro_url:
+        raise HTTPException(status_code=404, detail="Apólice não encontrada")
+
+    pdf_bytes = base64.b64decode(condo.apolice_seguro_url)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Apolice_{condo.nome}.pdf"'},
     )

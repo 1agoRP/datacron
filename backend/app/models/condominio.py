@@ -28,6 +28,8 @@ class Condominio(Base):
     cpf_sindico: Mapped[Optional[str]] = mapped_column(String(14), nullable=True)
     ata_eleicao_base64: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ata_eleicao_nome: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    avcb_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    apolice_seguro_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     gerente_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     assistente_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     administradora: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)

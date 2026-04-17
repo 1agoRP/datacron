@@ -31,7 +31,6 @@ from app.models.concessionaria import Concessionaria
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
 from app.services.pdf_processor import unlock_pdf, extract_data, save_pdf
-from app.services.alert_manager import check_and_create_alerts
 from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -443,12 +442,14 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         email_log.status = "processado"
 
         if conc:
+            from app.services.alert_manager import check_and_create_alerts
             await check_and_create_alerts(fatura, conc, db)
             
             # Forward if individualized reading is active
             if conc.leitura_individualizada:
                 forward_to = "assistente.gerencia4@propstarter.com.br"
-                subject_fwd = f"ENCAMINHADO: Leitura Individualizada - {condo_name or 'N/A'}"
+                # Keep original subject for threading
+                subject_fwd = fatura.email_assunto or f"Leitura Individualizada - {condo_name or 'N/A'}"
                 body_fwd = (
                     f"Fatura com leitura individualizada identificada.\n\n"
                     f"Condomínio: {condo_name or 'N/A'}\n"
@@ -461,6 +462,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
                     to=forward_to,
                     subject=subject_fwd,
                     message_text=body_fwd,
+                    in_reply_to=msg_id,
                     attachments=saved_paths # Forward all saved PDF paths
                 )
                 if success_fwd:

@@ -5,6 +5,7 @@ import Shell from '@/components/layout/Shell';
 import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
+import { ShieldAlert, Flame } from 'lucide-react';
 import { ptBR } from 'date-fns/locale';
 import useSWR from 'swr';
 import { formatCurrencyCeil } from '@/lib/utils';
@@ -159,6 +160,22 @@ export default function CondominiosPage() {
     }
   };
 
+  const handleDownloadAvcb = async (condoId: string) => {
+    try {
+      await api.downloadAvcb(condoId);
+    } catch (err: any) {
+      alert(err.message || 'Erro ao baixar AVCB');
+    }
+  };
+
+  const handleDownloadApolice = async (condoId: string) => {
+    try {
+      await api.downloadApoliceSeguro(condoId);
+    } catch (err: any) {
+      alert(err.message || 'Erro ao baixar Apólice de Seguro');
+    }
+  };
+
   const handleOpenHistory = async (conc: any) => {
     setHistoryConc(conc);
     try {
@@ -215,7 +232,7 @@ export default function CondominiosPage() {
     if (e) e.preventDefault();
     try {
       setCreating(true);
-      await api.updateCondominio(editCondo.id, {
+      const payload: any = {
         nome: editCondo.nome,
         endereco: editCondo.endereco,
         sindico: editCondo.sindico,
@@ -223,7 +240,14 @@ export default function CondominiosPage() {
         mandato_inicio: editCondo.mandato_inicio,
         mandato_fim: editCondo.mandato_fim,
         leitura_individualizada_ativa: editCondo.leitura_individualizada_ativa
-      });
+      };
+      
+      if (isAdmin) {
+        payload.numero = editCondo.numero;
+        payload.cnpj = editCondo.cnpj;
+      }
+
+      await api.updateCondominio(editCondo.id, payload);
       setEditCondo(null);
       mutate();
       setCreating(false);
@@ -284,7 +308,7 @@ export default function CondominiosPage() {
           style={{ height: 40, padding: '0 16px', fontSize: '0.85rem' }}
           onClick={() => setShowFilters(!showFilters)}
         >
-          <Filter size={15} /> Filtros {showFilters ? '✕' : ''}
+          <Filter size={15} /> Filtro Síndicos {showFilters ? '✕' : ''}
         </button>
         <div className="dc-filter-divider" />
         <span className="dc-filter-count">
@@ -378,13 +402,23 @@ export default function CondominiosPage() {
                       <div className="dc-cell-secondary">{condo.cnpj}</div>
                     </td>
                     <td>
-                      <div className="dc-row-actions" style={{ justifyContent: 'flex-end' }}>
+                      <div className="dc-row-actions" style={{ justifyContent: 'flex-end', display: 'flex', gap: 6 }}>
+                        {condo.avcb_url && (
+                          <button className="dc-icon-action" style={{ background: '#fef2f2', color: '#ef4444', borderColor: '#fecaca' }} title="Baixar AVCB" onClick={() => handleDownloadAvcb(condo.id)}>
+                            <Flame size={15} />
+                          </button>
+                        )}
+                        {condo.apolice_seguro_url && (
+                          <button className="dc-icon-action" style={{ background: '#fefce8', color: '#eab308', borderColor: '#fef08a' }} title="Baixar Apólice de Seguro" onClick={() => handleDownloadApolice(condo.id)}>
+                            <ShieldAlert size={15} />
+                          </button>
+                        )}
                         {condo.ata_eleicao_nome && (
                           <button className="dc-icon-action dc-badge-green" style={{ background: '#f0fdf4' }} title={`Baixar ATA: ${condo.ata_eleicao_nome}`} onClick={() => handleDownloadAta(condo.id)}>
                             <FileSignature size={15} />
                           </button>
                         )}
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginLeft: 4 }}>
                           <button className="dc-icon-action" title="Abrir detalhes" onClick={() => handleOpenDetails(condo)}><ExternalLink size={15} /></button>
                           {!readOnly && (
                             <button className="dc-icon-action" title="Editar / Opções" onClick={() => handleOpenEdit(condo)}><MoreVertical size={15} /></button>
@@ -496,6 +530,16 @@ export default function CondominiosPage() {
                 <label>Nome do Condomínio</label>
                 <input required disabled={!isAdmin} value={editCondo.nome} onChange={e => setEditCondo({...editCondo, nome: e.target.value})} className="dc-form-input" />
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="dc-form-group">
+                  <label>Número/ID</label>
+                  <input required disabled={!isAdmin} value={editCondo.numero} onChange={e => setEditCondo({...editCondo, numero: e.target.value})} className="dc-form-input" placeholder="Ex: 101" />
+                </div>
+                <div className="dc-form-group">
+                  <label>CNPJ</label>
+                  <input required disabled={!isAdmin} value={editCondo.cnpj} onChange={e => setEditCondo({...editCondo, cnpj: e.target.value})} className="dc-form-input" placeholder="00.000.000/0000-00" />
+                </div>
+              </div>
               <div className="dc-form-group">
                 <label>Endereço Completo</label>
                 <input required disabled={!isAdmin} value={editCondo.endereco} onChange={e => setEditCondo({...editCondo, endereco: e.target.value})} className="dc-form-input" />
@@ -503,16 +547,16 @@ export default function CondominiosPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="dc-form-group">
                   <label>Mandato Síndico (Início)</label>
-                  <input type="date" value={editCondo.mandato_inicio || ''} onChange={e => setEditCondo({...editCondo, mandato_inicio: e.target.value})} className="dc-form-input" />
+                  <input type="date" disabled={readOnly} value={editCondo.mandato_inicio || ''} onChange={e => setEditCondo({...editCondo, mandato_inicio: e.target.value})} className="dc-form-input" />
                 </div>
                 <div className="dc-form-group">
                   <label>Mandato Síndico (Fim)</label>
-                  <input type="date" value={editCondo.mandato_fim || ''} onChange={e => setEditCondo({...editCondo, mandato_fim: e.target.value})} className="dc-form-input" />
+                  <input type="date" disabled={readOnly} value={editCondo.mandato_fim || ''} onChange={e => setEditCondo({...editCondo, mandato_fim: e.target.value})} className="dc-form-input" />
                 </div>
               </div>
               <div className="dc-form-group">
                  <label className="dc-checkbox-wrapper">
-                  <input type="checkbox" checked={editCondo.leitura_individualizada_ativa || false} onChange={e => setEditCondo({...editCondo, leitura_individualizada_ativa: e.target.checked})} />
+                  <input type="checkbox" disabled={readOnly} checked={editCondo.leitura_individualizada_ativa || false} onChange={e => setEditCondo({...editCondo, leitura_individualizada_ativa: e.target.checked})} />
                   <span>Ativar Leitura Individualizada para este Condomínio</span>
                 </label>
               </div>
@@ -523,7 +567,7 @@ export default function CondominiosPage() {
                 </div>
                 <div className="dc-form-group">
                   <label>CPF do Síndico</label>
-                  <input value={editCondo.cpf_sindico || ''} onChange={e => setEditCondo({...editCondo, cpf_sindico: e.target.value})} className="dc-form-input" />
+                  <input disabled={readOnly} value={editCondo.cpf_sindico || ''} onChange={e => setEditCondo({...editCondo, cpf_sindico: e.target.value})} className="dc-form-input" />
                 </div>
               </div>
               

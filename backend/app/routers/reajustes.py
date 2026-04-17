@@ -101,6 +101,42 @@ async def delete_reajuste(
     await db.commit()
 
 
+@router.put("/{id}", response_model=ReajusteMercadoResponse)
+async def update_reajuste(
+    id: uuid.UUID,
+    categoria: str = Form(...),
+    percentual: float = Form(...),
+    vigencia: str = Form(...),
+    descricao: Optional[str] = Form(None),
+    categoria_personalizada: Optional[str] = Form(None),
+    pdf_file: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    """Updates an existing market rate adjustment."""
+    result = await db.execute(select(ReajusteMercado).where(ReajusteMercado.id == id))
+    r = result.scalar_one_or_none()
+    if not r:
+        raise HTTPException(status_code=404, detail="Reajuste nao encontrado")
+
+    r.categoria = categoria
+    r.percentual = percentual
+    r.vigencia = vigencia
+    r.descricao = descricao
+    r.categoria_personalizada = categoria_personalizada
+
+    if pdf_file:
+        if pdf_file.content_type != "application/pdf":
+            raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
+        pdf_bytes = await pdf_file.read()
+        r.documento_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        r.documento_nome = pdf_file.filename
+
+    await db.commit()
+    await db.refresh(r)
+    return r
+
+
 @router.get("/{id}/documento")
 async def download_documento_reajuste(
     id: uuid.UUID,

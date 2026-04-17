@@ -95,6 +95,8 @@ class CondominioUpdate(BaseModel):
     leitura_individualizada_ativa: Optional[bool] = None
     ata_eleicao_base64: Optional[str] = None
     ata_eleicao_nome: Optional[str] = None
+    avcb_url: Optional[str] = None
+    apolice_seguro_url: Optional[str] = None
     ativo: Optional[bool] = None
 
 
@@ -110,6 +112,8 @@ class CondominioResponse(BaseModel):
     mandato_fim: Optional[datetime] = None
     leitura_individualizada_ativa: bool = False
     ata_eleicao_nome: Optional[str] = None
+    avcb_url: Optional[str] = None
+    apolice_seguro_url: Optional[str] = None
     ativo: bool
     created_at: datetime
     updated_at: datetime
@@ -133,6 +137,8 @@ class ConcessionariaCreate(BaseModel):
     valor_medio: float = 0.0
     nome_personalizado: Optional[str] = None
     leitura_individualizada: bool = False
+    debito_automatico: bool = True
+    senha_portal: Optional[str] = None
 
 
 class ConcessionariaUpdate(BaseModel):
@@ -144,6 +150,8 @@ class ConcessionariaUpdate(BaseModel):
     valor_medio: Optional[float] = None
     nome_personalizado: Optional[str] = None
     leitura_individualizada: Optional[bool] = None
+    debito_automatico: Optional[bool] = None
+    senha_portal: Optional[str] = None
     ativo: Optional[bool] = None
 
 
@@ -178,6 +186,8 @@ class ConcessionariaResponse(BaseModel):
     valor_medio: float
     nome_personalizado: Optional[str] = None
     leitura_individualizada: bool = False
+    debito_automatico: bool = True
+    senha_portal: Optional[str] = None
     created_by_id: Optional[uuid.UUID] = None
     ativo: bool
     created_at: datetime

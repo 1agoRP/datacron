@@ -215,7 +215,10 @@ async def _dispatch_alert_emails(alerts: list[Alerta], fatura: Fatura, conc: Con
     
     # Ensure condominio is loaded for the name
     condo_name = conc.condominio.nome if conc.condominio else "N/A"
-    subject = f"ALERTA: Problema identificado na Fatura - {condo_name} ({fatura.referencia})"
+    
+    # Use original subject to ensure Gmail threading works perfectly
+    original_subject = fatura.email_assunto or f"Fatura - {condo_name}"
+    subject = original_subject
     
     body_lines = [
         f"Olá,",

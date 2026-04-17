@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2, Search, Filter, Key, Eye, EyeOff, ArrowUpDown, TrendingUp, History } from 'lucide-react';
+import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2, Search, Filter, Key, Eye, EyeOff, ArrowUpDown, TrendingUp, History, Copy, Check, Power } from 'lucide-react';
 import { api } from '@/lib/api';
 import Select from 'react-select';
 import useSWR from 'swr';
@@ -123,7 +123,9 @@ export default function ConcessionariasPage() {
     senha_manual: '',
     valor_medio: 0,
     nome_personalizado: '',
-    leitura_individualizada: false
+    leitura_individualizada: false,
+    debito_automatico: false,
+    senha_portal: ''
   };
 
   const [formConc, setFormConc] = useState<any>({ ...defaultConc });
@@ -255,7 +257,9 @@ export default function ConcessionariasPage() {
       senha_manual: conc.senha_manual || '',
       valor_medio: conc.valor_medio || 0,
       nome_personalizado: conc.nome_personalizado || '',
-      leitura_individualizada: conc.leitura_individualizada || false
+      leitura_individualizada: conc.leitura_individualizada || false,
+      debito_automatico: conc.debito_automatico || false,
+      senha_portal: conc.senha_portal || ''
     });
     setEditingId(conc.id);
     setShowPassword(false);
@@ -266,6 +270,25 @@ export default function ConcessionariasPage() {
     setIsModalOpen(false);
     setEditingId(null);
     setShowPassword(false);
+  };
+
+  const handleToggleDebito = async (concId: string, atual: boolean) => {
+    try {
+      if (readOnly) return;
+      await api.updateConcessionaria(concId, { debito_automatico: !atual });
+      mutateConcs();
+    } catch (err: any) {
+      alert('Erro ao alterar Débito Automático: ' + err.message);
+    }
+  };
+
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
+
+  const handleCopySenha = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const toggleSort = (field: 'nome' | 'numero') => {
@@ -397,9 +420,10 @@ export default function ConcessionariasPage() {
                 </th>
                 <th>Tipo / Código</th>
                 <th>Regra de Senha</th>
+                <th>Senha Portal</th>
                 <th>Vencimento</th>
+                <th>Déb. Aut.</th>
                 <th>Valor Médio</th>
-                <th>Status</th>
                 <th style={{ textAlign: 'right' }}>Ações</th>
               </tr>
             </thead>
@@ -447,16 +471,61 @@ export default function ConcessionariasPage() {
                       </div>
                     </td>
                     <td>
+                      {conc.senha_portal ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontFamily: revealedIds[conc.id] ? 'inherit' : 'monospace', fontSize: '1rem' }}>
+                            {revealedIds[conc.id] ? conc.senha_portal : '••••••••'}
+                          </span>
+                          <button
+                            onClick={() => setRevealedIds(prev => ({...prev, [conc.id]: !prev[conc.id]}))}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                            title={revealedIds[conc.id] ? "Ocultar" : "Revelar"}
+                          >
+                            {revealedIds[conc.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                          <button
+                            onClick={() => handleCopySenha(conc.senha_portal, conc.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedId === conc.id ? '#10b981' : '#94a3b8' }}
+                            title="Copiar Senha"
+                          >
+                            {copiedId === conc.id ? <Check size={14} /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                      ) : <span style={{ color: '#94a3b8' }}>—</span>}
+                    </td>
+                    <td>
                       <div className="dc-cell-primary">Dia {conc.dia_vencimento}</div>
                     </td>
                     <td>
-                      <div className="dc-cell-primary">{formatCurrencyCeil(conc.valor_medio || 0)}</div>
+                      <button
+                        onClick={() => handleToggleDebito(conc.id, conc.debito_automatico)}
+                        disabled={readOnly}
+                        style={{
+                          background: conc.debito_automatico ? '#10b981' : '#e2e8f0',
+                          border: 'none',
+                          borderRadius: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '2px',
+                          width: '40px',
+                          cursor: readOnly ? 'default' : 'pointer',
+                          transition: 'background 0.2s',
+                          position: 'relative'
+                        }}
+                        title={conc.debito_automatico ? 'Ativo' : 'Inativo'}
+                      >
+                        <div style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          background: '#fff',
+                          transform: conc.debito_automatico ? 'translateX(18px)' : 'translateX(0)',
+                          transition: 'transform 0.2s'
+                        }} />
+                      </button>
                     </td>
                     <td>
-                      <span className="dc-badge dc-badge-green">
-                        <span className="dc-badge-dot" />
-                        Ativo
-                      </span>
+                      <div className="dc-cell-primary">{formatCurrencyCeil(conc.valor_medio || 0)}</div>
                     </td>
                     <td>
                       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -633,6 +702,21 @@ export default function ConcessionariasPage() {
                     <label>Valor Médio Mensal (R$)</label>
                     <input className="dc-form-input" type="number" step="0.01" required disabled={readOnly} value={formConc.valor_medio} onChange={e => setFormConc({...formConc, valor_medio: parseFloat(e.target.value) || 0})} placeholder="Ex: 500.50" />
                   </div>
+                </div>
+
+                <div className="dc-form-group">
+                  <label>Senha do Portal da Concessionária (Opcional)</label>
+                  <input className="dc-form-input" disabled={readOnly} value={formConc.senha_portal || ''} onChange={e => setFormConc({...formConc, senha_portal: e.target.value})} placeholder="Para os síndicos/assistentes logarem no site" />
+                </div>
+
+                <div className="dc-form-group">
+                  <label className="dc-checkbox-wrapper">
+                    <input type="checkbox" checked={formConc.debito_automatico} onChange={e => setFormConc({...formConc, debito_automatico: e.target.checked})} disabled={readOnly} />
+                    <span>Esta conta está em Débito Automático?</span>
+                  </label>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4, marginLeft: 26 }}>
+                    Faturas em débito automático não gerarão pendências de pagamento, mesmo se a variação for detectada.
+                  </p>
                 </div>
 
                 <div className="dc-form-group">
