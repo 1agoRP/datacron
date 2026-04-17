@@ -285,8 +285,8 @@ export default function ConcessionariasPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
 
-  const handleCopySenha = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopySenha = (text: string | null | undefined, id: string) => {
+    navigator.clipboard.writeText(text || '');
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
