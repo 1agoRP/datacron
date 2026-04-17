@@ -6,7 +6,7 @@ import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Tra
 import { api } from '@/lib/api';
 import Select from 'react-select';
 import useSWR from 'swr';
-import { formatCurrencyCeil } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { isReadOnly } from '@/types';
 
@@ -526,7 +526,7 @@ export default function ConcessionariasPage() {
                       </div>
                     </td>
                     <td>
-                      <div className="dc-cell-primary">{formatCurrencyCeil(conc.valor_medio || 0)}</div>
+                      <div className="dc-cell-primary">{formatCurrency(conc.valor_medio || 0)}</div>
                     </td>
                     <td>
                       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
