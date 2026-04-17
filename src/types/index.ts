@@ -7,6 +7,8 @@ export interface Condominio {
   sindico: string;
   cpf_sindico: string;
   ata_eleicao_nome?: string | null;
+  avcb_url?: string | null;
+  apolice_seguro_url?: string | null;
   mandato_inicio?: string | null;
   mandato_fim?: string | null;
   leitura_individualizada_ativa?: boolean;
@@ -21,6 +23,8 @@ export interface Concessionaria {
   email_esperado: string | null;
   regra_senha: string;
   senha_manual: string | null;
+  senha_portal: string | null;
+  debito_automatico: boolean;
   dia_vencimento: number;
   valor_medio: number | null;
   nome_personalizado?: string | null;
