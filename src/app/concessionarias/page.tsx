@@ -471,35 +471,37 @@ export default function ConcessionariasPage() {
                       </div>
                     </td>
                     <td>
-                      {conc.senha_portal ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontFamily: revealedIds[conc.id] ? 'inherit' : 'monospace', fontSize: '1rem' }}>
-                            {revealedIds[conc.id] ? conc.senha_portal : '••••••••'}
-                          </span>
-                          <button
-                            onClick={() => setRevealedIds(prev => ({...prev, [conc.id]: !prev[conc.id]}))}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-                            title={revealedIds[conc.id] ? "Ocultar" : "Revelar"}
-                          >
-                            {revealedIds[conc.id] ? <EyeOff size={14} /> : <Eye size={14} />}
-                          </button>
-                          <button
-                            onClick={() => handleCopySenha(conc.senha_portal, conc.id)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedId === conc.id ? '#10b981' : '#94a3b8' }}
-                            title="Copiar Senha"
-                          >
-                            {copiedId === conc.id ? <Check size={14} /> : <Copy size={14} />}
-                          </button>
-                        </div>
-                      ) : <span style={{ color: '#94a3b8' }}>—</span>}
+                      {(() => {
+                        const cnpjDigits = conc.condominio?.cnpj?.replace(/\D/g, '') || '';
+                        const generatedPass = generatePasswordPreview(conc.regra_senha, cnpjDigits, conc.senha_manual || '');
+                        return generatedPass ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontFamily: revealedIds[conc.id] ? 'inherit' : 'monospace', fontSize: '1rem' }}>
+                              {revealedIds[conc.id] ? generatedPass : '••••••••'}
+                            </span>
+                            <button
+                              onClick={() => setRevealedIds(prev => ({...prev, [conc.id]: !prev[conc.id]}))}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                              title={revealedIds[conc.id] ? "Ocultar" : "Revelar"}
+                            >
+                              {revealedIds[conc.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                            <button
+                              onClick={() => handleCopySenha(generatedPass, conc.id)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedId === conc.id ? '#10b981' : '#94a3b8' }}
+                              title="Copiar Senha"
+                            >
+                              {copiedId === conc.id ? <Check size={14} /> : <Copy size={14} />}
+                            </button>
+                          </div>
+                        ) : <span style={{ color: '#94a3b8' }}>—</span>;
+                      })()}
                     </td>
                     <td>
                       <div className="dc-cell-primary">Dia {conc.dia_vencimento}</div>
                     </td>
                     <td>
-                      <button
-                        onClick={() => handleToggleDebito(conc.id, conc.debito_automatico)}
-                        disabled={readOnly}
+                      <div
                         style={{
                           background: conc.debito_automatico ? '#10b981' : '#e2e8f0',
                           border: 'none',
@@ -508,8 +510,7 @@ export default function ConcessionariasPage() {
                           alignItems: 'center',
                           padding: '2px',
                           width: '40px',
-                          cursor: readOnly ? 'default' : 'pointer',
-                          transition: 'background 0.2s',
+                          cursor: 'default',
                           position: 'relative'
                         }}
                         title={conc.debito_automatico ? 'Ativo' : 'Inativo'}
@@ -522,7 +523,7 @@ export default function ConcessionariasPage() {
                           transform: conc.debito_automatico ? 'translateX(18px)' : 'translateX(0)',
                           transition: 'transform 0.2s'
                         }} />
-                      </button>
+                      </div>
                     </td>
                     <td>
                       <div className="dc-cell-primary">{formatCurrencyCeil(conc.valor_medio || 0)}</div>
