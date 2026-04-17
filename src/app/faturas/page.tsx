@@ -401,8 +401,8 @@ export default function FaturasPage() {
                            <span className="dc-badge-dot" style={{ background: '#10b981' }} /> Ativo
                         </span>
                       ) : (
-                        <span className="dc-badge" style={{ fontSize: '0.72rem', background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' }}>
-                           Inativo
+                        <span className="dc-badge dc-badge-red" style={{ fontSize: '0.72rem' }}>
+                           <span className="dc-badge-dot" /> Inativo
                         </span>
                       )}
                     </td>

@@ -503,7 +503,7 @@ export default function ConcessionariasPage() {
                     <td>
                       <div
                         style={{
-                          background: conc.debito_automatico ? '#10b981' : '#e2e8f0',
+                          background: conc.debito_automatico ? '#10b981' : '#ef4444',
                           border: 'none',
                           borderRadius: '12px',
                           display: 'flex',
@@ -511,9 +511,10 @@ export default function ConcessionariasPage() {
                           padding: '2px',
                           width: '40px',
                           cursor: 'default',
-                          position: 'relative'
+                          position: 'relative',
+                          transition: 'background-color 0.2s'
                         }}
-                        title={conc.debito_automatico ? 'Ativo' : 'Inativo'}
+                        title={conc.debito_automatico ? 'Ativo' : 'Inativo (Atenção)'}
                       >
                         <div style={{
                           width: '18px',
