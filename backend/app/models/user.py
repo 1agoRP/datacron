@@ -39,6 +39,15 @@ class User(Base):
     codigo_usuario: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     whatsapp: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     administradora: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    
+    # Unified fields from database_usuarios
+    codigo_condominio: Mapped[Optional[str]] = mapped_column(String, nullable=True) # "39,48,70" or "todos"
+    gestor_usuarios: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    gestor_fornecedor: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    gestor_condominios: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    notificar_whatsapp: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    notificar_email: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
