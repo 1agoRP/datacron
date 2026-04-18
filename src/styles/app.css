@@ -1448,7 +1448,7 @@
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: 28px;
-  max-width: 960px;
+  max-width: 1100px;
 }
 @media (max-width: 768px) {
   .dc-settings-layout { grid-template-columns: 1fr; }
@@ -1478,6 +1478,25 @@
 .dc-settings-nav-item:hover { background: #f8fafc; color: #0f172a; }
 .dc-settings-nav-item.active { background: #eff6ff; color: #2563eb; }
 .dc-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.dc-profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+}
+@media (max-width: 1100px) {
+  .dc-profile-grid { grid-template-columns: 1fr; }
+}
+.dc-profile-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.dc-profile-sidebar {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -1735,4 +1754,90 @@
   gap: 12px;
   background: #f8fafc; /* Slightly different background for the footer */
   border-radius: 0 0 16px 16px;
+}
+
+/* Histórico de Faturas Style (Inspirado no Banco) */
+.dc-status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.dc-status-dot::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dc-status-dot-green::before { background-color: #16a34a; }
+.dc-status-dot-orange::before { background-color: #f97316; }
+.dc-status-dot-blue::before { background-color: #2563eb; }
+
+.dc-info-banner {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dc-info-banner:hover {
+  background: #e0f2fe;
+}
+
+.dc-info-banner::after {
+  content: "›";
+  position: absolute;
+  right: 20px;
+  font-size: 24px;
+  color: #0369a1;
+  opacity: 0.5;
+}
+
+.dc-table-action-footer {
+  margin: 16px -24px -24px -24px;
+  padding: 16px 24px;
+  background: #fff;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.03);
+}
+
+.dc-history-filter-btn {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  color: #475569;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dc-history-filter-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.dc-history-filter-btn svg {
+  color: #94a3b8;
 }

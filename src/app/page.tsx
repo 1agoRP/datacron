@@ -415,7 +415,7 @@ export default function LandingPage() {
               MÓDULOS DE ALTA PERFORMANCE
             </span>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 3vw, 2.8rem)', fontWeight: 800, color: 'var(--slate-900)', marginTop: '0.6rem', letterSpacing: '-0.03em', maxWidth: 600 }}>
-              Uma suíte completa para administradoras de imóveis.
+              Uma suíte completa para administradoras de Condomínios.
             </h2>
           </motion.div>
 
@@ -430,7 +430,7 @@ export default function LandingPage() {
                 Varredura Serverless de E-mail
               </h3>
               <p style={{ color: 'var(--slate-500)', fontSize: '0.95rem', lineHeight: 1.7, maxWidth: 460 }}>
-                Um agente Python de alta velocidade monitora suas caixas IMAP a cada 5 minutos. Ele identifica automaticamente faturas de Enel, Sabesp, Comgás e outras concessionárias, descartando spam e capturando apenas os PDFs essenciais.
+                Um agente Python de alta velocidade monitora suas caixas IMAP várias vezes ao dia. Ele identifica automaticamente faturas de Enel, Sabesp, Comgás e outras concessionárias, descartando spam e capturando apenas os PDFs essenciais.
               </p>
               <div style={{ marginTop: '1.75rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 {['IMAP / POP3', 'Multi-inbox', 'PDF Detector', 'Senha Auto'].map(tag => (
@@ -451,7 +451,7 @@ export default function LandingPage() {
                 Alertas Anti-Fraude
               </h3>
               <p style={{ color: 'var(--slate-500)', fontSize: '0.95rem', lineHeight: 1.7 }}>
-                Variações superiores a 30% no consumo disparam red-flags autônomas, prevenindo pagamentos de vazamentos estruturais ocultos.
+                Variações superiores a 20% no consumo disparam red-flags autônomas, prevenindo pagamentos de vazamentos estruturais ocultos.
               </p>
               <div style={{ marginTop: '1.5rem', background: 'var(--slate-50)', borderRadius: 10, padding: '0.875rem', border: '1px solid var(--slate-100)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -474,7 +474,7 @@ export default function LandingPage() {
                 OCR de Alta Precisão
               </h3>
               <p style={{ color: 'var(--slate-500)', fontSize: '0.95rem', lineHeight: 1.7 }}>
-                Modelos treinados para extrair referências de instalação, vencimentos e código de barras — com quebra automática de senhas baseada no CNPJ do condomínio.
+                Modelos treinados para extrair referências de instalação, vencimentos e código de barras — com quebra automática de senhas baseada no CNPJ do Condomínio.
               </p>
             </motion.div>
 
@@ -638,7 +638,7 @@ export default function LandingPage() {
                       Acesso Restrito
                     </h3>
                     <p style={{ color: 'var(--slate-400)', fontSize: '0.88rem', marginTop: '0.4rem' }}>
-                      Insira suas credenciais operacionais para continuar.
+                      Insira suas credenciais para continuar.
                     </p>
                   </div>
 

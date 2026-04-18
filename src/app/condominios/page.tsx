@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database } from 'lucide-react';
+import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database, CreditCard } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { ShieldAlert, Flame, ShieldCheck, HardHat } from 'lucide-react';
@@ -21,6 +21,24 @@ export default function CondominiosPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const readOnly = isReadOnly(user);
+  
+  const monthsList = [
+    { value: '01', label: 'Janeiro' }, { value: '02', label: 'Fevereiro' }, { value: '03', label: 'Março' },
+    { value: '04', label: 'Abril' }, { value: '05', label: 'Maio' }, { value: '06', label: 'Junho' },
+    { value: '07', label: 'Julho' }, { value: '08', label: 'Agosto' }, { value: '09', label: 'Setembro' },
+    { value: '10', label: 'Outubro' }, { value: '11', label: 'Novembro' }, { value: '12', label: 'Dezembro' }
+  ];
+
+  const formatReferencia = (ref: string) => {
+    if (!ref) return '—';
+    const parts = ref.split('/');
+    if (parts.length === 2 && !isNaN(Number(parts[0]))) {
+      const m = parseInt(parts[0], 10);
+      const mLabel = monthsList.find(i => parseInt(i.value, 10) === m)?.label || parts[0];
+      return `${mLabel}, ${parts[1]}`;
+    }
+    return ref;
+  };
   
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,6 +77,7 @@ export default function CondominiosPage() {
   const [historyConc, setHistoryConc] = useState<any>(null);
   const [historyFaturas, setHistoryFaturas] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedHistory, setSelectedHistory] = useState<Set<string>>(new Set());
 
   // Removed manual fetchData in favor of useSWR
 
@@ -224,6 +243,7 @@ export default function CondominiosPage() {
 
   const handleOpenHistory = async (conc: any) => {
     setHistoryConc(conc);
+    setSelectedHistory(new Set());
     try {
       setLoadingHistory(true);
       // Busca faturas exclusivamente do Banco de Dados
@@ -242,6 +262,21 @@ export default function CondominiosPage() {
       setHistoryFaturas([]);
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const toggleSelectFatura = (id: string) => {
+    const next = new Set(selectedHistory);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedHistory(next);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedHistory.size === historyFaturas.length) {
+      setSelectedHistory(new Set());
+    } else {
+      setSelectedHistory(new Set(historyFaturas.map(f => f.id)));
     }
   };
 
@@ -656,16 +691,57 @@ export default function CondominiosPage() {
             </div>
             <div className="dc-modal-body dc-space-y-4" style={{ maxHeight: 500, overflowY: 'auto' }}>
               {historyConc ? (
-                /* HISTORY VIEW */
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, background: '#f0f9ff', borderRadius: 10, border: '1px solid #bae6fd' }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 8, background: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1rem' }}>
-                      {historyConc.tipo[0]}
+                /* HISTORY VIEW (ESTILO BANCO) */
+                <div style={{ marginTop: -8 }}>
+                  {/* Banner Débito Automático */}
+                  <div 
+                    className="dc-info-banner" 
+                    style={{ 
+                      background: historyConc.debito_automatico ? '#f0f9ff' : '#fef2f2',
+                      border: `1px solid ${historyConc.debito_automatico ? '#bae6fd' : '#fecaca'}`
+                    }}
+                  >
+                    <div style={{ 
+                      width: 44, 
+                      height: 44, 
+                      borderRadius: 10, 
+                      background: '#fff', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      color: historyConc.debito_automatico ? '#1e40af' : '#ef4444', 
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.05)' 
+                    }}>
+                      <CreditCard size={22} />
                     </div>
                     <div>
-                      <div style={{ fontWeight: 800, color: '#0c4a6e' }}>{historyConc.tipo} — {historyConc.instalacao}</div>
-                      <div style={{ fontSize: '0.82rem', color: '#0369a1' }}>{detailsCondo.nome} · Dia {historyConc.dia_vencimento}</div>
+                      <div style={{ 
+                        fontWeight: 800, 
+                        fontSize: '0.9rem', 
+                        color: historyConc.debito_automatico ? '#0369a1' : '#b91c1c' 
+                      }}>
+                        {historyConc.debito_automatico ? 'Débito Automático Ativo' : 'Débito Automático Inativo'}
+                      </div>
+                      <div style={{ 
+                        fontSize: '0.8rem', 
+                        color: historyConc.debito_automatico ? '#0c4a6e' : '#991b1b', 
+                        opacity: 0.8 
+                      }}>
+                        {historyConc.debito_automatico 
+                          ? 'Suas faturas são processadas automaticamente no dia do vencimento.' 
+                          : 'As faturas deste condomínio precisam ser pagas manualmente todo mês.'}
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Filtros Localizados */}
+                  <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+                    <button className="dc-history-filter-btn">
+                      <Calendar size={14} /> Data de vencimento <ChevronLeft size={14} style={{ transform: 'rotate(-90deg)' }} />
+                    </button>
+                    <button className="dc-history-filter-btn">
+                      <Filter size={14} /> Situação <ChevronLeft size={14} style={{ transform: 'rotate(-90deg)' }} />
+                    </button>
                   </div>
 
                   {loadingHistory ? (
@@ -676,61 +752,142 @@ export default function CondominiosPage() {
                       <div style={{ fontWeight: 700 }}>Nenhuma fatura registrada para esta concessionária</div>
                     </div>
                   ) : (
-                    <table className="dc-table" style={{ fontSize: '0.85rem' }}>
-                      <thead>
-                        <tr>
-                          <th>Referência</th>
-                          <th>Vencimento</th>
-                          <th>Valor</th>
-                          <th>Status</th>
-                          <th style={{ textAlign: 'right' }}>PDF</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {historyFaturas.map(f => {
-                          const isGmail = f.status === 'gmail_archive';
-                          return (
-                            <tr key={f.id}>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  {isGmail ? <Mail size={14} color="#64748b" /> : <Database size={14} color="#3b82f6" />}
-                                  <span className="dc-cell-primary" style={{ fontSize: '0.75rem', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {f.referencia || '—'}
-                                  </span>
-                                </div>
-                              </td>
-                              <td>{f.vencimento ? (isGmail ? f.vencimento.split(' ').slice(0, 4).join(' ') : format(new Date(f.vencimento), 'dd/MM/yyyy')) : '—'}</td>
-                              <td><span className="dc-cell-primary">{f.valor > 0 ? formatCurrencyCeil(f.valor) : '—'}</span></td>
-                              <td>
-                                <span className={`dc-badge ${isGmail ? 'dc-badge-amber' : f.status === 'processada' ? 'dc-badge-green' : 'dc-badge-amber'}`} style={{ fontSize: '0.7rem' }}>
-                                  {isGmail ? 'Gmail' : (f.status || 'pendente').toUpperCase()}
-                                </span>
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                  <button
-                                    className={`dc-btn ${isGmail ? 'dc-btn-secondary' : 'dc-btn-secondary'}`}
-                                    style={{ height: 30, padding: '0 10px', fontSize: '0.75rem', gap: 4, opacity: isGmail ? 0.6 : 1 }}
-                                    disabled={!isGmail && !f.pdf_path}
-                                    onClick={() => {
-                                      if (isGmail) {
-                                        alert('Esta fatura está no Gmail. Aguarde a próxima varredura automática para processamento ou use a Central de Recebimento.');
-                                      } else {
-                                        handleDownloadFatura(f.id, f.pdf_nome_original || `fatura_${f.id}.pdf`);
-                                      }
-                                    }}
-                                  >
-                                    <Download size={12} /> {isGmail ? 'No Gmail' : 'Baixar'}
-                                  </button>
-                                </div>
-                              </td>
+                    <>
+                      <div style={{ overflowX: 'auto', border: '1px solid #f1f5f9', borderRadius: 12 }}>
+                        <table className="dc-table" style={{ fontSize: '0.85rem', border: 'none' }}>
+                          <thead style={{ background: '#fff' }}>
+                            <tr>
+                              <th style={{ width: 40 }}>
+                                <input 
+                                  type="checkbox" 
+                                  className="dc-checkbox"
+                                  checked={selectedHistory.size === historyFaturas.length && historyFaturas.length > 0}
+                                  onChange={toggleSelectAll}
+                                />
+                              </th>
+                              <th>Mês</th>
+                              <th>Vencimento</th>
+                              <th>Situação</th>
+                              <th>Emissão</th>
+                              <th>Valor</th>
+                              <th style={{ textAlign: 'right' }}></th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                          </thead>
+                          <tbody>
+                            {historyFaturas.map(f => {
+                              const isPaid = f.status === 'processada';
+                              const isSelected = selectedHistory.has(f.id);
+                              
+                              // Mock emission date based on creation or vencimiento -5 days
+                              const emissionDate = f.created_at ? new Date(f.created_at) : (f.vencimento ? new Date(new Date(f.vencimento).getTime() - 5*24*60*60*1000) : null);
+
+                              return (
+                                <tr key={f.id} style={{ background: isSelected ? '#f8fafc' : 'transparent' }}>
+                                  <td>
+                                    <input 
+                                      type="checkbox" 
+                                      className="dc-checkbox"
+                                      checked={isSelected}
+                                      onChange={() => toggleSelectFatura(f.id)}
+                                    />
+                                  </td>
+                                  <td>
+                                    <div style={{ fontWeight: 600, color: '#1e293b' }}>
+                                      {f.referencia ? formatReferencia(f.referencia) : '—'}
+                                    </div>
+                                  </td>
+                                  <td style={{ color: '#475569' }}>
+                                    {f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
+                                  </td>
+                                  <td>
+                                    <span className={`dc-status-dot ${isPaid ? 'dc-status-dot-green' : 'dc-status-dot-orange'}`}>
+                                      {isPaid ? 'Paga' : 'Em aberto'}
+                                    </span>
+                                  </td>
+                                  <td style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
+                                    {emissionDate ? format(emissionDate, 'dd/MM/yyyy') : '—'}
+                                  </td>
+                                  <td>
+                                    <div style={{ fontWeight: 800, color: '#0f172a' }}>
+                                      {formatCurrencyCeil(f.valor || 0)}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                                      <button 
+                                        onClick={() => handleDownloadFatura(f.id, f.pdf_nome_original || 'fatura.pdf')}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                                        title="Download"
+                                      >
+                                        <Download size={16} />
+                                      </button>
+                                      <button 
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                                        title="Pagar"
+                                      >
+                                        <CreditCard size={16} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Footer Ações */}
+                      <div className="dc-table-action-footer" style={{ 
+                        padding: '16px 0', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        borderTop: '1px solid #f1f5f9',
+                        marginTop: 12
+                      }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+                          {selectedHistory.size > 0 
+                            ? `${selectedHistory.size} fatura${selectedHistory.size !== 1 ? 's' : ''} selecionada${selectedHistory.size !== 1 ? 's' : ''}`
+                            : 'Nenhuma fatura selecionada'}
+                        </div>
+                        <div style={{ display: 'flex', gap: 12 }}>
+                          <button 
+                            className="dc-btn dc-btn-secondary" 
+                            style={{ 
+                              height: 48, 
+                              padding: '0 24px', 
+                              borderRadius: 12,
+                              background: '#fff',
+                              color: '#1e293b',
+                              fontWeight: 700,
+                              opacity: selectedHistory.size === 0 ? 0.5 : 1,
+                              cursor: selectedHistory.size === 0 ? 'not-allowed' : 'pointer'
+                            }} 
+                            disabled={selectedHistory.size === 0}
+                            onClick={() => alert('Exportando seleção...')}
+                          >
+                            Exportar
+                          </button>
+                          <button 
+                            className="dc-btn dc-btn-primary" 
+                            style={{ 
+                              height: 48, 
+                              padding: '0 40px', 
+                              borderRadius: 12,
+                              fontWeight: 700,
+                              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                              opacity: selectedHistory.size === 0 ? 0.5 : 1,
+                              cursor: selectedHistory.size === 0 ? 'not-allowed' : 'pointer'
+                            }} 
+                            disabled={selectedHistory.size === 0}
+                            onClick={() => alert('Processando pagamento...')}>
+                            Pagar
+                          </button>
+                        </div>
+                      </div>
+                    </>
                   )}
-                </>
+                </div>
               ) : (
                 /* DETAILS VIEW */
                 <>

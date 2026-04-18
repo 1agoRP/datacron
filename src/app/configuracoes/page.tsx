@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
-  User, Shield, Bell, Globe, Database, Mail, Smartphone, ArrowRight, Check, Key, Link as LinkIcon, LogOut, Trash2, Copy, Plus, Activity, RefreshCw, AlertTriangle
+  User, Shield, Bell, Globe, Database, Mail, Smartphone, ArrowRight, Check, Key, Link as LinkIcon, LogOut, Trash2, Copy, Plus, Activity, RefreshCw, AlertTriangle, Pencil
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
@@ -12,9 +12,7 @@ import { isReadOnly } from '@/types';
 
 const allNavItems = [
   { icon: User,       label: 'Perfil & Conta',            adminOnly: false },
-  { icon: Shield,     label: 'Privacidade & Segurança',    adminOnly: false },
   { icon: Bell,       label: 'Notificações',               adminOnly: true },
-  { icon: Mail,       label: 'Conexão Gmail',              adminOnly: true },
 ];
 
 export default function ConfiguracoesPage() {
@@ -117,16 +115,9 @@ export default function ConfiguracoesPage() {
   });
 
   React.useEffect(() => {
-    if (active === 'Conexão Gmail') {
-      api.getGmailStatus()
-        .then((res: any) => setGmailStatus(res))
-        .catch(err => {
-          console.error("Failed to load Gmail Status", err);
-          setGmailStatus({ connected: false });
-        });
-    }
 
-    if (active === 'Privacidade & Segurança') {
+
+    if (active === 'Perfil & Conta') {
       setIsLoadingSessions(true);
       api.getSessions()
         .then((res: any) => setSessions(res))
@@ -135,234 +126,225 @@ export default function ConfiguracoesPage() {
     }
   }, [active]);
 
-  const handleForceSync = async () => {
-    try {
-      setIsSyncing(true);
-      const res = await api.forceEmailScan() as any;
-      alert(res.message || 'Sincronização forçada iniciada com sucesso em segundo plano.');
-    } catch (e: any) {
-      alert(e.message || 'Falha ao forçar sincronização.');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
-  const handleConnectGmail = async () => {
-    try {
-      const res = await api.getGmailAuthUrl() as any;
-      if (res && res.url) {
-        // Open OAuth in Popup
-        const width = 500;
-        const height = 600;
-        const left = window.screenX + (window.outerWidth - width) / 2;
-        const top = window.screenY + (window.outerHeight - height) / 2;
-        
-        window.open(
-          res.url,
-          'GoogleOAuth',
-          `width=${width},height=${height},left=${left},top=${top}`
-        );
-        
-        // Simulating the user coming back after successful connection since no real callback exists yet:
-        setTimeout(() => {
-          api.getGmailStatus().then((st: any) => setGmailStatus(st));
-        }, 8000);
-      }
-    } catch (e: any) {
-      alert('Erro ao obter link de autenticação.');
-    }
-  };
 
   const renderContent = () => {
     switch (active) {
       case 'Perfil & Conta':
         return (
-          <>
-            <div className="dc-card dc-card-p">
-              <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: 20 }}>
-                Informações do Operador
-              </div>
-              <div className="dc-form-grid-2">
-                <div className="dc-form-group">
-                  <label className="dc-form-label">Nome Completo</label>
-                  <input 
-                    className="dc-form-input" 
-                    type="text" 
-                    disabled={!isAdmin}
-                    value={form.nome}
-                    onChange={(e) => setForm({ ...form, nome: e.target.value })} 
-                  />
+          <div className="dc-profile-grid">
+            <div className="dc-profile-main dc-space-y-6">
+              {/* Informações Pessoais */}
+              <div className="dc-card dc-card-p">
+                <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <User size={18} color="#2563eb" /> Informações do Perfil
                 </div>
-                <div className="dc-form-group">
-                  <label className="dc-form-label">E-mail Corporativo</label>
-                  <input 
-                    className="dc-form-input" 
-                    type="email" 
-                    disabled
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })} 
-                  />
-                </div>
-                <div className="dc-form-group">
-                  <label className="dc-form-label">ID Operacional</label>
-                  <input className="dc-form-input" type="text" value="DAT-90234-A" disabled />
-                </div>
-                <div className="dc-form-group">
-                  <label className="dc-form-label">Cargo</label>
-                  <select 
-                    className="dc-form-select"
-                    disabled={!isAdmin}
-                    value={form.cargo}
-                    onChange={(e) => setForm({ ...form, cargo: e.target.value })}
-                  >
-                    <option value="admin">Administrador Global</option>
-                    <option value="operador">Operador Pleno</option>
-                    <option value="supervisor">Supervisor</option>
-                    <option value="contabilidade">Contabilidade (Somente Leitura)</option>
-                    <option value="financeiro">Financeiro (Somente Leitura)</option>
-                    <option value="providencias">Providências (Somente Leitura)</option>
-                    <option value="geral">Geral (Somente Leitura)</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
-                <button 
-                  className="dc-btn dc-btn-primary" 
-                  onClick={handleSaveProfile}
-                  disabled={isSaving}
-                >
-                  {isSaving ? 'Salvando...' : 'Salvar Alterações'}
-                </button>
-              </div>
-            </div>
-
-            <div
-              className="dc-card dc-card-p"
-              style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', border: 'none', position: 'relative', overflow: 'hidden' }}
-            >
-              <div
-                style={{
-                  position: 'absolute', top: -40, right: -40,
-                  width: 160, height: 160, borderRadius: '50%',
-                  background: 'rgba(37, 99, 235, 0.3)', filter: 'blur(60px)',
-                  pointerEvents: 'none',
-                }}
-              />
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, position: 'relative', zIndex: 1 }}>
-                <div>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', marginBottom: 14 }}>
-                    <Smartphone size={22} />
-                  </div>
-                  <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff', marginBottom: 6 }}>
-                    Autenticação em Duas Etapas
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: '#94a3b8', lineHeight: 1.6, maxWidth: 380 }}>
-                    Aumente a segurança da base de dados dos seus condomínios ativando 2FA via App Autenticador ou SMS.
-                  </div>
-                </div>
-                <button className="dc-btn" style={{ background: '#fff', color: '#0f172a', flexShrink: 0, gap: 8 }} onClick={() => alert('Fluxo 2FA ativado.')}>
-                  Ativar Agora <ArrowRight size={15} />
-                </button>
-              </div>
-            </div>
-
-            {isAdmin && (
-              <div className="dc-card dc-card-p" style={{ border: '1px solid #fecaca', background: '#fff5f5' }}>
-                <div style={{ fontWeight: 800, fontSize: '1rem', color: '#dc2626', marginBottom: 6 }}>Zona de Perigo</div>
-                <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 20 }}>
-                  Ações irreversíveis relacionadas à conta Datacron e backups de faturas.
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                  <button className="dc-btn dc-btn-danger" onClick={() => confirm('Tem certeza que deseja desativar a conta?')}>Desativar Conta</button>
-                  <button className="dc-btn dc-btn-danger" onClick={() => confirm('Isto irá limpar todo o histórico de processamento. Continuar?')}>Limpar Histórico de Processamento</button>
-                </div>
-              </div>
-            )}
-          </>
-        );
-
-      case 'Privacidade & Segurança':
-        return (
-          <>
-            <div className="dc-card dc-card-p">
-              <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: 20 }}>
-                Alterar Senha
-              </div>
-              <div className="dc-form-grid-1" style={{ maxWidth: 400 }}>
-                <div className="dc-form-group">
-                  <label className="dc-form-label">Senha Atual</label>
-                  <input 
-                    className="dc-form-input" 
-                    type="password" 
-                    placeholder="Digite sua senha atual"
-                    value={pwForm.senhaAtual}
-                    onChange={e => setPwForm({ ...pwForm, senhaAtual: e.target.value })}
-                  />
-                </div>
-                <div className="dc-form-group">
-                  <label className="dc-form-label">Nova Senha</label>
-                  <input 
-                    className="dc-form-input" 
-                    type="password" 
-                    placeholder="Mínimo 8 caracteres"
-                    value={pwForm.novaSenha}
-                    onChange={e => setPwForm({ ...pwForm, novaSenha: e.target.value })}
-                  />
-                </div>
-                <div className="dc-form-group">
-                  <label className="dc-form-label">Confirmar Nova Senha</label>
-                  <input 
-                    className="dc-form-input" 
-                    type="password"
-                    value={pwForm.confirmaSenha}
-                    onChange={e => setPwForm({ ...pwForm, confirmaSenha: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div style={{ marginTop: 24 }}>
-                <button 
-                  className="dc-btn dc-btn-primary" 
-                  disabled={isUpdatingPw}
-                  onClick={handleUpdatePassword}
-                >
-                  {isUpdatingPw ? 'Atualizando...' : 'Atualizar Senha'}
-                </button>
-              </div>
-            </div>
-
-            <div className="dc-card dc-card-p">
-              <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: 6 }}>Sessões Ativas</div>
-              <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 20 }}>Dispositivos com acesso atual à sua conta.</div>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {isLoadingSessions ? (
-                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Carregando sessões...</div>
-                ) : sessions.length === 0 ? (
-                  <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Nenhuma sessão encontrada.</div>
-                ) : (
-                  sessions.map(s => (
-                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16, borderBottom: '1px solid #e2e8f0' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-                          {s.device.includes('Navegador') || s.device.includes('Chrome') || s.device.includes('Mac') ? <Globe size={20} /> : <Smartphone size={20} />}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>{s.device}</div>
-                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{s.location} • {s.last_active}</div>
-                        </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <div className="dc-form-group">
+                    <label className="dc-form-label">Nome Completo</label>
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        className="dc-form-input" 
+                        style={{ width: '100%', paddingRight: '44px', fontWeight: 600 }}
+                        type="text" 
+                        value={form.nome}
+                        onChange={(e) => setForm({ ...form, nome: e.target.value })} 
+                      />
+                      <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>
+                        <Pencil size={16} />
                       </div>
-                      {s.is_current ? (
-                        <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600 }}>Ativo</div>
-                      ) : (
-                        <button className="dc-btn" style={{ fontSize: '0.8rem', padding: '6px 12px' }}>Encerrar</button>
-                      )}
                     </div>
-                  ))
-                )}
+                  </div>
+
+                  <div className="dc-form-group">
+                    <label className="dc-form-label">E-mail de Acesso</label>
+                    <input 
+                      className="dc-form-input" 
+                      style={{ width: '100%', background: '#f1f5f9', color: '#64748b' }}
+                      type="email" 
+                      disabled
+                      value={form.email}
+                    />
+                  </div>
+
+                  <div className="dc-form-group">
+                    <label className="dc-form-label">Telefone / WhatsApp</label>
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        className="dc-form-input" 
+                        style={{ width: '100%', paddingRight: '44px' }}
+                        type="text" 
+                        defaultValue="11 91365-9493"
+                      />
+                      <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>
+                        <Pencil size={16} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="dc-form-group">
+                    <label className="dc-form-label">Cargo / Função</label>
+                    <input 
+                      className="dc-form-input" 
+                      style={{ width: '100%', textTransform: 'capitalize', background: '#f1f5f9', color: '#64748b' }}
+                      type="text" 
+                      disabled
+                      value={user?.role || 'Operador'}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
+                  <button className="dc-btn dc-btn-primary" onClick={handleSaveProfile} disabled={isSaving}>
+                    {isSaving ? 'Salvando...' : 'Salvar Perfil'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Segurança e Senha */}
+              <div className="dc-card dc-card-p">
+                <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Shield size={18} color="#2563eb" /> Segurança & Acesso
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+                   {/* Coluna de Troca de Senha */}
+                   <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: 16 }}>ALTERAR SENHA</div>
+                      <div className="dc-space-y-4">
+                        <div className="dc-form-group">
+                          <input 
+                            className="dc-form-input" 
+                            type="password" 
+                            placeholder="Senha atual"
+                            value={pwForm.senhaAtual}
+                            onChange={e => setPwForm({ ...pwForm, senhaAtual: e.target.value })}
+                          />
+                        </div>
+                        <div className="dc-form-group">
+                          <input 
+                            className="dc-form-input" 
+                            type="password" 
+                            placeholder="Nova senha"
+                            value={pwForm.novaSenha}
+                            onChange={e => setPwForm({ ...pwForm, novaSenha: e.target.value })}
+                          />
+                        </div>
+                        <div className="dc-form-group">
+                          <input 
+                            className="dc-form-input" 
+                            type="password" 
+                            placeholder="Confirmar nova senha"
+                            value={pwForm.confirmaSenha}
+                            onChange={e => setPwForm({ ...pwForm, confirmaSenha: e.target.value })}
+                          />
+                        </div>
+                        <button className="dc-btn dc-btn-dark dc-w-full" onClick={handleUpdatePassword} disabled={isUpdatingPw}>
+                          {isUpdatingPw ? 'Atualizando...' : 'Atualizar Minha Senha'}
+                        </button>
+                      </div>
+                   </div>
+
+                   {/* Coluna de Dispositivos */}
+                   <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: 16 }}>SESSÕES ATIVAS</div>
+                      <div className="dc-space-y-3">
+                        {sessions.slice(0, 3).map(s => (
+                          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                            <div style={{ width: 32, height: 32, borderRadius: '6px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', border: '1px solid #e2e8f0' }}>
+                               {s.device.includes('Navegador') ? <Globe size={16} /> : <Smartphone size={16} />}
+                            </div>
+                            <div className="dc-min-w-0">
+                               <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }} className="dc-truncate">{s.device}</div>
+                               <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{s.is_current ? 'Acessando agora' : s.last_active}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                   </div>
+                </div>
+              </div>
+
+              {isAdmin && (
+                <div style={{ padding: '0 4px', display: 'flex', justifyContent: 'center' }}>
+                    <button 
+                      className="dc-btn" 
+                      style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 600, border: 'none', background: 'none', textDecoration: 'underline' }}
+                      onClick={() => confirm('Tem certeza que deseja solicitar a desativação desta conta?')}
+                    >
+                      Deseja encerrar ou desativar sua conta? Clique aqui.
+                    </button>
+                </div>
+              )}
+            </div>
+
+            <div className="dc-profile-sidebar">
+              {/* Card de Perfil Minimalista */}
+              <div className="dc-card" style={{ padding: '32px 24px', textAlign: 'center', overflow: 'hidden', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 80, background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', zIndex: 0 }} />
+                
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                    <div style={{ 
+                      width: 96, height: 96, borderRadius: '50%', background: '#fff', 
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb',
+                      border: '6px solid #fff', boxShadow: '0 8px 16px rgba(0,0,0,0.08)'
+                    }}>
+                      <User size={44} />
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: 800, fontSize: '1.25rem', color: '#0f172a', marginBottom: 2 }}>{user?.nome}</div>
+                  <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {user?.role === 'admin' ? 'Administrador' : user?.role || 'Operador'}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid #f1f5f9', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                     <div style={{ width: 32, height: 32, borderRadius: '8px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                       <Activity size={16} />
+                     </div>
+                     <div>
+                       <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Código</div>
+                       <div style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 700 }}>#{user?.codigo_usuario || '1420'}</div>
+                     </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                     <div style={{ width: 32, height: 32, borderRadius: '8px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                       <Database size={16} />
+                     </div>
+                     <div className="dc-min-w-0">
+                       <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Condomínios</div>
+                       <div style={{ fontSize: '0.82rem', color: '#1e293b', fontWeight: 600 }} className="dc-truncate">
+                         {user?.condominios_ids?.join(', ') || 'Acesso a todos'}
+                       </div>
+                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card de Status Simplificado */}
+              <div className="dc-card dc-card-p" style={{ border: '1px solid #ecfdf5', background: '#fff' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 0 4px #ecfdf5' }} />
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#065f46' }}>Conta Protegida</span>
+                 </div>
+                 <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 8, lineHeight: 1.4 }}>
+                    Seu acesso está verificado e operando sob protocolo AES-256.
+                 </div>
+              </div>
+
+              <div style={{ textAlign: 'center' }}>
+                 <button className="dc-btn" onClick={() => api.logout().then(() => window.location.href = '/login')} style={{ color: '#ef4444', fontWeight: 600, fontSize: '0.85rem', gap: 8 }}>
+                    <LogOut size={16} /> Sair do Sistema
+                 </button>
               </div>
             </div>
-          </>
+          </div>
         );
+
+
 
       case 'Notificações':
         const notificationOption = (key: keyof typeof notifConfig, title: string, desc: string) => (
@@ -414,164 +396,10 @@ export default function ConfiguracoesPage() {
                     alert('Preferências de notificação salvas com sucesso!' + emailMsg);
                   } catch (e: any) {
                     alert('Falha ao salvar preferências: ' + e.message);
-                  }
-              }}>Salvar Preferências</button>
-            </div>
-          </div>
-        );
-
-      case 'Conexão Gmail':
-        const connected = gmailStatus?.connected;
-        const emailAddress = gmailStatus?.email || 'faturas@empresa.com.br';
-
-        return (
-          <div className="dc-card dc-card-p">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444' }}>
-                <Mail size={24} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#0f172a' }}>Integração com Gmail</div>
-                <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Conecte seu e-mail de cobranças para automação total.</div>
-              </div>
-            </div>
-
-            <div style={{ 
-              padding: '32px', 
-              background: connected ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' : 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)', 
-              borderRadius: '16px', 
-              border: connected ? '1px solid #bef264' : '1px solid #e2e8f0', 
-              textAlign: 'center', 
-              marginBottom: 32,
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              {/* Decorative background element */}
-              <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: connected ? '#10b98110' : '#64748b10' }}></div>
-
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-                {!gmailStatus ? (
-                  <div className="dc-badge dc-badge-secondary">
-                    <RefreshCw size={14} className="animate-spin" /> Verificando conexão...
-                  </div>
-                ) : connected ? (
-                  <div style={{ 
-                    padding: '10px 20px', 
-                    background: '#10b981', 
-                    color: '#fff', 
-                    borderRadius: '30px', 
-                    fontSize: '0.9rem', 
-                    fontWeight: 600, 
-                    display: 'flex', 
-                    gap: 10, 
-                    alignItems: 'center',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' 
-                  }}>
-                    <div style={{ width: 8, height: 8, background: '#fff', borderRadius: '50%', boxShadow: '0 0 8px #fff' }}></div>
-                    Conectado: {emailAddress}
-                  </div>
-                ) : (
-                  <div className="dc-badge dc-badge-warning" style={{ fontSize: '0.9rem', padding: '8px 16px' }}>
-                    Conta não vinculada
-                  </div>
-                )}
-              </div>
-
-              <div style={{ fontSize: '1rem', color: '#475569', maxWidth: 480, margin: '0 auto 24px auto', lineHeight: 1.6 }}>
-                {connected 
-                  ? 'O Datacron está varrendo sua caixa de entrada 3 vezes ao dia em busca de novas faturas e processando os anexos automaticamente.' 
-                  : 'Vincule sua conta Google Workspace ou Gmail para que o Datacron possa ler faturas recebidas (Sabesp, Light, Enel, etc) utilizando IA.'}
-              </div>
-              
-              {!connected ? (
-                <button 
-                  onClick={handleConnectGmail}
-                  style={{ 
-                    display: 'inline-flex', 
-                    alignItems: 'center', 
-                    gap: 12, 
-                    background: '#fff', 
-                    color: '#3c4043', 
-                    border: '1px solid #dadce0', 
-                    padding: '12px 24px', 
-                    borderRadius: '8px', 
-                    fontWeight: 600, 
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
-                  }}
-                  onMouseOver={(e) => { e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.12)'; e.currentTarget.style.background = '#f8f9fa'; }}
-                  onMouseOut={(e) => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)'; e.currentTarget.style.background = '#fff'; }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  Conectar conta do Google
-                </button>
-              ) : (
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
-                  <button 
-                    className="dc-btn dc-btn-secondary" 
-                    onClick={handleForceSync}
-                    disabled={isSyncing}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-                  >
-                    <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
-                    {isSyncing ? 'Sincronizando...' : 'Forçar Sincronização'}
-                  </button>
-                  <button 
-                    className="dc-btn" 
-                    style={{ color: '#ef4444', border: '1px solid #fee2e2', background: '#fff' }}
-                    onClick={() => {
-                       if(confirm('Tem certeza que deseja desconectar sua conta do Gmail?')) {
-                          alert('Conta desconectada com sucesso.');
-                          setGmailStatus({ connected: false });
-                       }
-                    }}
-                  >
-                    Desconectar Conta
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 24 }}>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                Histórico de Sincronização
-                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 400 }}>Últimos 3 registros</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {syncHistory.map((item, idx) => (
-                  <div key={idx} style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    padding: '12px 16px', 
-                    background: '#fff', 
-                    borderRadius: '8px', 
-                    border: '1px solid #f1f5f9' 
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      {item.status === 'Sucesso' ? (
-                        <div style={{ color: '#10b981' }}><Check size={16} /></div>
-                      ) : (
-                        <div style={{ color: '#ef4444' }}><AlertTriangle size={16} /></div>
-                      )}
-                      <div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>
-                          Sincronização {idx === 0 ? 'Automática' : 'Manual (Usuário)'}
-                        </div>
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{item.count} faturas encontradas</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>{idx === 0 ? 'Hoje, 11:32 AM' : idx === 1 ? 'Ontem, 16:45 PM' : 'Ontem, 08:32 AM'}</div>
-                  </div>
-                ))}
-              </div>
+                }}}
+              >
+                Salvar Preferências
+              </button>
             </div>
           </div>
         );
