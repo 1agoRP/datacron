@@ -22,7 +22,7 @@ import base64
 router = APIRouter(prefix="/concessionarias", tags=["Concessionárias"])
 
 
-@router.get("/", response_model=list[ConcessionariaResponse])
+@router.get("", response_model=list[ConcessionariaResponse])
 async def list_concessionarias(
     condominio_id: Optional[uuid.UUID] = None,
     tipo: Optional[str] = None,
@@ -47,7 +47,7 @@ async def list_concessionarias(
     return result.scalars().all()
 
 
-@router.post("/", response_model=ConcessionariaResponse, status_code=201)
+@router.post("", response_model=ConcessionariaResponse, status_code=201)
 async def create_concessionaria(
     body: ConcessionariaCreate,
     db: AsyncSession = Depends(get_db),

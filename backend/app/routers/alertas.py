@@ -14,7 +14,7 @@ from app.schemas import AlertaResponse, EmailLogResponse
 router = APIRouter(prefix="/alertas", tags=["Alertas"])
 
 
-@router.get("/", response_model=list[AlertaResponse])
+@router.get("", response_model=list[AlertaResponse])
 async def list_alertas(
     tipo: Optional[str] = None,
     gravidade: Optional[str] = None,

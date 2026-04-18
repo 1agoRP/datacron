@@ -27,7 +27,7 @@ def _escape_like(value: str) -> str:
     return value.replace("%", r"\%").replace("_", r"\_")
 
 
-@router.get("/", response_model=list[CondominioResponse])
+@router.get("", response_model=list[CondominioResponse])
 async def list_condominios(
     search: Optional[str] = Query(None, description="Busca por nome, número ou CNPJ"),
     ativo: bool = Query(True),

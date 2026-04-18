@@ -3,7 +3,7 @@ from httpx import AsyncClient
 
 @pytest.mark.asyncio
 async def test_alertas_list_empty(auth_client: AsyncClient):
-    resp = await auth_client.get("/api/alertas/")
+    resp = await auth_client.get("/api/alertas")
     assert resp.status_code == 200
     assert resp.json() == []
 

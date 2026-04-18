@@ -103,7 +103,7 @@ async def contratos_stats(
     }
 
 
-@router.get("/", response_model=list[ContratoResponse])
+@router.get("", response_model=list[ContratoResponse])
 async def list_contratos(
     condominio_id: Optional[uuid.UUID] = None,
     tipo_contrato: Optional[str] = None,
@@ -157,7 +157,7 @@ async def list_contratos(
     return responses
 
 
-@router.post("/", response_model=ContratoResponse, status_code=201)
+@router.post("", response_model=ContratoResponse, status_code=201)
 async def create_contrato(
     body: ContratoCreate,
     db: AsyncSession = Depends(get_db),

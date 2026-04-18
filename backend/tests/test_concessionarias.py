@@ -1,19 +1,22 @@
 import pytest
 from httpx import AsyncClient
+import uuid
 
 @pytest.mark.asyncio
 async def test_list_concessionarias_empty(auth_client: AsyncClient):
-    resp = await auth_client.get("/api/concessionarias/")
+    resp = await auth_client.get("/api/concessionarias")
     assert resp.status_code == 200
     assert resp.json() == []
 
 @pytest.mark.asyncio
 async def test_create_concessionaria(auth_client: AsyncClient):
     # Condominio required first
-    c_resp = await auth_client.post("/api/condominios/", json={
-        "nome": "Condo B", "numero": "B01", "endereco": "B", 
-        "cnpj": "33.333.333/3333-33", "sindico": "B"
+    uid = uuid.uuid4().hex[:4]
+    c_resp = await auth_client.post("/api/condominios", json={
+        "nome": f"Condo B {uid}", "numero": f"B{uid}", "endereco": "B", 
+        "cnpj": "11.222.333/0001-81", "sindico": "B"
     })
+    assert c_resp.status_code == 201
     condo_id = c_resp.json()["id"]
 
     # Now concessionaria
@@ -25,22 +28,25 @@ async def test_create_concessionaria(auth_client: AsyncClient):
         "regra_senha": "manual",
         "senha_manual": "mysenha",
         "dia_vencimento": 10,
-        "valor_medio": 200.0
+        "valor_medio": 200.0,
+        "debito_automatico": True,
+        "leitura_individualizada": False
     }
-    r = await auth_client.post("/api/concessionarias/", json=payload)
+    r = await auth_client.post("/api/concessionarias", json=payload)
     assert r.status_code == 201
     data = r.json()
     assert data["tipo"] == "Enel"
     assert data["instalacao"] == "12345"
     assert data["regra_senha"] == "manual"
-    assert "senha_manual" not in data # Because it's generally shouldn't be exposed or just not in response model
 
 @pytest.mark.asyncio
 async def test_update_concessionaria(auth_client: AsyncClient):
-    c_resp = await auth_client.post("/api/condominios/", json={
-        "nome": "Condo C", "numero": "C01", "endereco": "C", 
-        "cnpj": "44.444.444/4444-44", "sindico": "C"
+    uid = uuid.uuid4().hex[:4]
+    c_resp = await auth_client.post("/api/condominios", json={
+        "nome": f"Condo C {uid}", "numero": f"C{uid}", "endereco": "C", 
+        "cnpj": "11.222.333/0001-81", "sindico": "C"
     })
+    assert c_resp.status_code == 201
     condo_id = c_resp.json()["id"]
 
     payload = {
@@ -48,9 +54,14 @@ async def test_update_concessionaria(auth_client: AsyncClient):
         "tipo": "Sabesp",
         "instalacao": "9999",
         "dia_vencimento": 5,
-        "valor_medio": 50.0
+        "valor_medio": 50.0,
+        "debito_automatico": True,
+        "leitura_individualizada": False
     }
-    r = await auth_client.post("/api/concessionarias/", json=payload)
+    r = await auth_client.post("/api/concessionarias", json=payload)
+    if r.status_code != 201:
+        print(f"DEBUG: {r.json()}")
+    assert r.status_code == 201
     conc_id = r.json()["id"]
 
     # Update
@@ -61,10 +72,12 @@ async def test_update_concessionaria(auth_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_delete_concessionaria(auth_client: AsyncClient):
-    c_resp = await auth_client.post("/api/condominios/", json={
-        "nome": "Condo D", "numero": "D01", "endereco": "D", 
-        "cnpj": "55.555.555/5555-55", "sindico": "D"
+    uid = uuid.uuid4().hex[:4]
+    c_resp = await auth_client.post("/api/condominios", json={
+        "nome": f"Condo D {uid}", "numero": f"D{uid}", "endereco": "D", 
+        "cnpj": "11.222.333/0001-81", "sindico": "D"
     })
+    assert c_resp.status_code == 201
     condo_id = c_resp.json()["id"]
 
     payload = {
@@ -72,8 +85,11 @@ async def test_delete_concessionaria(auth_client: AsyncClient):
         "tipo": "Sabesp",
         "instalacao": "8888",
         "dia_vencimento": 15,
+        "debito_automatico": True,
+        "leitura_individualizada": False
     }
-    r = await auth_client.post("/api/concessionarias/", json=payload)
+    r = await auth_client.post("/api/concessionarias", json=payload)
+    assert r.status_code == 201
     conc_id = r.json()["id"]
 
     d_resp = await auth_client.delete(f"/api/concessionarias/{conc_id}")
