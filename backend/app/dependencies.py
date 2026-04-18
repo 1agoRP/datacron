@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy import select
+from sqlalchemy import select, func, extract, text, or_, and_, cast, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -114,39 +114,53 @@ async def get_user_condo_ids(
 ) -> list[uuid.UUID] | None:
     """Returns list of condominio IDs the user can access.
     Returns None if the user is admin (unrestricted access)."""
-    # Se for admin, não filtra nada (vê tudo)
     if user.role == "admin":
         return None
 
-    from sqlalchemy import text
     from app.models.condominio import Condominio
+    from app.models.user_condominio import UserCondominio
+    
+    final_ids = set()
 
-    # 1. Tentar buscar da coluna unificada codigo_condominio
+    # 1. Tentar buscar da coluna unificada codigo_condominio (carteira)
     if user.codigo_condominio:
         try:
             codigo_str = user.codigo_condominio
-            
             if "todos" in codigo_str.lower():
-                return None # Unrestricted access
+                return None
                 
-            # Particionar os códigos (ex: "39, 48, 70")
             codes = [c.strip() for c in codigo_str.split(",") if c.strip()]
             if codes:
-                # Buscar os UUIDs na tabela condominios baseando-se no campo 'numero'
-                condo_res = await db.execute(
-                    select(Condominio.id).where(Condominio.numero.in_(codes))
-                )
-                ids = list(condo_res.scalars().all())
-                if ids:
-                    return ids
-        except Exception as e:
-            from app.routers.condominios import logger
-            logger.error(f"Erro ao buscar carteira em users.codigo_condominio: {e}")
+                numeric_codes = []
+                for c in codes:
+                    try:
+                        numeric_codes.append(int(c))
+                    except ValueError:
+                        pass
+                
+                # Query condominios that match either exact string or casted number
+                stmt = select(Condominio.id).where(Condominio.ativo == True)
+                filters = [Condominio.numero.in_(codes)]
+                
+                if numeric_codes:
+                    # Regex check for digits only + cast match
+                    filters.append(
+                        and_(
+                            Condominio.numero.op('~')('^[0-9]+$'),
+                            cast(Condominio.numero, Integer).in_(numeric_codes)
+                        )
+                    )
+                
+                res = await db.execute(stmt.where(or_(*filters)))
+                final_ids.update(res.scalars().all())
+        except Exception:
+            # Silent fail for carteira processing to avoid breaking login
+            pass
 
-    # 2. Fallback: Tabela user_condominios (Relacionamentos manuais/novos)
-    from app.models.user_condominio import UserCondominio
-    result = await db.execute(
+    # 2. UNIÃO com a tabela user_condominios (Relacionamentos específicos)
+    res_uc = await db.execute(
         select(UserCondominio.condominio_id).where(UserCondominio.user_id == user.id)
     )
-    ids = list(result.scalars().all())
-    return ids
+    final_ids.update(res_uc.scalars().all())
+    
+    return list(final_ids)

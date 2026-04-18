@@ -21,6 +21,7 @@ class UserInToken(BaseModel):
     administradora: Optional[str] = None
     codigo_usuario: Optional[int] = None
     condominios_ids: list[str] = []
+    codigo_condominio: Optional[str] = None
     model_config = {"from_attributes": True}
 
 
@@ -39,6 +40,8 @@ class UserResponse(BaseModel):
     administradora: Optional[str] = None
     codigo_usuario: Optional[int] = None
     created_at: datetime
+    condominios_ids: list[str] = []
+    codigo_condominio: Optional[str] = None
     model_config = {"from_attributes": True}
 
 

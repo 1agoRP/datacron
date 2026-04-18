@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import (
     hash_password, verify_password,
-    create_access_token, get_current_user, require_role,
+    create_access_token, get_current_user, require_role, get_user_condo_ids,
 )
 from app.models.user import User
 from app.schemas import LoginRequest, TokenResponse, UserResponse, UserInToken, PasswordUpdate
@@ -56,17 +56,21 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
     if not user.ativo:
         raise HTTPException(status_code=403, detail="Conta desativada")
 
-    # Fetch assigned condominio IDs for the user
-    condo_ids = []
-    if user.role != "admin":
-        from sqlalchemy.orm import selectinload
-        result_uc = await db.execute(
-            select(UserCondominio.condominio_id).where(UserCondominio.user_id == user.id)
-        )
-        condo_ids = [str(cid) for cid in result_uc.scalars().all()]
+    # Fetch allowed condominio IDs using unified logic
+    from app.dependencies import get_user_condo_ids
+    condo_uuid_list = await get_user_condo_ids(user, db)
+    # If None (admin), we pass an empty list or special flag?
+    # Context expect list of strings in JWT
+    condo_ids = [str(cid) for cid in condo_uuid_list] if condo_uuid_list is not None else []
 
     token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "role": user.role, "nome": user.nome, "condominios_ids": condo_ids},
+        data={
+            "sub": str(user.id), 
+            "email": user.email, 
+            "role": user.role, 
+            "nome": user.nome, 
+            "condominios_ids": condo_ids
+        },
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     return TokenResponse(
@@ -79,14 +83,27 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
             role=user.role,
             administradora=user.administradora,
             condominios_ids=condo_ids,
+            codigo_condominio=user.codigo_condominio,
         ),
     )
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """Returns the currently authenticated user's data."""
-    return current_user
+    # Hydrate condominium IDs for the response
+    condo_uuid_list = await get_user_condo_ids(current_user, db)
+    condo_ids = [str(cid) for cid in condo_uuid_list] if condo_uuid_list is not None else []
+    
+    # Build response manually to include computed field
+    user_data = UserResponse.model_validate(current_user).model_dump()
+    user_data["condominios_ids"] = condo_ids
+    user_data["codigo_condominio"] = current_user.codigo_condominio
+    
+    return user_data
 
 
 @router.post("/update-password")
@@ -135,7 +152,15 @@ async def update_profile(
     await db.commit()
     await db.refresh(current_user)
     
-    return current_user
+    # Hydrate condominium IDs for the response
+    condo_uuid_list = await get_user_condo_ids(current_user, db)
+    condo_ids = [str(cid) for cid in condo_uuid_list] if condo_uuid_list is not None else []
+    
+    user_data = UserResponse.model_validate(current_user).model_dump()
+    user_data["condominios_ids"] = condo_ids
+    user_data["codigo_condominio"] = current_user.codigo_condominio
+    
+    return user_data
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)
