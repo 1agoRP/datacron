@@ -181,11 +181,11 @@ class ApiClient {
     const safeParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
     const query = new URLSearchParams(safeParams).toString();
-    return this.request<Condominio[]>(`/condominios/?${query}`);
+    return this.request<Condominio[]>(`/condominios?${query}`);
   }
 
   async createCondominio(data: Partial<Condominio>) {
-    return this.request('/condominios/', {
+    return this.request('/condominios', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -317,11 +317,11 @@ class ApiClient {
     const safeParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
     const query = new URLSearchParams(safeParams).toString();
-    return this.request<Concessionaria[]>(`/concessionarias/?${query}`);
+    return this.request<Concessionaria[]>(`/concessionarias?${query}`);
   }
 
   async createConcessionaria(data: Partial<Concessionaria>) {
-    return this.request<Concessionaria>('/concessionarias/', {
+    return this.request<Concessionaria>('/concessionarias', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -358,7 +358,7 @@ class ApiClient {
     const safeParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
     const query = new URLSearchParams(safeParams).toString();
-    return this.request<Fatura[]>(`/faturas/?${query}`);
+    return this.request<Fatura[]>(`/faturas?${query}`);
   }
 
   async getFatura(id: string) {
@@ -397,7 +397,7 @@ class ApiClient {
       safeParams[k] = String(v);
     }
     const query = new URLSearchParams(safeParams).toString();
-    return this.request<Alerta[]>(`/alertas/?${query}`);
+    return this.request<Alerta[]>(`/alertas?${query}`);
   }
 
   async patchAlerta(id: string, data: Partial<Alerta>) {
@@ -587,7 +587,7 @@ class ApiClient {
     const safeParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
     const query = new URLSearchParams(safeParams).toString();
-    return this.request<any[]>(`/contratos/?${query}`);
+    return this.request<any[]>(`/contratos?${query}`);
   }
 
   async getContractTypes() {

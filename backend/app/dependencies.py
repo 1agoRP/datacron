@@ -114,8 +114,9 @@ async def get_user_condo_ids(
 ) -> list[uuid.UUID] | None:
     """Returns list of condominio IDs the user can access.
     Returns None if the user is admin (unrestricted access)."""
-    if user.is_admin:
-        return None  # No filter needed
+    # Se for admin, não filtra nada (vê tudo)
+    if user.role == "admin":
+        return None
 
     from sqlalchemy import text
     from app.models.condominio import Condominio

@@ -20,4 +20,4 @@ async def test_alertas_invalid_id(auth_client: AsyncClient):
     # Try resolving non-existent alert
     resp = await auth_client.put(f"/api/alertas/{invalid_id}/resolver")
     assert resp.status_code == 404
-    assert "não encontrado" in resp.json()["detail"].lower()
+    assert "nao encontrado" in resp.json()["detail"].lower()
