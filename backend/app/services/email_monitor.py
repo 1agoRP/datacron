@@ -448,6 +448,20 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         db.add(fatura)
         await db.flush()
 
+        # Se desbloqueada, salva também no histórico conforme solicitado
+        if pdf_unlocked:
+            from app.models.historico_fatura import HistoricoFatura
+            hist = HistoricoFatura(
+                condominio_id=fatura.condominio_id,
+                concessionaria_id=fatura.concessionaria_id,
+                referencia=fatura.referencia,
+                vencimento=fatura.vencimento,
+                valor=fatura.valor,
+                base_64=fatura.pdf_base64,
+                debito_automatico=fatura.debito_automatico
+            )
+            db.add(hist)
+
         email_log.fatura_id = fatura.id
         email_log.status = "processado"
 

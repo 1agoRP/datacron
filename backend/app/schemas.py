@@ -466,3 +466,25 @@ class ReajusteMercadoResponse(BaseModel):
     documento_nome: Optional[str] = None
     created_at: datetime
     model_config = {"from_attributes": True}
+
+
+# ─── Histórico Fatura ───────────────────────────────────────────
+
+
+class HistoricoFaturaResponse(BaseModel):
+    id: uuid.UUID
+    condominio_id: Optional[uuid.UUID] = None
+    concessionaria_id: Optional[uuid.UUID] = None
+    referencia: str
+    vencimento: Optional[date] = None
+    valor: float
+    base_64: Optional[str] = None
+    debito_automatico: bool = False
+    created_at: datetime
+    updated_at: datetime
+
+    # Nested
+    condominio: Optional[CondominioMini] = None
+    concessionaria: Optional[ConcessionariaMini] = None
+
+    model_config = {"from_attributes": True}

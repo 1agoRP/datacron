@@ -9,9 +9,10 @@ from app.models.alerta import Alerta
 from app.models.relatorio import RelatorioGerado
 from app.models.reajuste_concessionaria import ReajusteConcessionaria
 from app.models.reajuste_mercado import ReajusteMercado
+from app.models.historico_fatura import HistoricoFatura
 
 __all__ = [
     "User", "UserCondominio", "Condominio", "Concessionaria", "Fatura", "Alerta",
     "RelatorioGerado", "Contrato", "ContractFile",
-    "ReajusteConcessionaria", "ReajusteMercado",
+    "ReajusteConcessionaria", "ReajusteMercado", "HistoricoFatura",
 ]
