@@ -52,3 +52,7 @@ env/
 bin/
 /lib/
 include/
+
+# Datacron Diagnostic/Utility
+scratch/
+backend/list_users.py
