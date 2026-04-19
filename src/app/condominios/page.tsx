@@ -824,7 +824,11 @@ export default function CondominiosPage() {
                         {historyConc.debito_automatico
                           ? 'Suas faturas são processadas automaticamente de maneira programada.'
                           : 'As faturas deste condomínio precisam ser pagas manualmente.'}
-                             {/* Toolbar de Ações Rápidas */}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Toolbar de Ações Rápidas */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                     <h5 style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e293b', margin: 0 }}>Faturas Registradas</h5>
                     <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{historyFaturas.length} documento(s) encontrado(s)</div>
