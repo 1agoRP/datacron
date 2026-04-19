@@ -75,6 +75,8 @@ class User(Base):
     def has_module_access(self, module: str) -> bool:
         if self.role == "admin":
             return True
+        if module == "gmail" and self.role in ("gerencia", "assistente"):
+            return True
         return module not in ADMIN_ONLY_MODULES
 
     def __repr__(self) -> str:

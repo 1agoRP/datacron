@@ -53,6 +53,7 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
     const role = user?.role || 'geral';
     if (role === 'admin') return allNav;
     return allNav.filter(item => {
+      if (item.module === 'gmail' && (role === 'gerencia' || role === 'assistente')) return true;
       if (item.module && ADMIN_ONLY_MODULES.has(item.module)) return false;
       return true;
     });
