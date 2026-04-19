@@ -51,8 +51,11 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetchWithRetry(`${API_BASE_URL}${endpoint}`, {
+    const finalUrl = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`.replace(/([^:])\/\//g, '$1/');
+
+    const response = await fetchWithRetry(finalUrl, {
       ...options,
+      mode: 'cors',
       headers,
     });
 

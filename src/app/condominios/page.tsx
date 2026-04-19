@@ -249,14 +249,21 @@ export default function CondominiosPage() {
   };
 
   const handleOpenStatus = async (condo: any) => {
+    if (!condo?.id) return;
     setStatusModalCondo(condo);
     setIsStatusModalOpen(true);
     setLoadingStatus(true);
     setStatusError(null);
+    setStatusItems([]);
+
     try {
+      // Small delay to ensure modal transition doesn't interfere with main thread
+      await new Promise(r => setTimeout(r, 100));
+      
+      const condoId = String(condo.id).trim();
+      
       // 1. Fetch concessionaires for this condo
-      // We don't pass 'ativo: true' here to be robust against any server-side boolean parsing issues
-      const allConcs = await api.getConcessionarias({ condominio_id: condo.id });
+      const allConcs = await api.getConcessionarias({ condominio_id: condoId });
       
       // Filter active ones locally
       const concs = allConcs.filter(c => c.ativo === true || String(c.ativo) === 'true' || c.ativo === undefined);
@@ -370,7 +377,12 @@ export default function CondominiosPage() {
 
         // Fallback to traditional download endpoint if base64 is missing
         const token = localStorage.getItem('datacron_token');
-        const resp = await fetch(`${API_BASE_URL}/faturas/${fatura.id}/pdf`, {
+        const endpoint = `/faturas/${fatura.id}/pdf`;
+        const finalUrl = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`.replace(/([^:])\/\//g, '$1/');
+
+        const resp = await fetch(finalUrl, {
+          method: 'GET',
+          mode: 'cors',
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!resp.ok) throw new Error('Falha ao baixar do sistema');
