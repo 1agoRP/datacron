@@ -587,9 +587,9 @@ class ApiClient {
   }
 
   async downloadGmailFatura(messageId: string, filename: string) {
-    const response = await fetch(`${this.baseUrl}/faturas/gmail-download/${messageId}`, {
+    const response = await fetch(`${API_BASE_URL}/faturas/gmail-download/${messageId}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+        'Authorization': `Bearer ${this.getToken()}`
       }
     });
 
