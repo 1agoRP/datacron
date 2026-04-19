@@ -206,14 +206,52 @@ async def check_missing_bills(db: AsyncSession) -> None:
 
 
 async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura] = None) -> None:
-    """Sends alert details via email to the manager and optionally to the concessionaire contact."""
+    """Sends alert details via email to the assigned users for the related condominium."""
     import os
-    manager_email = "assistente.gerencia4@propstarter.com.br"
-    
-    # 1. Gather context
+    from sqlalchemy import select, or_
     from app.models.condominio import Condominio
-    from app.models.concessionaria import Concessionaria
+    from app.models.user import User, ROLES_FULL_ACCESS
+    from app.models.user_condominio import UserCondominio
+
+    # 1. Determine recipients
+    recipients = set()
     
+    if alert.condominio_id:
+        # Find users with access to this specific condo
+        stmt = (
+            select(User.email)
+            .join(UserCondominio)
+            .where(
+                UserCondominio.condominio_id == alert.condominio_id,
+                User.ativo == True,
+                User.role.in_(ROLES_FULL_ACCESS)
+            )
+        )
+        res = await db.execute(stmt)
+        recipients.update(res.scalars().all())
+        
+        # Also include users with global access ("todos" or "admin" role)
+        stmt_global = select(User.email).where(
+            User.ativo == True,
+            or_(User.role == "admin", User.codigo_condominio == "todos")
+        )
+        res_global = await db.execute(stmt_global)
+        recipients.update(res_global.scalars().all())
+    
+    # If no specific users found (e.g. unidentified email or no mappings)
+    if not recipients:
+        stmt_fallback = select(User.email).where(
+            User.ativo == True,
+            User.role.in_(ROLES_FULL_ACCESS)
+        )
+        res_fallback = await db.execute(stmt_fallback)
+        recipients.update(res_fallback.scalars().all())
+
+    # Final fallback if still empty
+    if not recipients:
+        recipients.add("assistente.gerencia4@propstarter.com.br")
+
+    # 2. Gather context
     condo = None
     if alert.condominio_id:
         res = await db.execute(select(Condominio).where(Condominio.id == alert.condominio_id))
@@ -244,7 +282,6 @@ async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura]
         ])
         in_reply_to = fatura.gmail_message_id
         
-        # Attach PDF if unlocked (per user request)
         if fatura.pdf_desbloqueado and fatura.pdf_path and os.path.exists(fatura.pdf_path):
             try:
                 with open(fatura.pdf_path, "rb") as f:
@@ -253,20 +290,21 @@ async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura]
                 logger.error(f"Failed to read PDF for attachment: {e}")
 
     body.append("Por favor, verifique a Central de Alertas no painel administrativo.")
+    message_text = "\n".join(body)
     
-    # 2. Send to Manager
-    success = send_notification_email(
-        to=manager_email,
-        subject=subject,
-        message_text="\n".join(body),
-        in_reply_to=in_reply_to,
-        attachments=attachments if attachments else None
-    )
-    
-    if success:
-        logger.info(f"Notification for alert {alert.id} sent to manager.")
-    else:
-        logger.error(f"Failed to send alert notification to manager.")
+    # 3. Send to all identified users
+    for email in recipients:
+        success = send_notification_email(
+            to=email,
+            subject=subject,
+            message_text=message_text,
+            in_reply_to=in_reply_to,
+            attachments=attachments if attachments else None
+        )
+        if success:
+            logger.info(f"Notification for alert {alert.id} sent to {email}.")
+        else:
+            logger.error(f"Failed to send alert notification to {email}.")
 
 
 async def check_mandate_expirations(db: AsyncSession) -> None:
