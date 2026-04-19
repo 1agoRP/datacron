@@ -1,15 +1,17 @@
 import uuid
 from typing import Optional
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_write, get_user_condo_ids
 from app.models.user import User
-from app.models.alerta import Alerta, EmailLog
-from app.schemas import AlertaResponse, EmailLogResponse
+from app.models.alerta import Alerta
+from app.schemas import AlertaResponse
+from app.services.email_sender import send_notification_email
 
 router = APIRouter(prefix="/alertas", tags=["Alertas"])
 
@@ -27,7 +29,6 @@ async def list_alertas(
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     stmt = select(Alerta).where(Alerta.resolvido == resolvido)
-    # RBAC: filter by user's assigned condominios
     if allowed_condo_ids is not None:
         stmt = stmt.where(Alerta.condominio_id.in_(allowed_condo_ids))
     if tipo:
@@ -53,7 +54,6 @@ async def mark_as_read(
     if not a:
         raise HTTPException(status_code=404, detail="Alerta nao encontrado")
     
-    # RBAC Check
     if allowed_condo_ids is not None and a.condominio_id and a.condominio_id not in allowed_condo_ids:
         raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
     a.lido = True
@@ -65,6 +65,7 @@ async def mark_as_read(
 @router.put("/{id}/resolver", response_model=AlertaResponse)
 async def resolve_alerta(
     id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
@@ -74,33 +75,11 @@ async def resolve_alerta(
     if not a:
         raise HTTPException(status_code=404, detail="Alerta nao encontrado")
     
-    # RBAC Check
     if allowed_condo_ids is not None and a.condominio_id and a.condominio_id not in allowed_condo_ids:
         raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
     
-    # If it's an email_nao_identificado alert, try to send reply email to sender
-    if a.tipo == "email_nao_identificado":
-        try:
-            import re
-            # Extract sender email from the alert message
-            sender_match = re.search(r"de '([^']+)'", a.mensagem)
-            subject_match = re.search(r"assunto '([^']+)'", a.mensagem)
-            sender = sender_match.group(1) if sender_match else None
-            subject = subject_match.group(1) if subject_match else "Fatura"
-            
-            if sender:
-                _send_resolution_email(sender, subject)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"Could not send resolution email: {e}")
-    
-    # ALWAYS send a confirmation email to the user who is resolving it (the manager)
-    # This fulfills the user's request: "resolução de problema que me enviaria um e-mail"
-    try:
-        _send_manager_resolution_email(current_user.email, a)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Could not send manager notification: {e}")
+    # Send emails in background to avoid "Failed to fetch" (timeouts)
+    background_tasks.add_task(process_alert_resolution_emails, a.tipo, a.mensagem, current_user.email)
     
     a.lido = True
     a.resolvido = True
@@ -109,146 +88,81 @@ async def resolve_alerta(
     return a
 
 
-def _send_resolution_email(recipient: str, original_subject: str):
-    """
-    Sends a professional HTML reply email informing that the concessionaria
-    was not found in the system and needs review.
-    """
-    import re
-    from app.services.email_sender import send_notification_email
+def process_alert_resolution_emails(alerta_tipo: str, alerta_mensagem: str, manager_email: str):
+    """Handles all email notifications related to an alert resolution."""
+    try:
+        # 1. Reply to sender if it was an unidentified email
+        if alerta_tipo == "email_nao_identificado":
+            import re
+            sender_match = re.search(r"de '([^']+)'", alerta_mensagem)
+            subject_match = re.search(r"assunto '([^']+)'", alerta_mensagem)
+            sender = sender_match.group(1) if sender_match else None
+            subject = subject_match.group(1) if subject_match else "Fatura"
+            
+            if sender:
+                _send_reply_to_sender(sender, subject)
+        
+        # 2. Notify the manager
+        _send_manager_confirmation(manager_email, alerta_tipo, alerta_mensagem)
+    except Exception as e:
+        import logging
+        logging.error(f"Error in background alert emails: {e}")
 
-    # Detect dealership type from subject for better subject line
+
+def _send_reply_to_sender(recipient: str, original_subject: str):
+    import re
     subj_upper = original_subject.upper()
     if "ENEL" in subj_upper or "ELETROPAULO" in subj_upper:
-        tipo_label = "Enel"
-        codigo_label = "Instalação"
+        tipo_label, codigo_label = "Enel", "Instalação"
     elif "SABESP" in subj_upper:
-        tipo_label = "Sabesp"
-        codigo_label = "Fornecimento"
+        tipo_label, codigo_label = "Sabesp", "Fornecimento"
     elif "COMGÁS" in subj_upper or "COMGAS" in subj_upper:
-        tipo_label = "Comgas"
-        codigo_label = "Código de Usuário"
+        tipo_label, codigo_label = "Comgas", "Código de Usuário"
     else:
-        tipo_label = "Concessionária"
-        codigo_label = "Código"
+        tipo_label, codigo_label = "Concessionária", "Código"
 
-    # Extract code from subject if available
     code_match = re.search(r"(\d{6,})", original_subject)
     code = code_match.group(1) if code_match else "N/D"
 
     subject = f"{tipo_label} - {codigo_label} {code} - nao reconhecida no cadastro"
     
-    body_text = f"Prezado(a), informamos que o e-mail recebido ({original_subject}) não foi identificado em nosso sistema Datacron."
-
-    # Detect dealership type from subject for better subject line
-    subj_upper = original_subject.upper()
-    if "ENEL" in subj_upper or "ELETROPAULO" in subj_upper:
-        tipo_label = "Enel"
-        codigo_label = "Instalação"
-    elif "SABESP" in subj_upper:
-        tipo_label = "Sabesp"
-        codigo_label = "Fornecimento"
-    elif "COMGÁS" in subj_upper or "COMGAS" in subj_upper:
-        tipo_label = "Comgas"
-        codigo_label = "Código de Usuário"
-    else:
-        tipo_label = "Concessionária"
-        codigo_label = "Código"
-
-    # Extract code from subject if available
-    code_match = re.search(r"(\d{6,})", original_subject)
-    code = code_match.group(1) if code_match else "N/D"
-
-    subject = f"{tipo_label} - {codigo_label} {code} - nao reconhecida no cadastro"
-
     body_html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="UTF-8"></head>
-<body style="font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background-color: #f1f5f9;">
-  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
-    
-    <!-- Header -->
-    <div style="background: linear-gradient(135deg, #1e40af, #2563eb); padding: 28px 32px; text-align: center;">
-      <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">⚡ Datacron</h1>
-      <p style="color: #93c5fd; margin: 6px 0 0; font-size: 13px; font-weight: 600;">Sistema de Gestão de Faturas</p>
+<body style="font-family: sans-serif; padding: 20px; color: #334155;">
+    <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px;">
+        <h2 style="color: #1e40af;">Datacron - Concessionaria Nao Identificada</h2>
+        <p>Prezado(a), o e-mail recebido ({original_subject}) nao foi identificado em nosso sistema.</p>
+        <p>Sera necessaria uma revisao manual pela administracao.</p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+        <p style="font-size: 12px; color: #64748b;">Este e uma mensagem automatica, por favor nao responda.</p>
     </div>
-
-    <!-- Body -->
-    <div style="padding: 32px;">
-      <h2 style="color: #0f172a; font-size: 18px; font-weight: 800; margin: 0 0 16px;">
-        Aviso: Concessionaria Nao Identificada
-      </h2>
-      
-      <p style="color: #475569; font-size: 14px; line-height: 1.7; margin: 0 0 20px;">
-        Prezado(a), informamos que o e-mail recebido nao foi identificado como uma concessionaria cadastrada em nosso sistema Datacron.
-      </p>
-
-      <!-- Info Table -->
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 24px;">
-        <div style="padding: 14px 18px; border-bottom: 1px solid #e2e8f0; display: flex;">
-          <span style="color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; min-width: 120px;">Remetente</span>
-          <span style="color: #0f172a; font-size: 14px; font-weight: 600;">{recipient}</span>
-        </div>
-        <div style="padding: 14px 18px; border-bottom: 1px solid #e2e8f0; display: flex;">
-          <span style="color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; min-width: 120px;">Assunto Original</span>
-          <span style="color: #0f172a; font-size: 14px; font-weight: 600;">{original_subject}</span>
-        </div>
-        <div style="padding: 14px 18px; display: flex;">
-          <span style="color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; min-width: 120px;">Tipo Detectado</span>
-          <span style="color: #2563eb; font-size: 14px; font-weight: 700;">{tipo_label} ({codigo_label})</span>
-        </div>
-      </div>
-
-      <p style="color: #475569; font-size: 14px; line-height: 1.7; margin: 0 0 8px;">
-        Acao necessaria: Sera necessaria uma revisao para verificar se esta concessionaria deve ser cadastrada no sistema.
-      </p>
-      
-      <p style="color: #64748b; font-size: 13px; line-height: 1.6; margin: 0;">
-        Caso tenha duvidas, entre em contato com a administracao.
-      </p>
-    </div>
-
-    <!-- Footer -->
-    <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 32px; text-align: center;">
-      <p style="color: #94a3b8; font-size: 12px; margin: 0; font-weight: 600;">
-        Datacron - Gestao Inteligente de Faturas - E-mail enviado automaticamente
-      </p>
-    </div>
-  </div>
 </body>
 </html>"""
 
-    message_text = body_text
     send_notification_email(
         to=recipient,
         subject=subject,
-        message_text=message_text,
+        message_text=f"Aviso: Concessionaria nao identificada no sistema para o assunto: {original_subject}",
         html_body=body_html
     )
 
 
-def _send_manager_resolution_email(recipient: str, alerta: Alerta):
-    """Sends a confirmation email to the manager who resolved the alert."""
-    from app.services.email_sender import send_notification_email
-    
-    subject = f"✅ Alerta Resolvido: {alerta.tipo.replace('_', ' ').title()}"
+def _send_manager_confirmation(recipient: str, alerta_tipo: str, alerta_mensagem: str):
+    subject = f"✅ Pendência Resolvida: {alerta_tipo.replace('_', ' ').title()}"
     
     body_html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <body style="font-family: sans-serif; padding: 20px; color: #334155;">
     <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px;">
         <h2 style="color: #16a34a; margin-top: 0;">Resolução Confirmada</h2>
-        <p>Olá, o seguinte alerta foi marcado como <strong>resolvido</strong> em sua conta Datacron:</p>
-        
-        <div style="background: #f8fafc; padding: 16px; border-radius: 6px; margin: 20px 0;">
-            <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold;">Tipo</div>
-            <div style="font-size: 16px; margin-bottom: 12px;">{alerta.tipo.replace('_', ' ').upper()}</div>
-            
-            <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold;">Mensagem</div>
-            <div style="font-size: 14px;">{alerta.mensagem}</div>
+        <p>O alerta abaixo foi marcado como <strong>resolvido</strong>:</p>
+        <div style="background: #f8fafc; padding: 16px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #16a34a;">
+            <div style="font-size: 12px; color: #64748b; text-transform: uppercase;">Tipo</div>
+            <div style="font-weight: bold; margin-bottom: 8px;">{alerta_tipo.upper()}</div>
+            <div style="font-size: 12px; color: #64748b; text-transform: uppercase;">Mensagem</div>
+            <div>{alerta_mensagem}</div>
         </div>
-        
-        <p style="font-size: 13px; color: #94a3b8;">Data da resolução: {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
+        <p style="font-size: 12px; color: #94a3b8;">Sistema Datacron - {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
     </div>
 </body>
 </html>"""
@@ -256,10 +170,9 @@ def _send_manager_resolution_email(recipient: str, alerta: Alerta):
     send_notification_email(
         to=recipient,
         subject=subject,
-        message_text=f"Alerta resolvido: {alerta.mensagem}",
+        message_text=f"Alerta resolvido com sucesso: {alerta_mensagem}",
         html_body=body_html
     )
-from datetime import datetime
 
 
 @router.delete("/{id}", status_code=204)
@@ -274,7 +187,6 @@ async def delete_alerta(
     if not a:
         raise HTTPException(status_code=404, detail="Alerta nao encontrado")
     
-    # RBAC Check
     if allowed_condo_ids is not None and a.condominio_id and a.condominio_id not in allowed_condo_ids:
         raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
     await db.delete(a)
@@ -287,8 +199,6 @@ async def count_alertas(
     _: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Returns unread alert count, useful for the notification badge."""
-    from sqlalchemy import func
     stmt = select(func.count(Alerta.id)).where(Alerta.lido == False, Alerta.resolvido == False)
     if allowed_condo_ids is not None:
         stmt = stmt.where(Alerta.condominio_id.in_(allowed_condo_ids))
