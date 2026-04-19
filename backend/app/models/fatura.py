@@ -42,6 +42,7 @@ class Fatura(Base):
     pdf_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     pdf_desbloqueado: Mapped[bool] = mapped_column(Boolean, default=False)
     pdf_nome_original: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    pdf_base64: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Extracted data (flexible JSONB)
     dados_extraidos: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)

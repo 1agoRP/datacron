@@ -228,6 +228,7 @@ class FaturaResponse(BaseModel):
     pdf_desbloqueado: bool
     pdf_nome_original: Optional[str] = None
     pdf_path: Optional[str] = None
+    pdf_base64: Optional[str] = None
     variacao_percentual: Optional[float] = None
     debito_automatico: bool = False
     created_at: datetime

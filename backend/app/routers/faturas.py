@@ -193,14 +193,32 @@ async def download_fatura_pdf(
 ):
     """Serves the processed (unlocked) PDF for download."""
     import os
+    import base64
 
     result = await db.execute(select(Fatura).where(Fatura.id == id))
     f = result.scalar_one_or_none()
-    if not f or not f.pdf_path:
+    if not f:
+        raise HTTPException(status_code=404, detail="Fatura não encontrada")
+
+    # Prefer base64 from DB if available
+    if f.pdf_base64:
+        try:
+            pdf_data = base64.b64decode(f.pdf_base64)
+            filename = f.pdf_nome_original or f"fatura_{id}.pdf"
+            return StreamingResponse(
+                io.BytesIO(pdf_data),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"attachment; filename={filename}"},
+            )
+        except Exception as e:
+            logger.error(f"Erro ao decodificar base64 da fatura {id}: {e}")
+
+    # Fallback to local path
+    if not f.pdf_path:
         raise HTTPException(status_code=404, detail="PDF não encontrado para esta fatura")
 
     if not os.path.exists(f.pdf_path):
-        raise HTTPException(status_code=404, detail="Arquivo PDF não encontrado no servidor")
+        raise HTTPException(status_code=404, detail="Arquivo PDF não encontrado no servidor e campo base64 vazio")
 
     def file_iterator(path: str):
         with open(path, "rb") as file:

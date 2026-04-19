@@ -440,6 +440,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             pdf_path=pdf_path,
             pdf_desbloqueado=pdf_unlocked,
             pdf_nome_original=safe_filename,
+            pdf_base64=base64.b64encode(final_bytes).decode('utf-8') if pdf_unlocked else None,
             dados_extraidos=extracted,
             debito_automatico=extracted.get("debito_automatico", False),
         )
