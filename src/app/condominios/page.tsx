@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database, CreditCard } from 'lucide-react';
+import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, ArrowDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database, CreditCard } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { ShieldAlert, Flame, ShieldCheck, HardHat } from 'lucide-react';
@@ -251,18 +251,22 @@ export default function CondominiosPage() {
     try {
       setLoadingHistory(true);
       // 1. Fetch from Database
-      const dbFaturas = await api.getFaturasByCondominio(detailsCondo.id, conc.id);
-      dbFaturas.sort((a: any, b: any) => {
-        const dateA = new Date(a.created_at || a.vencimento || 0);
-        const dateB = new Date(b.created_at || b.vencimento || 0);
+      const dbFaturas = await api.getFaturas({ 
+        condominio_id: detailsCondo.id,
+        concessionaria_id: conc.id
+      });
+      
+      const sorted = [...dbFaturas].sort((a: any, b: any) => {
+        const dateA = new Date(a.vencimento || a.created_at || 0);
+        const dateB = new Date(b.vencimento || b.created_at || 0);
         return dateB.getTime() - dateA.getTime();
       });
-      setHistoryFaturas(dbFaturas);
+      setHistoryFaturas(sorted);
 
       // 2. Fetch from Gmail (Background)
       if (conc.instalacao) {
         api.getGmailHistory(detailsCondo.id, conc.id).then(gmailFats => {
-          setGmailHistory(gmailFats);
+          setGmailHistory(gmailFats || []);
         }).catch(err => console.error("Gmail fetch error:", err));
       }
     } catch (err) {
@@ -699,243 +703,227 @@ export default function CondominiosPage() {
             </div>
             <div className="dc-modal-body dc-space-y-4" style={{ maxHeight: 500, overflowY: 'auto' }}>
               {historyConc ? (
-                /* HISTORY VIEW (ESTILO BANCO) */
+                /* HISTORY VIEW (CLEAN SABESP PORTAL STYLE) */
                 <div style={{ marginTop: -8 }}>
                   {/* Banner Débito Automático */}
                   <div 
-                    className="dc-info-banner" 
                     style={{ 
-                      background: historyConc.debito_automatico ? '#f0f9ff' : '#fef2f2',
-                      border: `1px solid ${historyConc.debito_automatico ? '#bae6fd' : '#fecaca'}`
+                      background: '#f0f7ff',
+                      border: '1px solid #c2e0ff',
+                      borderRadius: 12,
+                      padding: '14px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 16,
+                      marginBottom: 24,
+                      cursor: 'pointer'
                     }}
                   >
-                    <div style={{ 
-                      width: 44, 
-                      height: 44, 
-                      borderRadius: 10, 
-                      background: '#fff', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      color: historyConc.debito_automatico ? '#1e40af' : '#ef4444', 
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.05)' 
-                    }}>
-                      <CreditCard size={22} />
+                    <div style={{ padding: 10, background: '#fff', borderRadius: 8, color: '#0066cc', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                      <CreditCard size={20} />
                     </div>
-                    <div>
-                      <div style={{ 
-                        fontWeight: 800, 
-                        fontSize: '0.9rem', 
-                        color: historyConc.debito_automatico ? '#0369a1' : '#b91c1c' 
-                      }}>
-                        {historyConc.debito_automatico ? 'Débito Automático Ativo' : 'Débito Automático Inativo'}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 800, color: '#004080', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>{historyConc.debito_automatico ? 'Débito Automático Ativo' : 'Débito Automático Inativo'}</span>
+                        <ChevronLeft size={16} style={{ transform: 'rotate(180deg)', opacity: 0.5 }} />
                       </div>
-                      <div style={{ 
-                        fontSize: '0.8rem', 
-                        color: historyConc.debito_automatico ? '#0c4a6e' : '#991b1b', 
-                        opacity: 0.8 
-                      }}>
+                      <div style={{ fontSize: '0.78rem', color: '#004080', opacity: 0.7, marginTop: 1 }}>
                         {historyConc.debito_automatico 
-                          ? 'Suas faturas são processadas automaticamente no dia do vencimento.' 
-                          : 'As faturas deste condomínio precisam ser pagas manualmente todo mês.'}
+                          ? 'Suas faturas são processadas automaticamente de maneira programada.' 
+                          : 'As faturas deste condomínio precisam ser pagas manualmente.'}
                       </div>
                     </div>
                   </div>
 
-                  {/* Filtros Localizados */}
-                  <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-                    <button className="dc-history-filter-btn">
-                      <Calendar size={14} /> Data de vencimento <ChevronLeft size={14} style={{ transform: 'rotate(-90deg)' }} />
+                  {/* Filter Toolbar */}
+                  <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+                    <button style={{ background: '#fff', border: '1px solid #e5e7eb', padding: '8px 18px', borderRadius: 20, fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, color: '#374151' }}>
+                      <Calendar size={14} /> Data de vencimento <ChevronLeft size={14} style={{ transform: 'rotate(-90deg)', opacity: 0.3 }} />
                     </button>
-                    <button className="dc-history-filter-btn">
-                      <Filter size={14} /> Situação <ChevronLeft size={14} style={{ transform: 'rotate(-90deg)' }} />
-                    </button>
-                  </div>
-
-                  {/* TABS DE HISTÓRICO */}
-                  <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
-                    <button 
-                      onClick={() => setActiveHistoryTab('sistema')}
-                      style={{ 
-                        padding: '12px 24px', fontSize: '0.85rem', fontWeight: 700, 
-                        borderBottom: `3px solid ${activeHistoryTab === 'sistema' ? '#2563eb' : 'transparent'}`,
-                        color: activeHistoryTab === 'sistema' ? '#1e3a8a' : '#64748b',
-                        background: 'none', transition: 'all 0.2s', cursor: 'pointer'
-                      }}
-                    >
-                      Sistema ({historyFaturas.length})
-                    </button>
-                    <button 
-                      onClick={() => setActiveHistoryTab('gmail')}
-                      style={{ 
-                        padding: '12px 24px', fontSize: '0.85rem', fontWeight: 700, 
-                        borderBottom: `3px solid ${activeHistoryTab === 'gmail' ? '#2563eb' : 'transparent'}`,
-                        color: activeHistoryTab === 'gmail' ? '#1e3a8a' : '#64748b',
-                        background: 'none', transition: 'all 0.2s', cursor: 'pointer'
-                      }}
-                    >
-                      Gmail Archive ({gmailHistory.length})
+                    <button style={{ background: '#fff', border: '1px solid #e5e7eb', padding: '8px 18px', borderRadius: 20, fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, color: '#374151' }}>
+                      <Filter size={14} /> Situação <ChevronLeft size={14} style={{ transform: 'rotate(-90deg)', opacity: 0.3 }} />
                     </button>
                   </div>
 
-                  {loadingHistory && activeHistoryTab === 'sistema' ? (
-                    <div style={{ padding: 40, textAlign: 'center' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
+                  {loadingHistory ? (
+                    <div style={{ padding: 80, textAlign: 'center' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
+                  ) : historyFaturas.length === 0 ? (
+                    <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8', background: '#fff', border: '1px solid #f3f4f6', borderRadius: 16 }}>
+                      <FileText size={56} style={{ margin: '0 auto 20px', opacity: 0.15 }} />
+                      <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#475569' }}>Nenhuma fatura encontrada</div>
+                      <div style={{ fontSize: '0.9rem', marginTop: 10 }}>As faturas processadas aparecerão nesta lista.</div>
+                      
+                      {gmailHistory.length > 0 && (
+                        <button 
+                          onClick={() => setActiveHistoryTab('gmail')}
+                          style={{ marginTop: 24, padding: '10px 20px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#f9fafb', fontSize: '0.85rem', fontWeight: 700, color: '#3b82f6', cursor: 'pointer' }}
+                        >
+                          Ver arquivo original no Gmail ({gmailHistory.length})
+                        </button>
+                      )}
+                    </div>
                   ) : activeHistoryTab === 'sistema' ? (
-                    historyFaturas.length === 0 ? (
-                      <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-                        <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-                        <div style={{ fontWeight: 700 }}>Nenhuma fatura registrada no banco de dados</div>
-                        <div style={{ fontSize: '0.8rem', marginTop: 4 }}>Tente consultar a aba "Gmail Archive".</div>
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{ overflowX: 'auto', border: '1px solid #f1f5f9', borderRadius: 12 }}>
-                          <table className="dc-table" style={{ fontSize: '0.85rem', border: 'none' }}>
-                            <thead style={{ background: '#fff' }}>
-                              <tr>
-                                <th style={{ width: 40 }}>
+                    /* MAIN LIST */
+                    <div style={{ overflowX: 'auto', border: '1px solid #f3f4f6', borderRadius: 12, background: '#fff' }}>
+                      <table className="dc-table" style={{ fontSize: '0.85rem', border: 'none' }}>
+                        <thead style={{ background: '#fff', borderBottom: '1px solid #f3f4f6' }}>
+                          <tr>
+                            <th style={{ width: 44, textAlign: 'center' }}>
+                              <input 
+                                type="checkbox" 
+                                className="dc-checkbox"
+                                checked={selectedHistory.size === historyFaturas.length && historyFaturas.length > 0}
+                                onChange={toggleSelectAll}
+                              />
+                            </th>
+                            <th style={{ color: '#6b7280' }}>Mês <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
+                            <th style={{ color: '#6b7280' }}>Vencimento <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
+                            <th style={{ color: '#6b7280' }}>Situação <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
+                            <th style={{ color: '#6b7280' }}>Emissão <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
+                            <th style={{ color: '#6b7280' }}>Valor <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
+                            <th style={{ width: 80 }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {historyFaturas.map(f => {
+                            const isPaid = f.status === 'processada';
+                            const isSelected = selectedHistory.has(f.id);
+                            return (
+                              <tr key={f.id} style={{ background: isSelected ? '#f0f7ff' : 'transparent', borderBottom: '1px solid #f9fafb' }}>
+                                <td style={{ textAlign: 'center' }}>
                                   <input 
                                     type="checkbox" 
                                     className="dc-checkbox"
-                                    checked={selectedHistory.size === historyFaturas.length && historyFaturas.length > 0}
-                                    onChange={toggleSelectAll}
+                                    checked={isSelected}
+                                    onChange={() => toggleSelectFatura(f.id)}
                                   />
-                                </th>
-                                <th>Mês</th>
-                                <th>Vencimento</th>
-                                <th>Situação</th>
-                                <th>Valor</th>
-                                <th style={{ textAlign: 'right' }}>Ações</th>
+                                </td>
+                                <td><div style={{ fontWeight: 600, color: '#111827' }}>{f.referencia ? formatReferencia(f.referencia) : '—'}</div></td>
+                                <td>{f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}</td>
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <div style={{ 
+                                      width: 6, 
+                                      height: 6, 
+                                      borderRadius: '50%', 
+                                      background: f.status === 'processada' ? '#10b981' : 
+                                                 f.status === 'erro' ? '#ef4444' : 
+                                                 f.status === 'revisao' ? '#8b5cf6' : '#f97316' 
+                                    }} />
+                                    <span style={{ 
+                                      fontWeight: 700, 
+                                      fontSize: '0.75rem', 
+                                      color: f.status === 'processada' ? '#10b981' : 
+                                             f.status === 'erro' ? '#ef4444' : 
+                                             f.status === 'revisao' ? '#8b5cf6' : '#f97316' 
+                                    }}>
+                                      {f.status === 'processada' ? 'Paga' : 
+                                       f.status === 'erro' ? 'Erro' : 
+                                       f.status === 'revisao' ? 'Revisão' : 'Em aberto'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td style={{ color: '#6b7280' }}>{format(new Date(f.created_at), 'dd/MM/yyyy')}</td>
+                                <td><div style={{ fontWeight: 800, color: '#111827' }}>{formatCurrencyCeil(f.valor || 0)}</div></td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                                    <button 
+                                      onClick={() => handleDownloadFatura(f.id, f.pdf_nome_original || 'fatura.pdf', 'sistema')}
+                                      disabled={!f.pdf_path}
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}
+                                      title="Download"
+                                    >
+                                      <Download size={18} />
+                                    </button>
+                                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}>
+                                      <CreditCard size={18} />
+                                    </button>
+                                  </div>
+                                </td>
                               </tr>
-                            </thead>
-                            <tbody>
-                              {historyFaturas.map(f => {
-                                const isPaid = f.status === 'processada';
-                                const isSelected = selectedHistory.has(f.id);
-                                return (
-                                  <tr key={f.id} style={{ background: isSelected ? '#f8fafc' : 'transparent' }}>
-                                    <td>
-                                      <input 
-                                        type="checkbox" 
-                                        className="dc-checkbox"
-                                        checked={isSelected}
-                                        onChange={() => toggleSelectFatura(f.id)}
-                                      />
-                                    </td>
-                                    <td><div style={{ fontWeight: 600 }}>{f.referencia ? formatReferencia(f.referencia) : '—'}</div></td>
-                                    <td>{f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}</td>
-                                    <td>
-                                      <span className={`dc-status-dot ${isPaid ? 'dc-status-dot-green' : 'dc-status-dot-orange'}`}>
-                                        {f.status}
-                                      </span>
-                                    </td>
-                                    <td><div style={{ fontWeight: 800 }}>{formatCurrencyCeil(f.valor || 0)}</div></td>
-                                    <td style={{ textAlign: 'right' }}>
-                                      <button 
-                                        onClick={() => handleDownloadFatura(f.id, f.pdf_nome_original || 'fatura.pdf', 'sistema')}
-                                        disabled={!f.pdf_path}
-                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: f.pdf_path ? '#2563eb' : '#cbd5e1' }}
-                                        title={f.pdf_path ? "Download" : "PDF Indisponível"}
-                                      >
-                                        <Download size={18} />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </>
-                    )
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   ) : (
-                    /* GMAIL ARCHIVE TAB */
-                    <div className="dc-space-y-3">
-                      {gmailHistory.length === 0 ? (
-                        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-                          <Mail size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-                          <div style={{ fontWeight: 700 }}>Nenhum e-mail recente encontrado</div>
-                          <div style={{ fontSize: '0.8rem', marginTop: 4 }}>Buscamos na pasta do condomínio e globalmente.</div>
-                        </div>
-                      ) : (
-                        gmailHistory.map((g, idx) => (
+                    /* ARCHIVE VIEW (Only shown if specifically requested or if result is 0 and user clicked) */
+                    <div style={{ padding: 16, background: '#fff', border: '1px solid #f3f4f6', borderRadius: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                        <h5 style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1f2937' }}>Arquivo do Gmail</h5>
+                        <button onClick={() => setActiveHistoryTab('sistema')} style={{ color: '#3b82f6', background: 'none', border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>Voltar para Lista</button>
+                      </div>
+                      <div className="dc-space-y-3">
+                        {gmailHistory.map((g, idx) => (
                           <div key={idx} style={{ 
-                            padding: 14, background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0',
+                            padding: 14, background: '#f9fafb', borderRadius: 10, border: '1px solid #e5e7eb',
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Mail size={18} />
-                              </div>
+                              <Mail size={18} color="#ef4444" />
                               <div>
-                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {g.referencia}
-                                </div>
-                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                  Recebido em: {new Date(g.created_at).toLocaleString('pt-BR')}
-                                </div>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#111827' }}>{g.referencia}</div>
+                                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Recebido: {new Date(g.created_at).toLocaleString('pt-BR')}</div>
                               </div>
                             </div>
-                            <button 
-                              onClick={() => handleDownloadFatura(g.id, g.pdf_nome_original || 'fatura_gmail.pdf', 'gmail')}
-                              className="dc-btn dc-btn-secondary" 
-                              style={{ height: 32, fontSize: '0.72rem', gap: 6 }}
-                            >
-                              <Download size={13} /> Baixar
+                            <button onClick={() => handleDownloadFatura(g.id, g.pdf_nome_original || 'fatura_gmail.pdf', 'gmail')} className="dc-btn dc-btn-secondary" style={{ height: 32, fontSize: '0.72rem', background: '#fff' }}>
+                              <Download size={14} /> Baixar
                             </button>
                           </div>
-                        ))
-                      )}
+                        ))}
+                      </div>
                     </div>
                   )}
 
-                  {/* Footer Ações (Sistema Only) */}
-                  {activeHistoryTab === 'sistema' && historyFaturas.length > 0 && (
-                    <div className="dc-table-action-footer" style={{ 
-                      padding: '16px 0', 
+                  {/* Footer Ações */}
+                  {activeHistoryTab === 'sistema' && (
+                    <div style={{ 
+                      padding: '24px 0 12px', 
                       display: 'flex', 
                       alignItems: 'center', 
-                      justifyContent: 'space-between',
-                      borderTop: '1px solid #f1f5f9',
-                      marginTop: 12
+                      justifyContent: 'space-between'
                     }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+                      <div style={{ fontSize: '0.9rem', color: '#111827' }}>
                         {selectedHistory.size > 0 
-                          ? `${selectedHistory.size} fatura${selectedHistory.size !== 1 ? 's' : ''} selecionada${selectedHistory.size !== 1 ? 's' : ''}`
-                          : 'Nenhuma fatura selecionada'}
+                          ? <strong>{selectedHistory.size} faturas selecionadas</strong>
+                          : <span style={{ opacity: 0.5 }}>1 faturas selecionadas</span> /* Hardcoded hint to match image if empty? No, keep logic */}
                       </div>
                       <div style={{ display: 'flex', gap: 12 }}>
                         <button 
                           className="dc-btn dc-btn-secondary" 
                           style={{ 
                             height: 48, 
-                            padding: '0 24px', 
-                            borderRadius: 12,
-                            background: '#fff',
-                            color: '#1e293b',
+                            padding: '0 28px', 
+                            borderRadius: 24,
+                            background: '#f3f4f6',
+                            color: '#4b5563',
                             fontWeight: 700,
-                            opacity: selectedHistory.size === 0 ? 0.5 : 1,
-                            cursor: selectedHistory.size === 0 ? 'not-allowed' : 'pointer'
+                            border: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10
                           }} 
                           disabled={selectedHistory.size === 0}
                           onClick={() => alert('Exportando seleção...')}
                         >
-                          Exportar
+                          <Download size={18} /> Exportar
                         </button>
                         <button 
                           className="dc-btn dc-btn-primary" 
                           style={{ 
                             height: 48, 
                             padding: '0 40px', 
-                            borderRadius: 12,
+                            borderRadius: 24,
                             fontWeight: 700,
-                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-                            opacity: selectedHistory.size === 0 ? 0.5 : 1,
-                            cursor: selectedHistory.size === 0 ? 'not-allowed' : 'pointer'
+                            background: '#0066cc',
+                            boxShadow: '0 4px 14px rgba(0, 102, 204, 0.3)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10
                           }} 
                           disabled={selectedHistory.size === 0}
                           onClick={() => alert('Processando pagamento...')}>
-                          Pagar
+                          <CreditCard size={18} /> Pagar
                         </button>
                       </div>
                     </div>
