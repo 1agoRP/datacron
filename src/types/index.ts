@@ -12,6 +12,8 @@ export interface Condominio {
   mandato_inicio?: string | null;
   mandato_fim?: string | null;
   leitura_individualizada_ativa?: boolean;
+  contas_esperadas?: number;
+  contas_recebidas?: number;
   created_at: string;
 }
 
@@ -31,6 +33,7 @@ export interface Concessionaria {
   leitura_individualizada?: boolean;
   created_by_id?: string;
   created_at: string;
+  ativo: boolean;
   
   condominio?: Condominio;
 }
@@ -53,7 +56,6 @@ export interface Fatura {
   variacao_percentual?: number | null;
   debito_automatico?: boolean;
   created_at: string;
-
 
   condominio?: Condominio;
   concessionaria?: Concessionaria;
