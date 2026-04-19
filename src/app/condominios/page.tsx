@@ -888,60 +888,57 @@ export default function CondominiosPage() {
                       )}
                     </div>
                   )}
-              </tbody>
-                        </table>
-                      </div>
 
-                      {/* Footer Ações */}
-                      <div className="dc-table-action-footer" style={{ 
-                        padding: '16px 0', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'space-between',
-                        borderTop: '1px solid #f1f5f9',
-                        marginTop: 12
-                      }}>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
-                          {selectedHistory.size > 0 
-                            ? `${selectedHistory.size} fatura${selectedHistory.size !== 1 ? 's' : ''} selecionada${selectedHistory.size !== 1 ? 's' : ''}`
-                            : 'Nenhuma fatura selecionada'}
-                        </div>
-                        <div style={{ display: 'flex', gap: 12 }}>
-                          <button 
-                            className="dc-btn dc-btn-secondary" 
-                            style={{ 
-                              height: 48, 
-                              padding: '0 24px', 
-                              borderRadius: 12,
-                              background: '#fff',
-                              color: '#1e293b',
-                              fontWeight: 700,
-                              opacity: selectedHistory.size === 0 ? 0.5 : 1,
-                              cursor: selectedHistory.size === 0 ? 'not-allowed' : 'pointer'
-                            }} 
-                            disabled={selectedHistory.size === 0}
-                            onClick={() => alert('Exportando seleção...')}
-                          >
-                            Exportar
-                          </button>
-                          <button 
-                            className="dc-btn dc-btn-primary" 
-                            style={{ 
-                              height: 48, 
-                              padding: '0 40px', 
-                              borderRadius: 12,
-                              fontWeight: 700,
-                              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-                              opacity: selectedHistory.size === 0 ? 0.5 : 1,
-                              cursor: selectedHistory.size === 0 ? 'not-allowed' : 'pointer'
-                            }} 
-                            disabled={selectedHistory.size === 0}
-                            onClick={() => alert('Processando pagamento...')}>
-                            Pagar
-                          </button>
-                        </div>
+                  {/* Footer Ações (Sistema Only) */}
+                  {activeHistoryTab === 'sistema' && historyFaturas.length > 0 && (
+                    <div className="dc-table-action-footer" style={{ 
+                      padding: '16px 0', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      borderTop: '1px solid #f1f5f9',
+                      marginTop: 12
+                    }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+                        {selectedHistory.size > 0 
+                          ? `${selectedHistory.size} fatura${selectedHistory.size !== 1 ? 's' : ''} selecionada${selectedHistory.size !== 1 ? 's' : ''}`
+                          : 'Nenhuma fatura selecionada'}
                       </div>
-                    </>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <button 
+                          className="dc-btn dc-btn-secondary" 
+                          style={{ 
+                            height: 48, 
+                            padding: '0 24px', 
+                            borderRadius: 12,
+                            background: '#fff',
+                            color: '#1e293b',
+                            fontWeight: 700,
+                            opacity: selectedHistory.size === 0 ? 0.5 : 1,
+                            cursor: selectedHistory.size === 0 ? 'not-allowed' : 'pointer'
+                          }} 
+                          disabled={selectedHistory.size === 0}
+                          onClick={() => alert('Exportando seleção...')}
+                        >
+                          Exportar
+                        </button>
+                        <button 
+                          className="dc-btn dc-btn-primary" 
+                          style={{ 
+                            height: 48, 
+                            padding: '0 40px', 
+                            borderRadius: 12,
+                            fontWeight: 700,
+                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                            opacity: selectedHistory.size === 0 ? 0.5 : 1,
+                            cursor: selectedHistory.size === 0 ? 'not-allowed' : 'pointer'
+                          }} 
+                          disabled={selectedHistory.size === 0}
+                          onClick={() => alert('Processando pagamento...')}>
+                          Pagar
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               ) : (
