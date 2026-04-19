@@ -29,6 +29,12 @@ class HistoricoFatura(Base):
     pdf_nome_original: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     base_64: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     debito_automatico: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Email origin metadata
+    email_remetente: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email_assunto: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    gmail_message_id: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -884,6 +884,24 @@ export default function CondominiosPage() {
                                   <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#cbd5e1' }} />
                                   <span>Registrado em {f.created_at ? format(new Date(f.created_at), 'dd/MM/yyyy') : '—'}</span>
                                 </div>
+                                
+                                {f.email_remetente && (
+                                  <div style={{ 
+                                    fontSize: '0.75rem', 
+                                    color: '#94a3b8', 
+                                    marginTop: 6, 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: 5,
+                                    borderTop: '1px dashed #f1f5f9',
+                                    paddingTop: 6
+                                  }}>
+                                    <Mail size={12} />
+                                    <span style={{ maxWidth: 350, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      <strong>{f.email_remetente}</strong>: {f.email_assunto}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                             

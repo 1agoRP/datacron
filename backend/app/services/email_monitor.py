@@ -467,7 +467,10 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
                 valor=fatura.valor,
                 pdf_nome_original=fatura.pdf_nome_original,
                 base_64=fatura.pdf_base64,
-                debito_automatico=fatura.debito_automatico
+                debito_automatico=fatura.debito_automatico,
+                email_remetente=fatura.email_remetente,
+                email_assunto=fatura.email_assunto,
+                gmail_message_id=fatura.gmail_message_id
             )
             db.add(hist)
 
