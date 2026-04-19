@@ -91,8 +91,14 @@ export default function LandingPage() {
       clearTimeout(timeout);
       clearTimeout(warningTimeout);
       const errorMsg = err instanceof Error ? err.message : 'Falha na autenticação';
-      if (errorMsg.toLowerCase().includes('falha ao buscar')) {
-        setError('Servidor indisponível. Verifique sua conexão e tente novamente.');
+      const isNetworkError = err instanceof Error && (
+        err.message.toLowerCase().includes('failed to fetch') || 
+        err.message.toLowerCase().includes('networkerror') ||
+        err.message.toLowerCase().includes('falha ao buscar')
+      );
+                          
+      if (isNetworkError) {
+        setError('O servidor não respondeu. Verifique se o Backend está rodando ou se há bloqueio de rede.');
       } else {
         setError(errorMsg);
       }

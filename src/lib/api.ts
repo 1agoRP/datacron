@@ -18,7 +18,11 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
     // Only retry safe, idempotent methods, OR any method if it is a network failure (server is warming up)
     const method = (options.method || 'GET').toUpperCase();
     const isIdempotent = ['GET', 'OPTIONS', 'HEAD', 'PUT', 'DELETE'].includes(method);
-    const isNetworkError = err.message && err.message.toLowerCase().includes('failed to fetch');
+    const isNetworkError = err.message && (
+      err.message.toLowerCase().includes('failed to fetch') || 
+      err.message.toLowerCase().includes('networkerror') ||
+      err.message.toLowerCase().includes('falha ao buscar')
+    );
     
     if (retries > 0 && (isIdempotent || isNetworkError)) {
       console.warn(`[Network Error / Cold Start] Retrying ${method} to ${url} in ${delay}ms... (${retries} retries left). Error: ${err.message}`);
