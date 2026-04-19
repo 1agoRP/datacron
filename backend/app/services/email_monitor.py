@@ -534,79 +534,82 @@ async def run_email_scan():
         lock_file.touch()
         logger.info("Starting Gmail IMAP inbox scan...")
 
-    mail = get_imap_connection()
-    if not mail:
-        return
-
-    try:
-        mail.select("inbox")
-        status, messages = mail.search(None, "ALL")
-        if status != "OK":
-            logger.error("Erro ao buscar emails no IMAP: " + str(status))
+        mail = get_imap_connection()
+        if not mail:
             return
 
-        msg_ids = messages[0].split()
-        if not msg_ids or (len(msg_ids) == 1 and msg_ids[0] == b''):
-            logger.info("No messages found in inbox")
-            return
+        try:
+            mail.select("inbox")
+            status, messages = mail.search(None, "ALL")
+            if status != "OK":
+                logger.error("Erro ao buscar emails no IMAP: " + str(status))
+                return
 
-        # Ensure the "not identified" label exists
-        ensure_gmail_label(mail, "Datacron/E-mails nao identificados")
+            msg_ids = messages[0].split()
+            if not msg_ids or (len(msg_ids) == 1 and msg_ids[0] == b''):
+                logger.info("No messages found in inbox")
+                return
 
-        # Process in reverse order (newest first) to handle EXPUNGE correctly
-        # We collect results first, then move in reverse
-        results: list[tuple[bytes, Optional[str]]] = []
+            # Ensure the "not identified" label exists
+            ensure_gmail_label(mail, "Datacron/E-mails nao identificados")
 
-        async with AsyncSessionLocal() as db:
-            for m_id in msg_ids:
-                msg_id_str = m_id.decode('utf-8')
-                try:
-                    res, msg_data = mail.fetch(m_id, "(RFC822)")
-                    if res != "OK": continue
-                    
-                    raw_email = msg_data[0][1]
-                    msg = email.message_from_bytes(raw_email)
-                    
-                    # Message-ID works as unique identifier
-                    unique_msg_id = msg.get("Message-ID", f"imap-{msg_id_str}-{datetime.now().timestamp()}")
-                    unique_msg_id = str(unique_msg_id).strip()
-                    if len(unique_msg_id) > 255:
-                        unique_msg_id = unique_msg_id[:255]
+            # Process in reverse order (newest first) to handle EXPUNGE correctly
+            # We collect results first, then move in reverse
+            results: list[tuple[bytes, Optional[str]]] = []
 
-                    condo_name = await process_email_message(unique_msg_id, msg, db)
-                    results.append((m_id, condo_name))
-                except Exception as e:
-                    logger.error(f"Error processing IMAP message ID {msg_id_str}: {e}")
-                    # Still move unprocessable emails to "não identificados"
-                    results.append((m_id, None))
-                    continue
+            async with AsyncSessionLocal() as db:
+                for m_id in msg_ids:
+                    msg_id_str = m_id.decode('utf-8')
+                    try:
+                        res, msg_data = mail.fetch(m_id, "(RFC822)")
+                        if res != "OK": continue
+                        
+                        raw_email = msg_data[0][1]
+                        msg = email.message_from_bytes(raw_email)
+                        
+                        # Message-ID works as unique identifier
+                        unique_msg_id = msg.get("Message-ID", f"imap-{msg_id_str}-{datetime.now().timestamp()}")
+                        unique_msg_id = str(unique_msg_id).strip()
+                        if len(unique_msg_id) > 255:
+                            unique_msg_id = unique_msg_id[:255]
 
-        # Move emails to labels (reverse order to avoid sequence number issues)
-        for m_id, condo_name in reversed(results):
-            if condo_name:
-                label = f"Datacron/{condo_name}"
-            else:
-                label = "Datacron/E-mails nao identificados"
-            move_email_to_label(mail, m_id, label)
+                        condo_name = await process_email_message(unique_msg_id, msg, db)
+                        results.append((m_id, condo_name))
+                    except Exception as e:
+                        logger.error(f"Error processing IMAP message ID {msg_id_str}: {e}")
+                        # Still move unprocessable emails to "não identificados"
+                        results.append((m_id, None))
+                        continue
 
-        # Expunge all deleted messages at once
-        mail.expunge()
+            # Move emails to labels (reverse order to avoid sequence number issues)
+            for m_id, condo_name in reversed(results):
+                if condo_name:
+                    label = f"Datacron/{condo_name}"
+                else:
+                    label = "Datacron/E-mails nao identificados"
+                move_email_to_label(mail, m_id, label)
 
-        logger.info(f"Scan complete. Processed and moved {len(results)} message(s)")
+            # Expunge all deleted messages at once
+            mail.expunge()
+
+            logger.info(f"Scan complete. Processed and moved {len(results)} message(s)")
+
+        except Exception as e:
+            logger.error(f"Gmail scan internal error: {e}")
+        finally:
+            try:
+                mail.close()
+                mail.logout()
+            except:
+                pass
 
     except Exception as e:
         logger.error(f"Gmail scan failed: {e}")
     finally:
         # Clean up lock
         try:
-            lock_file = Path("/tmp/datacron_scan.lock") if os.name != 'nt' else Path("datacron_scan.lock")
             if lock_file.exists():
                 lock_file.unlink()
-        except:
-            pass
-        try:
-            mail.close()
-            mail.logout()
         except:
             pass
 def get_gmail_history(label_name: str, filter_text: str) -> list[dict]:
