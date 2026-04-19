@@ -26,6 +26,7 @@ class HistoricoFatura(Base):
     referencia: Mapped[str] = mapped_column(String(50), nullable=False)
     vencimento: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     valor: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    pdf_nome_original: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     base_64: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     debito_automatico: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(

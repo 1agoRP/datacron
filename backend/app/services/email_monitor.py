@@ -457,6 +457,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
                 referencia=fatura.referencia,
                 vencimento=fatura.vencimento,
                 valor=fatura.valor,
+                pdf_nome_original=fatura.pdf_nome_original,
                 base_64=fatura.pdf_base64,
                 debito_automatico=fatura.debito_automatico
             )

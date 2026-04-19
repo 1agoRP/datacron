@@ -478,6 +478,7 @@ class HistoricoFaturaResponse(BaseModel):
     referencia: str
     vencimento: Optional[date] = None
     valor: float
+    pdf_nome_original: Optional[str] = None
     base_64: Optional[str] = None
     debito_automatico: bool = False
     created_at: datetime

@@ -736,6 +736,14 @@ class ApiClient {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   }
+
+  // Histórico
+  async getHistorico(params: Record<string, string | number> = {}) {
+    const safeParams: Record<string, string> = {};
+    for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
+    const query = new URLSearchParams(safeParams).toString();
+    return this.request<any[]>(`/historico?${query}`);
+  }
 }
 
 export const api = new ApiClient();

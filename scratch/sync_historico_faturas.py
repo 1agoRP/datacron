@@ -40,6 +40,7 @@ async def sync_historico():
                     referencia=f.referencia,
                     vencimento=f.vencimento,
                     valor=f.valor,
+                    pdf_nome_original=f.pdf_nome_original,
                     base_64=f.pdf_base64,
                     debito_automatico=f.debito_automatico,
                     created_at=f.created_at,

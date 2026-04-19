@@ -250,8 +250,8 @@ export default function CondominiosPage() {
     setActiveHistoryTab('sistema');
     try {
       setLoadingHistory(true);
-      // 1. Fetch from Database
-      const dbFaturas = await api.getFaturas({ 
+      // 1. Fetch from Historico Table (New)
+      const dbFaturas = await api.getHistorico({ 
         condominio_id: detailsCondo.id,
         concessionaria_id: conc.id
       });
@@ -292,11 +292,36 @@ export default function CondominiosPage() {
     }
   };
 
-  const handleDownloadFatura = async (faturaId: string, filename: string, source: 'sistema' | 'gmail' = 'sistema') => {
+  const handleDownloadFatura = async (fatura: any, filename: string, source: 'sistema' | 'gmail' = 'sistema') => {
     try {
       if (source === 'sistema') {
+        const base64Data = fatura.base_64 || fatura.pdf_base64;
+        
+        if (base64Data) {
+          // Download directly from base64 string
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'application/pdf' });
+          
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          a.remove();
+          return;
+        }
+
+        // Fallback to traditional download endpoint if base64 is missing
         const token = localStorage.getItem('datacron_token');
-        const resp = await fetch(`${API_BASE_URL}/faturas/${faturaId}/pdf`, {
+        const resp = await fetch(`${API_BASE_URL}/faturas/${fatura.id}/pdf`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!resp.ok) throw new Error('Falha ao baixar do sistema');
@@ -310,7 +335,7 @@ export default function CondominiosPage() {
         window.URL.revokeObjectURL(url);
         a.remove();
       } else {
-        await api.downloadGmailFatura(faturaId, filename);
+        await api.downloadGmailFatura(fatura.id, filename);
       }
     } catch (err: any) {
       alert('❌ ' + (err.message || 'Erro ao baixar fatura'));
@@ -828,9 +853,8 @@ export default function CondominiosPage() {
                                 <td style={{ textAlign: 'right' }}>
                                   <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                                     <button 
-                                      onClick={() => handleDownloadFatura(f.id, f.pdf_nome_original || 'fatura.pdf', 'sistema')}
-                                      disabled={!f.pdf_path}
-                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}
+                                      onClick={() => handleDownloadFatura(f, f.pdf_nome_original || 'fatura.pdf', 'sistema')}
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0066cc' }}
                                       title="Download"
                                     >
                                       <Download size={18} />
@@ -866,7 +890,7 @@ export default function CondominiosPage() {
                                 <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Recebido: {new Date(g.created_at).toLocaleString('pt-BR')}</div>
                               </div>
                             </div>
-                            <button onClick={() => handleDownloadFatura(g.id, g.pdf_nome_original || 'fatura_gmail.pdf', 'gmail')} className="dc-btn dc-btn-secondary" style={{ height: 32, fontSize: '0.72rem', background: '#fff' }}>
+                            <button onClick={() => handleDownloadFatura(g, g.pdf_nome_original || 'fatura_gmail.pdf', 'gmail')} className="dc-btn dc-btn-secondary" style={{ height: 32, fontSize: '0.72rem', background: '#fff' }}>
                               <Download size={14} /> Baixar
                             </button>
                           </div>
