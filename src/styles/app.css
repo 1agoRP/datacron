@@ -406,6 +406,8 @@
 }
 .dc-stat-card:hover {
   border-color: #bfdbfe;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
 }
 .dc-stat-top {
   display: flex;
@@ -420,6 +422,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 }
 .dc-stat-badge {
   display: flex;
@@ -450,6 +453,61 @@
   letter-spacing: -0.04em;
   line-height: 1;
   margin-top: 4px;
+}
+
+/* ─── PREMIUM DASHBOARD ELEMENTS ────────────────────────── */
+.dc-dashboard-header-stats {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.dc-card-vibrant {
+  border-top: 4px solid #2563eb;
+}
+
+.dc-glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+@keyframes dc-fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dc-animate-fade-in {
+  animation: dc-fade-in-up 0.4s ease-out forwards;
+}
+
+.dc-chart-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+  justify-content: center;
+}
+
+.dc-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.dc-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
 
 /* ─── DASHBOARD GRID ─────────────────────────────────────── */

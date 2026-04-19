@@ -51,10 +51,18 @@ async def dashboard_stats(
     result = await db.execute(alert_stmt)
     active_alerts = result.scalar_one()
 
+    # Total faturado (sum of all faturas)
+    total_faturado_stmt = select(func.sum(Fatura.valor))
+    if allowed_condo_ids is not None:
+        total_faturado_stmt = total_faturado_stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
+    result = await db.execute(total_faturado_stmt)
+    total_faturado = result.scalar() or 0.0
+
     return {
         "condominios_count": condominios_count,
         "recebidas_hoje": recebidas_hoje,
         "active_alerts": active_alerts,
+        "total_faturado": round(float(total_faturado), 2),
     }
 
 

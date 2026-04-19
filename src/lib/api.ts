@@ -556,7 +556,12 @@ class ApiClient {
 
   // Dashboard
   async getDashboardKpis() {
-    return this.request<{ condominios_count: number; recebidas_hoje: number; active_alerts: number }>('/dashboard/stats');
+    return this.request<{ 
+      condominios_count: number; 
+      recebidas_hoje: number; 
+      active_alerts: number;
+      total_faturado: number;
+    }>('/dashboard/stats');
   }
 
   async getDashboardContasEsperadas(mes?: string) {

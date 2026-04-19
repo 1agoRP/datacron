@@ -95,6 +95,7 @@ export interface DashboardStats {
   condominiosCount: number;
   activeAlerts: number;
   recebidasHoje: number;
+  totalFaturado: number;
   faturas: Fatura[];
   alertas: Alerta[];
 }
