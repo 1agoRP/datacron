@@ -861,9 +861,10 @@ export default function CondominiosPage() {
                       <table className="dc-table" style={{ fontSize: '0.85rem', border: 'none' }}>
                         <thead style={{ background: '#fff', borderBottom: '1px solid #f3f4f6' }}>
                           <tr>
-                            <th style={{ color: '#6b7280', paddingLeft: 24 }}>Mês <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
+                            <th style={{ color: '#6b7280', paddingLeft: 24 }}>Referência <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
                             <th style={{ color: '#6b7280' }}>Vencimento <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
                             <th style={{ color: '#6b7280' }}>Situação <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
+                            <th style={{ color: '#6b7280' }}>Pagamento <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
                             <th style={{ color: '#6b7280' }}>Emissão <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
                             <th style={{ color: '#6b7280' }}>Valor <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
                             <th style={{ width: 80 }}></th>
@@ -871,48 +872,38 @@ export default function CondominiosPage() {
                         </thead>
                         <tbody>
                           {historyFaturas.map(f => {
-                            const isPaid = f.status === 'processada';
                             const isSelected = selectedHistory.has(f.id);
+                            const hasAutoDebit = f.debito_automatico === true || String(f.debito_automatico) === 'true';
+                            
                             return (
-                              <tr key={f.id} style={{ background: isSelected ? '#f0f7ff' : 'transparent', borderBottom: '1px solid #f9fafb' }}>
-                                <td style={{ paddingLeft: 24 }}><div style={{ fontWeight: 600, color: '#111827' }}>{f.referencia ? formatReferencia(f.referencia) : '—'}</div></td>
+                              <tr key={f.id} style={{ background: isSelected ? '#f0f7ff' : 'transparent', borderBottom: '1px solid #f3f4f6' }}>
+                                <td style={{ paddingLeft: 24 }}><div style={{ fontWeight: 600, color: '#111827' }}>{f.referencia || '—'}</div></td>
                                 <td>{f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}</td>
                                 <td>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <div style={{ 
-                                      width: 6, 
-                                      height: 6, 
-                                      borderRadius: '50%', 
-                                      background: f.status === 'processada' ? '#10b981' : 
-                                                 f.status === 'erro' ? '#ef4444' : 
-                                                 f.status === 'revisao' ? '#8b5cf6' : '#f97316' 
-                                    }} />
-                                    <span style={{ 
-                                      fontWeight: 700, 
-                                      fontSize: '0.75rem', 
-                                      color: f.status === 'processada' ? '#10b981' : 
-                                             f.status === 'erro' ? '#ef4444' : 
-                                             f.status === 'revisao' ? '#8b5cf6' : '#f97316' 
-                                    }}>
-                                      {f.status === 'processada' ? 'Paga' : 
-                                       f.status === 'erro' ? 'Erro' : 
-                                       f.status === 'revisao' ? 'Revisão' : 'Em aberto'}
-                                    </span>
+                                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
+                                    <span style={{ fontWeight: 700, fontSize: '0.75rem', color: '#10b981' }}>Registrada</span>
                                   </div>
                                 </td>
-                                <td style={{ color: '#6b7280' }}>{format(new Date(f.created_at), 'dd/MM/yyyy')}</td>
+                                <td>
+                                  {hasAutoDebit ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#0369a1', fontWeight: 600 }}>
+                                      <CreditCard size={12} /> <span style={{ fontSize: '0.7rem' }}>Automático</span>
+                                    </div>
+                                  ) : (
+                                    <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Manual</span>
+                                  )}
+                                </td>
+                                <td style={{ color: '#6b7280' }}>{f.created_at ? format(new Date(f.created_at), 'dd/MM/yyyy') : '—'}</td>
                                 <td><div style={{ fontWeight: 800, color: '#111827' }}>{formatCurrencyCeil(f.valor || 0)}</div></td>
                                 <td style={{ textAlign: 'right' }}>
                                   <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                                     <button 
-                                      onClick={() => handleDownloadFatura(f, f.pdf_nome_original || 'fatura.pdf', 'sistema')}
+                                      onClick={() => handleDownloadFatura(f, f.pdf_nome_original || `fatura_${f.id}.pdf`, 'sistema')}
                                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0066cc' }}
                                       title="Download"
                                     >
                                       <Download size={18} />
-                                    </button>
-                                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}>
-                                      <CreditCard size={18} />
                                     </button>
                                   </div>
                                 </td>
