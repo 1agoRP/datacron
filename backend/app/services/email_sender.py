@@ -11,7 +11,8 @@ def send_notification_email(
     subject: str, 
     message_text: str, 
     in_reply_to: Optional[str] = None,
-    attachments: Optional[list[tuple[str, bytes]]] = None
+    attachments: Optional[list[tuple[str, bytes]]] = None,
+    html_body: Optional[str] = None
 ) -> bool:
     """Sends an email using Gmail SMTP, optionally as a reply to a Message-ID."""
     if not settings.GMAIL_USER or not settings.GMAIL_PASSWORD:
@@ -20,6 +21,9 @@ def send_notification_email(
     try:
         msg = EmailMessage()
         msg.set_content(message_text)
+        if html_body:
+            msg.add_alternative(html_body, subtype='html')
+            
         msg["To"] = to
         msg["From"] = settings.GMAIL_USER
         msg["Subject"] = subject

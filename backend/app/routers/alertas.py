@@ -66,7 +66,7 @@ async def mark_as_read(
 async def resolve_alerta(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Alerta).where(Alerta.id == id))
@@ -78,7 +78,7 @@ async def resolve_alerta(
     if allowed_condo_ids is not None and a.condominio_id and a.condominio_id not in allowed_condo_ids:
         raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
     
-    # If it's an email_nao_identificado alert, try to send reply email
+    # If it's an email_nao_identificado alert, try to send reply email to sender
     if a.tipo == "email_nao_identificado":
         try:
             import re
@@ -94,6 +94,14 @@ async def resolve_alerta(
             import logging
             logging.getLogger(__name__).warning(f"Could not send resolution email: {e}")
     
+    # ALWAYS send a confirmation email to the user who is resolving it (the manager)
+    # This fulfills the user's request: "resolução de problema que me enviaria um e-mail"
+    try:
+        _send_manager_resolution_email(current_user.email, a)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Could not send manager notification: {e}")
+    
     a.lido = True
     a.resolvido = True
     await db.commit()
@@ -106,15 +114,31 @@ def _send_resolution_email(recipient: str, original_subject: str):
     Sends a professional HTML reply email informing that the concessionaria
     was not found in the system and needs review.
     """
-
-    import base64
     import re
-    from email.mime.text import MIMEText
-    from app.services.email_monitor import get_gmail_service
+    from app.services.email_sender import send_notification_email
 
-    service = get_gmail_service()
-    if not service:
-        raise Exception("Gmail service not available")
+    # Detect dealership type from subject for better subject line
+    subj_upper = original_subject.upper()
+    if "ENEL" in subj_upper or "ELETROPAULO" in subj_upper:
+        tipo_label = "Enel"
+        codigo_label = "Instalação"
+    elif "SABESP" in subj_upper:
+        tipo_label = "Sabesp"
+        codigo_label = "Fornecimento"
+    elif "COMGÁS" in subj_upper or "COMGAS" in subj_upper:
+        tipo_label = "Comgas"
+        codigo_label = "Código de Usuário"
+    else:
+        tipo_label = "Concessionária"
+        codigo_label = "Código"
+
+    # Extract code from subject if available
+    code_match = re.search(r"(\d{6,})", original_subject)
+    code = code_match.group(1) if code_match else "N/D"
+
+    subject = f"{tipo_label} - {codigo_label} {code} - nao reconhecida no cadastro"
+    
+    body_text = f"Prezado(a), informamos que o e-mail recebido ({original_subject}) não foi identificado em nosso sistema Datacron."
 
     # Detect dealership type from subject for better subject line
     subj_upper = original_subject.upper()
@@ -194,15 +218,48 @@ def _send_resolution_email(recipient: str, original_subject: str):
 </body>
 </html>"""
 
-    message = MIMEText(body_html, "html", "utf-8")
-    message["To"] = recipient
-    message["Subject"] = subject
+    message_text = body_text
+    send_notification_email(
+        to=recipient,
+        subject=subject,
+        message_text=message_text,
+        html_body=body_html
+    )
 
-    raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
-    service.users().messages().send(
-        userId="me",
-        body={"raw": raw}
-    ).execute()
+
+def _send_manager_resolution_email(recipient: str, alerta: Alerta):
+    """Sends a confirmation email to the manager who resolved the alert."""
+    from app.services.email_sender import send_notification_email
+    
+    subject = f"✅ Alerta Resolvido: {alerta.tipo.replace('_', ' ').title()}"
+    
+    body_html = f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<body style="font-family: sans-serif; padding: 20px; color: #334155;">
+    <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px;">
+        <h2 style="color: #16a34a; margin-top: 0;">Resolução Confirmada</h2>
+        <p>Olá, o seguinte alerta foi marcado como <strong>resolvido</strong> em sua conta Datacron:</p>
+        
+        <div style="background: #f8fafc; padding: 16px; border-radius: 6px; margin: 20px 0;">
+            <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold;">Tipo</div>
+            <div style="font-size: 16px; margin-bottom: 12px;">{alerta.tipo.replace('_', ' ').upper()}</div>
+            
+            <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: bold;">Mensagem</div>
+            <div style="font-size: 14px;">{alerta.mensagem}</div>
+        </div>
+        
+        <p style="font-size: 13px; color: #94a3b8;">Data da resolução: {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
+    </div>
+</body>
+</html>"""
+
+    send_notification_email(
+        to=recipient,
+        subject=subject,
+        message_text=f"Alerta resolvido: {alerta.mensagem}",
+        html_body=body_html
+    )
+from datetime import datetime
 
 
 @router.delete("/{id}", status_code=204)

@@ -29,15 +29,24 @@ export default function AlertasPage() {
       setResolving(alerta.id);
       await api.resolveAlerta(alerta.id);
 
+      const isEmailIssue = alerta.tipo === 'email_nao_identificado';
       const senderMatch = alerta.mensagem.match(/de '([^']+)'/);
       const sender = senderMatch ? senderMatch[1] : 'remetente';
 
-      alert(
-        `✅ Pendência resolvida!\n\n` +
-        `Uma resposta padrão foi registrada informando que a concessionária de '${sender}' não foi ` +
-        `localizada no cadastro e precisa de uma revisão para ser cadastrada ou não.\n\n` +
-        `O alerta foi marcado como resolvido.`
-      );
+      if (isEmailIssue) {
+        alert(
+          `✅ Pendência resolvida!\n\n` +
+          `Uma resposta padrão foi enviada para '${sender}' informando que a concessionária não foi ` +
+          `localizada no cadastro.\n\n` +
+          `Você também receberá um e-mail de confirmação.`
+        );
+      } else {
+        alert(
+          `✅ Alerta resolvido!\n\n` +
+          `O alerta foi marcado como resolvido com sucesso.\n\n` +
+          `Um e-mail de confirmação foi enviado para sua conta (${user?.email}).`
+        );
+      }
 
       // Optimistic update: remove from cache, then revalidate
       mutate();
