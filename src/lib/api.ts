@@ -177,7 +177,7 @@ class ApiClient {
   }
 
   // Condominios
-  async getCondominios(params: Record<string, string | number> = {}) {
+  async getCondominios(params: Record<string, string | number | boolean> = {}) {
     const safeParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
     const query = new URLSearchParams(safeParams).toString();
@@ -313,7 +313,7 @@ class ApiClient {
   }
 
   // Concessionarias
-  async getConcessionarias(params: Record<string, string | number> = {}) {
+  async getConcessionarias(params: Record<string, string | number | boolean> = {}) {
     const safeParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
     const query = new URLSearchParams(safeParams).toString();
@@ -354,7 +354,7 @@ class ApiClient {
   }
 
   // Faturas
-  async getFaturas(params: Record<string, string | number> = {}) {
+  async getFaturas(params: Record<string, string | number | boolean> = {}) {
     const safeParams: Record<string, string> = {};
     for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
     const query = new URLSearchParams(safeParams).toString();
