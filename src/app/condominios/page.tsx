@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, ArrowDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database, CreditCard } from 'lucide-react';
+import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, ArrowDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database, CreditCard, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { ShieldAlert, Flame, ShieldCheck, HardHat } from 'lucide-react';
@@ -80,6 +80,10 @@ export default function CondominiosPage() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [activeHistoryTab, setActiveHistoryTab] = useState<'sistema' | 'gmail'>('sistema');
   const [selectedHistory, setSelectedHistory] = useState<Set<string>>(new Set());
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [statusModalCondo, setStatusModalCondo] = useState<any>(null);
+  const [statusItems, setStatusItems] = useState<any[]>([]);
+  const [loadingStatus, setLoadingStatus] = useState(false);
 
   // Removed manual fetchData in favor of useSWR
 
@@ -240,6 +244,41 @@ export default function CondominiosPage() {
       await api.downloadApoliceSeguro(condoId);
     } catch (err: any) {
       alert(err.message || 'Erro ao baixar Apólice de Seguro');
+    }
+  };
+
+  const handleOpenStatus = async (condo: any) => {
+    setStatusModalCondo(condo);
+    setIsStatusModalOpen(true);
+    setLoadingStatus(true);
+    try {
+      // 1. Get all active concessionaires for this condo
+      const concs = await api.getConcessionarias({ condominio_id: condo.id, ativo: true });
+      
+      // 2. Get invoices received this month for this condo
+      const now = new Date();
+      const allInvoices = await api.getFaturas({ condominio_id: condo.id });
+      
+      // Filter to current month to match "Status de Contas" logic in backend list
+      const currentMonthInvoices = allInvoices.filter((f: any) => {
+        const d = new Date(f.created_at);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      });
+
+      // 3. Merge to see what's missing
+      const items = concs.map((c: any) => {
+        const matchingFatura = currentMonthInvoices.find((f: any) => f.concessionaria_id === c.id);
+        return {
+          concessionaria: c,
+          fatura: matchingFatura || null
+        };
+      });
+      
+      setStatusItems(items);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingStatus(false);
     }
   };
 
@@ -502,7 +541,14 @@ export default function CondominiosPage() {
                       </div>
                     </td>
                     <td>
-                      <div className="dc-progress-bar-wrap">
+                      <div 
+                        className="dc-progress-bar-wrap" 
+                        style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
+                        title="Clique para ver detalhes das contas"
+                        onClick={(e) => { e.stopPropagation(); handleOpenStatus(condo); }}
+                        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                      >
                         <div className="dc-progress-bar-labels">
                           <span className="dc-progress-bar-label">{rec}/{total} contas</span>
                           <span className="dc-progress-bar-pct">{pct}%</span>
@@ -1121,6 +1167,122 @@ export default function CondominiosPage() {
             </div>
             <div className="dc-modal-footer">
               <button type="button" className="dc-btn dc-btn-secondary" onClick={() => { setDetailsCondo(null); setHistoryConc(null); }}>Fechar Visualização</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Status de Contas */}
+      {isStatusModalOpen && (
+        <div className="dc-modal-overlay">
+          <div className="dc-modal-content" style={{ maxWidth: 600 }}>
+            <div className="dc-modal-header" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: 16 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="dc-condo-icon" style={{ width: 40, height: 40 }}><Building2 size={20}/></div>
+                  <div>
+                    <h2 className="dc-modal-title" style={{ margin: 0 }}>Status de Contas</h2>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 500 }}>{statusModalCondo?.nome}</div>
+                  </div>
+                </div>
+              </div>
+              <button className="dc-modal-close" onClick={() => setIsStatusModalOpen(false)}><X size={20} /></button>
+            </div>
+            
+            <div className="dc-modal-body" style={{ padding: '24px 0', minHeight: 400 }}>
+              <div style={{ padding: '0 24px 16px' }}>
+                <div style={{ padding: 12, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Calendar size={16} color="#3b82f6" />
+                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
+                    Referência: {format(new Date(), 'MMMM / yyyy', { locale: ptBR })}
+                  </span>
+                </div>
+              </div>
+
+              {loadingStatus ? (
+                <div style={{ padding: 60, textAlign: 'center' }}>
+                  <div className="dc-loading-spinner" style={{ margin: '0 auto' }} />
+                  <p style={{ marginTop: 12, fontSize: '0.9rem', color: '#64748b' }}>Buscando comprovantes...</p>
+                </div>
+              ) : statusItems.length === 0 ? (
+                <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>
+                  <Zap size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+                  <p>Nenhuma concessionária ativa vinculada.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 24px' }}>
+                  {statusItems.map((item, idx) => (
+                    <div key={idx} style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      padding: 16, 
+                      borderRadius: 14, 
+                      border: '1px solid',
+                      borderColor: item.fatura ? '#bcf0da' : '#e2e8f0',
+                      background: item.fatura ? '#f0fdf4' : '#fff',
+                      boxShadow: item.fatura ? 'none' : '0 2px 4px rgba(0,0,0,0.02)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        {item.fatura ? (
+                          <div style={{ width: 44, height: 44, borderRadius: 12, background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                            <CheckCircle2 size={24} />
+                          </div>
+                        ) : (
+                          <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                            <Clock size={24} />
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>
+                            {item.concessionaria.tipo === 'Outros' ? item.concessionaria.nome_personalizado : item.concessionaria.tipo}
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: item.fatura ? '#059669' : '#64748b', fontWeight: 500 }}>
+                            {item.fatura ? `Recebida em ${format(new Date(item.fatura.created_at), 'dd/MM/yyyy')}` : `Vencimento planejado: Dia ${item.concessionaria.dia_vencimento}`}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        {item.fatura ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>{formatCurrencyCeil(item.fatura.valor || 0)}</div>
+                            </div>
+                            <button 
+                              className="dc-btn" 
+                              style={{ 
+                                height: 40, 
+                                width: 40, 
+                                padding: 0, 
+                                borderRadius: 10,
+                                background: '#fff',
+                                border: '1px solid #10b981',
+                                color: '#10b981',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              onClick={() => handleDownloadFatura(item.fatura, item.fatura.pdf_nome_original || 'fatura.pdf')}
+                              title="Baixar Fatura"
+                            >
+                              <Download size={18} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ padding: '6px 14px', borderRadius: 20, background: '#fff7ed', color: '#ea580c', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #ffedd5' }}>
+                            <AlertCircle size={15} /> Pendente
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="dc-modal-footer">
+              <button type="button" className="dc-btn dc-btn-secondary" style={{ width: '100%', height: 48 }} onClick={() => setIsStatusModalOpen(false)}>Fechar</button>
             </div>
           </div>
         </div>
