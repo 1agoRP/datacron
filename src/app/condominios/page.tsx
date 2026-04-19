@@ -252,15 +252,17 @@ export default function CondominiosPage() {
     setIsStatusModalOpen(true);
     setLoadingStatus(true);
     try {
-      // 1. Get all active concessionaires for this condo
-      const concs = await api.getConcessionarias({ condominio_id: condo.id, ativo: true });
+      // 1. Get concessionaires for this condo (fetch all then filter to be safe with type comparisons)
+      const allConcs = await api.getConcessionarias({ condominio_id: condo.id });
+      const concs = allConcs.filter(c => c.ativo === true || String(c.ativo) === 'true');
       
       // 2. Get invoices received this month for this condo
       const now = new Date();
       const allInvoices = await api.getFaturas({ condominio_id: condo.id });
       
-      // Filter to current month to match "Status de Contas" logic in backend list
+      // Filter to current month to match "Status de Contas" logic in backend
       const currentMonthInvoices = allInvoices.filter((f: any) => {
+        if (!f.created_at) return false;
         const d = new Date(f.created_at);
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       });
@@ -272,11 +274,15 @@ export default function CondominiosPage() {
           concessionaria: c,
           fatura: matchingFatura || null
         };
+      }).sort((a, b) => {
+        // Sort received first, then by name
+        if (!!a.fatura !== !!b.fatura) return a.fatura ? -1 : 1;
+        return (a.concessionaria.tipo || '').localeCompare(b.concessionaria.tipo || '');
       });
       
       setStatusItems(items);
     } catch (err) {
-      console.error(err);
+      console.error('Error loading status details:', err);
     } finally {
       setLoadingStatus(false);
     }
