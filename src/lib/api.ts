@@ -21,7 +21,7 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
     const isNetworkError = err.message && err.message.toLowerCase().includes('failed to fetch');
     
     if (retries > 0 && (isIdempotent || isNetworkError)) {
-      console.warn(`[Network Error / Cold Start] Retrying ${method} to ${url} in ${delay}ms... (${retries} retries left)`, err);
+      console.warn(`[Network Error / Cold Start] Retrying ${method} to ${url} in ${delay}ms... (${retries} retries left). Error: ${err.message}`);
       if (isNetworkError) {
           // Longer delay for cold starts
           await new Promise(r => setTimeout(r, delay * 2));
@@ -30,6 +30,7 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
       await new Promise(r => setTimeout(r, delay));
       return fetchWithRetry(url, options, retries - 1, delay * 1.5);
     }
+    console.error(`[API Client] Final failure for ${method} ${url}:`, err);
     throw err;
   }
 }
@@ -102,7 +103,9 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetchWithRetry(`${API_BASE_URL}${endpoint}`, {
+    const finalUrl = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`.replace(/([^:])\/\//g, '$1/');
+
+    const response = await fetchWithRetry(finalUrl, {
       ...options,
       headers,
       body: formData,

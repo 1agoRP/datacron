@@ -19,7 +19,9 @@ export function middleware(request: NextRequest) {
 
   // Always allow public paths and Next.js internals
   const isPublic = PUBLIC_PATHS.includes(pathname);
-  if (isPublic) {
+  const isApi = pathname.startsWith('/api');
+
+  if (isPublic || isApi) {
     return NextResponse.next();
   }
 
