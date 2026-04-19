@@ -72,10 +72,11 @@ export default function Dashboard() {
       console.error("Dashboard fetch error:", err);
       throw err;
     }
-  }, { revalidateOnFocus: true, refreshInterval: 60000 });
+  }, { revalidateOnFocus: false, refreshInterval: 300000 }); // Every 5 minutes, silently
 
   const { data: contasEsperadas } = useSWR('dashboard/contas', 
-    () => api.getDashboardContasEsperadas().catch(() => null)
+    () => api.getDashboardContasEsperadas().catch(() => null),
+    { revalidateOnFocus: false, refreshInterval: 300000 }
   );
 
   const { data: chartData, isLoading: chartLoading } = useSWR<ChartData[]>(
@@ -154,9 +155,9 @@ export default function Dashboard() {
           positive
         />
         <StatCard
-          title="Operação Mensal"
+          title="Faturas Processadas"
           value={contasEsperadas ? `${contasEsperadas.recebidas}/${contasEsperadas.total_esperadas}` : '0/0'}
-          subtitle={`${performancePct}% das contas recebidas`}
+          subtitle={`${performancePct}% da meta mensal`}
           icon={<Zap size={24} />}
           gradient={['#fffbeb', '#fef3c7']}
           iconColor="#d97706"

@@ -1899,3 +1899,49 @@
 .dc-history-filter-btn svg {
   color: #94a3b8;
 }
+/* ─── SEGMENTED CONTROL ─────────────────────────────────── */
+.dc-segmented-control {
+  display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 12px;
+  gap: 4px;
+}
+
+.dc-segmented-control button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #64748b;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dc-segmented-control button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.5);
+  color: #334155;
+}
+
+.dc-segmented-control button.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.dc-segmented-control button.active-negative {
+  color: #dc2626;
+}
+
+.dc-segmented-control button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

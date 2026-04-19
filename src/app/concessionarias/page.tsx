@@ -420,7 +420,7 @@ export default function ConcessionariasPage() {
                 </th>
                 <th>Tipo / Código</th>
                 <th>Regra de Senha</th>
-                <th>Senha Portal</th>
+
                 <th>Vencimento</th>
                 <th>Déb. Aut.</th>
                 <th>Valor Médio</th>
@@ -470,33 +470,7 @@ export default function ConcessionariasPage() {
                         {conc.regra_senha === 'manual' ? 'Senha Manual' : conc.regra_senha.replace(/_/g, ' ')}
                       </div>
                     </td>
-                    <td>
-                      {(() => {
-                        const cnpjDigits = conc.condominio?.cnpj?.replace(/\D/g, '') || '';
-                        const generatedPass = generatePasswordPreview(conc.regra_senha, cnpjDigits, conc.senha_manual || '');
-                        return generatedPass ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontFamily: revealedIds[conc.id] ? 'inherit' : 'monospace', fontSize: '1rem' }}>
-                              {revealedIds[conc.id] ? generatedPass : '••••••••'}
-                            </span>
-                            <button
-                              onClick={() => setRevealedIds(prev => ({...prev, [conc.id]: !prev[conc.id]}))}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-                              title={revealedIds[conc.id] ? "Ocultar" : "Revelar"}
-                            >
-                              {revealedIds[conc.id] ? <EyeOff size={14} /> : <Eye size={14} />}
-                            </button>
-                            <button
-                              onClick={() => handleCopySenha(generatedPass, conc.id)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedId === conc.id ? '#10b981' : '#94a3b8' }}
-                              title="Copiar Senha"
-                            >
-                              {copiedId === conc.id ? <Check size={14} /> : <Copy size={14} />}
-                            </button>
-                          </div>
-                        ) : <span style={{ color: '#94a3b8' }}>—</span>;
-                      })()}
-                    </td>
+                    
                     <td>
                       <div className="dc-cell-primary">Dia {conc.dia_vencimento}</div>
                     </td>
@@ -706,29 +680,41 @@ export default function ConcessionariasPage() {
                   </div>
                 </div>
 
-                <div className="dc-form-group">
-                  <label>Senha do Portal da Concessionária (Opcional)</label>
-                  <input className="dc-form-input" disabled={readOnly} value={formConc.senha_portal || ''} onChange={e => setFormConc({...formConc, senha_portal: e.target.value})} placeholder="Para os síndicos/assistentes logarem no site" />
-                </div>
-
-                <div className="dc-form-group">
-                  <label className="dc-checkbox-wrapper">
-                    <input type="checkbox" checked={formConc.debito_automatico} onChange={e => setFormConc({...formConc, debito_automatico: e.target.checked})} disabled={readOnly} />
-                    <span>Esta conta está em Débito Automático?</span>
-                  </label>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4, marginLeft: 26 }}>
-                    Faturas em débito automático não gerarão pendências de pagamento, mesmo se a variação for detectada.
-                  </p>
-                </div>
-
-                <div className="dc-form-group">
-                  <label className="dc-checkbox-wrapper">
-                    <input type="checkbox" checked={formConc.leitura_individualizada} onChange={e => setFormConc({...formConc, leitura_individualizada: e.target.checked})} disabled={readOnly} />
-                    <span>Esta conta possui Individualização de Leitura? (Leitura Individualizada)</span>
-                  </label>
-                  <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4, marginLeft: 26 }}>
-                    Se ativado, as faturas processadas serão automaticamente encaminhadas para o setor de individualização.
-                  </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="dc-form-group">
+                    <label>Débito Automático</label>
+                    <div className="dc-segmented-control">
+                      <button 
+                        type="button" 
+                        className={formConc.debito_automatico ? 'active' : ''} 
+                        disabled={readOnly}
+                        onClick={() => setFormConc({...formConc, debito_automatico: true})}
+                      >Sim</button>
+                      <button 
+                        type="button" 
+                        className={!formConc.debito_automatico ? 'active active-negative' : ''} 
+                        disabled={readOnly}
+                        onClick={() => setFormConc({...formConc, debito_automatico: false})}
+                      >Não</button>
+                    </div>
+                  </div>
+                  <div className="dc-form-group">
+                    <label>Leitura Individualizada</label>
+                    <div className="dc-segmented-control">
+                      <button 
+                        type="button" 
+                        className={formConc.leitura_individualizada ? 'active' : ''} 
+                        disabled={readOnly}
+                        onClick={() => setFormConc({...formConc, leitura_individualizada: true})}
+                      >Ativa</button>
+                      <button 
+                        type="button" 
+                        className={!formConc.leitura_individualizada ? 'active active-negative' : ''} 
+                        disabled={readOnly}
+                        onClick={() => setFormConc({...formConc, leitura_individualizada: false})}
+                      >Inativa</button>
+                    </div>
+                  </div>
                 </div>
               </div>
               

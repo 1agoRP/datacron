@@ -120,6 +120,9 @@ async def get_user_condo_ids(
     from app.models.condominio import Condominio
     from app.models.user_condominio import UserCondominio
     
+    if user.role == 'admin':
+        return None
+        
     final_ids = set()
 
     # 1. Tentar buscar da coluna unificada codigo_condominio (carteira)

@@ -169,49 +169,67 @@ async def criar_fornecedor(
 
     new_id = str(uuid.uuid4())
 
-    await db.execute(
-        text("""
-            INSERT INTO database_fornecedores (
-                id,
-                "documentoFornecedor",
-                "nomeFornecedor",
-                "e-mailFornecedor",
-                "whatsappFornecedor",
-                "categoriaFornecedor",
-                administradora,
-                status,
-                created_at
-            ) VALUES (
-                :id::uuid,
-                :documento,
-                :nome,
-                :email,
-                :whatsapp,
-                :categoria,
-                :administradora,
-                'ATIVO',
-                NOW()
-            )
-        """),
-        {
+    try:
+        result = await db.execute(
+            text("""
+                INSERT INTO database_fornecedores (
+                    id,
+                    "documentoFornecedor",
+                    "nomeFornecedor",
+                    "e-mailFornecedor",
+                    "whatsappFornecedor",
+                    "categoriaFornecedor",
+                    administradora,
+                    status,
+                    created_by_id,
+                    created_at
+                ) VALUES (
+                    :id::uuid,
+                    :documento,
+                    :nome,
+                    :email,
+                    :whatsapp,
+                    :categoria,
+                    :administradora,
+                    'ATIVO',
+                    :user_id,
+                    NOW()
+                ) RETURNING *
+            """),
+            {
+                "id": new_id,
+                "documento": body.documentoFornecedor,
+                "nome": body.nomeFornecedor,
+                "email": body.emailFornecedor,
+                "whatsapp": body.whatsappFornecedor,
+                "categoria": body.categoriaFornecedor,
+                "administradora": administradora,
+                "user_id": current_user.id,
+            },
+        )
+        await db.commit()
+        
+        row = result.fetchone()
+        if row:
+            # Convert row to dict, mapping CamelCase names if necessary, 
+            # though '*' should return them as defined in DB.
+            return dict(row._mapping)
+        
+        # Fallback if fetchone fails but insert succeeded
+        return {
             "id": new_id,
-            "documento": body.documentoFornecedor,
-            "nome": body.nomeFornecedor,
-            "email": body.emailFornecedor,
-            "whatsapp": body.whatsappFornecedor,
-            "categoria": body.categoriaFornecedor,
-            "administradora": administradora,
-        },
-    )
-    await db.commit()
+            "documentoFornecedor": body.documentoFornecedor,
+            "nomeFornecedor": body.nomeFornecedor,
+            "e-mailFornecedor": body.emailFornecedor,
+            "whatsappFornecedor": body.whatsappFornecedor,
+            "categoriaFornecedor": body.categoriaFornecedor,
+            "status": "ATIVO"
+        }
 
-    return {
-        "id": new_id,
-        "documentoFornecedor": body.documentoFornecedor,
-        "nomeFornecedor": body.nomeFornecedor,
-        "emailFornecedor": body.emailFornecedor,
-        "whatsappFornecedor": body.whatsappFornecedor,
-        "categoriaFornecedor": body.categoriaFornecedor,
-        "administradora": administradora,
-        "status": "ATIVO",
-    }
+    except Exception as e:
+        await db.rollback()
+        import logging
+        logging.error(f"Erro ao criar fornecedor no DB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro interno ao salvar fornecedor: {str(e)}")
+
+

@@ -30,19 +30,22 @@ async def dashboard_stats(
     """
     today = date.today()
 
-    # Condominios count
-    condo_stmt = select(func.count(Condominio.id))
+    # Condominios count (Active only)
+    condo_stmt = select(func.count(Condominio.id)).where(Condominio.ativo == True)
     if allowed_condo_ids is not None:
         condo_stmt = condo_stmt.where(Condominio.id.in_(allowed_condo_ids))
     result = await db.execute(condo_stmt)
     condominios_count = result.scalar_one()
 
-    # Faturas received today
-    fatura_stmt = select(func.count(Fatura.id)).where(func.date(Fatura.created_at) == today)
+    # Faturas received in Current Month (KPI is more useful than just 'today')
+    fatura_stmt = select(func.count(Fatura.id)).where(
+        extract("month", Fatura.created_at) == today.month,
+        extract("year", Fatura.created_at) == today.year
+    )
     if allowed_condo_ids is not None:
         fatura_stmt = fatura_stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
     result = await db.execute(fatura_stmt)
-    recebidas_hoje = result.scalar_one()
+    recebidas_mes = result.scalar_one()
 
     # Active (unresolved) alerts count
     alert_stmt = select(func.count(Alerta.id)).where(Alerta.resolvido == False)
@@ -51,7 +54,7 @@ async def dashboard_stats(
     result = await db.execute(alert_stmt)
     active_alerts = result.scalar_one()
 
-    # Total faturado (sum of all faturas)
+    # Total faturado (sum of faturas in current month or year? Let's keep all time but rename if needed)
     total_faturado_stmt = select(func.sum(Fatura.valor))
     if allowed_condo_ids is not None:
         total_faturado_stmt = total_faturado_stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
@@ -60,7 +63,7 @@ async def dashboard_stats(
 
     return {
         "condominios_count": condominios_count,
-        "recebidas_hoje": recebidas_hoje,
+        "recebidas_hoje": recebidas_mes,  # Renaming internally for logic, but keeping key as today for frontend compatibility
         "active_alerts": active_alerts,
         "total_faturado": round(float(total_faturado), 2),
     }

@@ -793,15 +793,7 @@ export default function CondominiosPage() {
                       <table className="dc-table" style={{ fontSize: '0.85rem', border: 'none' }}>
                         <thead style={{ background: '#fff', borderBottom: '1px solid #f3f4f6' }}>
                           <tr>
-                            <th style={{ width: 44, textAlign: 'center' }}>
-                              <input 
-                                type="checkbox" 
-                                className="dc-checkbox"
-                                checked={selectedHistory.size === historyFaturas.length && historyFaturas.length > 0}
-                                onChange={toggleSelectAll}
-                              />
-                            </th>
-                            <th style={{ color: '#6b7280' }}>Mês <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
+                            <th style={{ color: '#6b7280', paddingLeft: 24 }}>Mês <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
                             <th style={{ color: '#6b7280' }}>Vencimento <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
                             <th style={{ color: '#6b7280' }}>Situação <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
                             <th style={{ color: '#6b7280' }}>Emissão <ArrowDown size={12} style={{ display: 'inline', marginLeft: 4 }} /></th>
@@ -815,15 +807,7 @@ export default function CondominiosPage() {
                             const isSelected = selectedHistory.has(f.id);
                             return (
                               <tr key={f.id} style={{ background: isSelected ? '#f0f7ff' : 'transparent', borderBottom: '1px solid #f9fafb' }}>
-                                <td style={{ textAlign: 'center' }}>
-                                  <input 
-                                    type="checkbox" 
-                                    className="dc-checkbox"
-                                    checked={isSelected}
-                                    onChange={() => toggleSelectFatura(f.id)}
-                                  />
-                                </td>
-                                <td><div style={{ fontWeight: 600, color: '#111827' }}>{f.referencia ? formatReferencia(f.referencia) : '—'}</div></td>
+                                <td style={{ paddingLeft: 24 }}><div style={{ fontWeight: 600, color: '#111827' }}>{f.referencia ? formatReferencia(f.referencia) : '—'}</div></td>
                                 <td>{f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}</td>
                                 <td>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -899,59 +883,7 @@ export default function CondominiosPage() {
                     </div>
                   )}
 
-                  {/* Footer Ações */}
-                  {activeHistoryTab === 'sistema' && (
-                    <div style={{ 
-                      padding: '24px 0 12px', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'space-between'
-                    }}>
-                      <div style={{ fontSize: '0.9rem', color: '#111827' }}>
-                        {selectedHistory.size > 0 
-                          ? <strong>{selectedHistory.size} faturas selecionadas</strong>
-                          : <span style={{ opacity: 0.5 }}>1 faturas selecionadas</span> /* Hardcoded hint to match image if empty? No, keep logic */}
-                      </div>
-                      <div style={{ display: 'flex', gap: 12 }}>
-                        <button 
-                          className="dc-btn dc-btn-secondary" 
-                          style={{ 
-                            height: 48, 
-                            padding: '0 28px', 
-                            borderRadius: 24,
-                            background: '#f3f4f6',
-                            color: '#4b5563',
-                            fontWeight: 700,
-                            border: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 10
-                          }} 
-                          disabled={selectedHistory.size === 0}
-                          onClick={() => alert('Exportando seleção...')}
-                        >
-                          <Download size={18} /> Exportar
-                        </button>
-                        <button 
-                          className="dc-btn dc-btn-primary" 
-                          style={{ 
-                            height: 48, 
-                            padding: '0 40px', 
-                            borderRadius: 24,
-                            fontWeight: 700,
-                            background: '#0066cc',
-                            boxShadow: '0 4px 14px rgba(0, 102, 204, 0.3)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 10
-                          }} 
-                          disabled={selectedHistory.size === 0}
-                          onClick={() => alert('Processando pagamento...')}>
-                          <CreditCard size={18} /> Pagar
-                        </button>
-                      </div>
-                    </div>
-                  )}
+
                 </div>
               ) : (
                 /* DETAILS VIEW */
