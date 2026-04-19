@@ -84,6 +84,7 @@ export default function CondominiosPage() {
   const [statusModalCondo, setStatusModalCondo] = useState<any>(null);
   const [statusItems, setStatusItems] = useState<any[]>([]);
   const [loadingStatus, setLoadingStatus] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   // Removed manual fetchData in favor of useSWR
 
@@ -251,23 +252,26 @@ export default function CondominiosPage() {
     setStatusModalCondo(condo);
     setIsStatusModalOpen(true);
     setLoadingStatus(true);
+    setStatusError(null);
     try {
-      // 1. Get concessionaires for this condo (fetch all then filter to be safe with type comparisons)
+      // 1. Fetch concessionaires for this condo
+      // We don't pass 'ativo: true' here to be robust against any server-side boolean parsing issues
       const allConcs = await api.getConcessionarias({ condominio_id: condo.id });
-      const concs = allConcs.filter(c => c.ativo === true || String(c.ativo) === 'true');
+      
+      // Filter active ones locally
+      const concs = allConcs.filter(c => c.ativo === true || String(c.ativo) === 'true' || c.ativo === undefined);
       
       // 2. Get invoices received this month for this condo
       const now = new Date();
       const allInvoices = await api.getFaturas({ condominio_id: condo.id });
       
-      // Filter to current month to match "Status de Contas" logic in backend
       const currentMonthInvoices = allInvoices.filter((f: any) => {
         if (!f.created_at) return false;
         const d = new Date(f.created_at);
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       });
 
-      // 3. Merge to see what's missing
+      // 3. Merge
       const items = concs.map((c: any) => {
         const matchingFatura = currentMonthInvoices.find((f: any) => f.concessionaria_id === c.id);
         return {
@@ -275,14 +279,14 @@ export default function CondominiosPage() {
           fatura: matchingFatura || null
         };
       }).sort((a, b) => {
-        // Sort received first, then by name
         if (!!a.fatura !== !!b.fatura) return a.fatura ? -1 : 1;
         return (a.concessionaria.tipo || '').localeCompare(b.concessionaria.tipo || '');
       });
       
       setStatusItems(items);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading status details:', err);
+      setStatusError(err.message || 'Falha ao carregar dados');
     } finally {
       setLoadingStatus(false);
     }
@@ -1209,6 +1213,12 @@ export default function CondominiosPage() {
                 <div style={{ padding: 60, textAlign: 'center' }}>
                   <div className="dc-loading-spinner" style={{ margin: '0 auto' }} />
                   <p style={{ marginTop: 12, fontSize: '0.9rem', color: '#64748b' }}>Buscando comprovantes...</p>
+                </div>
+              ) : statusError ? (
+                <div style={{ padding: 60, textAlign: 'center', color: '#ef4444' }}>
+                  <AlertCircle size={40} style={{ margin: '0 auto 12px' }} />
+                  <p style={{ fontWeight: 700 }}>Erro ao carregar</p>
+                  <p style={{ fontSize: '0.85rem', marginTop: 4 }}>{statusError}</p>
                 </div>
               ) : statusItems.length === 0 ? (
                 <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>
