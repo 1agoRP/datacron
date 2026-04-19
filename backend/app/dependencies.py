@@ -138,30 +138,29 @@ async def get_user_condo_ids(
                     except ValueError:
                         pass
                 
-                # Query condominios that match either exact string or casted number
-                # We use trim() to handle accidental whitespace
-                trimmed_num = func.trim(Condominio.numero)
-                stmt = select(Condominio.id).where(Condominio.ativo == True)
+                # We use string matching with common padding to be safe and fast.
+                # This handles cases like '6', '006', '0006' without casting errors.
+                all_possible_codes = set(codes)
+                for c in codes:
+                    if c.isdigit():
+                        all_possible_codes.add(c.zfill(2))
+                        all_possible_codes.add(c.zfill(3))
+                        all_possible_codes.add(c.zfill(4))
                 
-                # Match exact string (with padding if already padded in codes)
-                filters = [trimmed_num.in_(codes)]
-                
-                if numeric_codes:
-                    # Regex check for digits only (after trim) + cast match
-                    # This handles cases where DB has "0006" and codes has "6"
-                    filters.append(
-                        and_(
-                            trimmed_num.op('~')('^[0-9]+$'),
-                            cast(trimmed_num, Integer).in_(numeric_codes)
-                        )
+                stmt = select(Condominio.id).where(
+                    and_(
+                        Condominio.ativo == True,
+                        func.trim(Condominio.numero).in_(list(all_possible_codes))
                     )
+                )
                 
-                res = await db.execute(stmt.where(or_(*filters)))
+                res = await db.execute(stmt)
                 ids_found = res.scalars().all()
                 final_ids.update(ids_found)
         except Exception as e:
-            # Silent fail for carteira processing to avoid breaking login, but log if needed
-            print(f"DEBUG: Error in get_user_condo_ids carteira: {e}")
+            # Log the error but don't crash
+            import logging
+            logging.error(f"Error in get_user_condo_ids carteira: {e}")
             pass
 
     # 2. UNIÃO com a tabela user_condominios (Relacionamentos específicos)

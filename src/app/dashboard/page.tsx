@@ -47,21 +47,31 @@ export default function Dashboard() {
   const [chartGroup, setChartGroup] = useState<ChartGroup>('mes');
 
   // SWR: Fetch consolidated stats
-  const { data: stats, isLoading: loadingStats, mutate: mutateStats } = useSWR<DashboardStats>('dashboard/stats', async () => {
-    const [kpis, latestFaturas, alertas] = await Promise.all([
-      api.getDashboardKpis(),
-      api.getFaturas({ limit: 6 }),
-      api.getAlertas({ limit: 5, resolvido: false }),
-    ]);
-    
-    return {
-      condominiosCount: kpis.condominios_count,
-      faturas: latestFaturas as Fatura[],
-      alertas: alertas as Alerta[],
-      activeAlerts: kpis.active_alerts,
-      recebidasHoje: kpis.recebidas_hoje,
-      totalFaturado: kpis.total_faturado,
-    };
+  const { 
+    data: stats, 
+    isLoading: loadingStats, 
+    error: errorStats,
+    mutate: mutateStats 
+  } = useSWR<DashboardStats>('dashboard/stats', async () => {
+    try {
+      const [kpis, latestFaturas, alertas] = await Promise.all([
+        api.getDashboardKpis().catch(e => ({ condominios_count: 0, active_alerts: 0, recebidas_hoje: 0, total_faturado: 0 })),
+        api.getFaturas({ limit: 6 }).catch(e => []),
+        api.getAlertas({ limit: 5, resolvido: false }).catch(e => []),
+      ]);
+      
+      return {
+        condominiosCount: kpis.condominios_count,
+        faturas: latestFaturas as Fatura[],
+        alertas: alertas as Alerta[],
+        activeAlerts: kpis.active_alerts,
+        recebidasHoje: kpis.recebidas_hoje,
+        totalFaturado: kpis.total_faturado,
+      };
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+      throw err;
+    }
   }, { revalidateOnFocus: true, refreshInterval: 60000 });
 
   const { data: contasEsperadas } = useSWR('dashboard/contas', 
@@ -89,7 +99,7 @@ export default function Dashboard() {
     return Math.round((contasEsperadas.recebidas / contasEsperadas.total_esperadas) * 100);
   }, [contasEsperadas]);
 
-  if (loadingStats && !stats) {
+  if (loadingStats && !stats && !errorStats) {
     return (
       <Shell>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
