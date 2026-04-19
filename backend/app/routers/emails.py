@@ -78,9 +78,9 @@ async def get_agent_status(_: User = Depends(require_module("gmail"))):
 
 @router.get("/inbox")
 async def get_inbox_status(_: User = Depends(require_module("gmail"))):
-    """Returns the current count of emails in the Gmail inbox."""
+    from fastapi.concurrency import run_in_threadpool
     from app.services.email_monitor import get_inbox_count
-    count = get_inbox_count()
+    count = await run_in_threadpool(get_inbox_count)
     return {"inbox_count": count}
 
 import os

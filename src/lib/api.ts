@@ -425,21 +425,11 @@ class ApiClient {
   }
 
   async forceEmailScan() {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
-    try {
-      return await this.request('/emails/forcar-varredura', {
-        method: 'POST',
-        signal: controller.signal,
-      });
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        throw new Error('Tempo limite excedido. A varredura pode estar em andamento no servidor.');
-      }
-      throw err;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    // We removed the 30s timeout here because the backend handles the scan in background.
+    // However, if the server is VERY slow (cold start), we still want to wait a bit.
+    return await this.request('/emails/forcar-varredura', {
+      method: 'POST'
+    });
   }
 
   async getAgentStatus() {

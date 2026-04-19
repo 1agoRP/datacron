@@ -19,6 +19,7 @@ import imaplib
 import email
 from email.utils import parsedate_to_datetime
 from email.header import decode_header
+import concurrent.futures
 from app.services.email_sender import send_notification_email
 
 
@@ -516,13 +517,22 @@ async def run_email_scan():
     """Main entry point called by the scheduler.
     
     Scans ALL emails in the inbox, processes them, and moves each one
-    to the appropriate Gmail label:
-    - Datacron/{condominio_name} if identified
-    - Datacron/E-mails não identificados if not identified
-    
-    After the scan, the inbox should be empty.
+    to the appropriate Gmail label.
     """
-    logger.info("Starting Gmail IMAP inbox scan...")
+    # Simple lock file to prevent concurrent scans in the same instance
+    lock_file = Path("/tmp/datacron_scan.lock") if os.name != 'nt' else Path("datacron_scan.lock")
+    if lock_file.exists():
+        # Check if lock is stale (> 30 mins)
+        if (datetime.now().timestamp() - lock_file.stat().m_ctime) < 1800:
+            logger.info("Scan and/or varredura already in progress (lock file exists). Skipping.")
+            return
+        else:
+            logger.warning("Stale scan lock found, removing it.")
+            lock_file.unlink()
+
+    try:
+        lock_file.touch()
+        logger.info("Starting Gmail IMAP inbox scan...")
 
     mail = get_imap_connection()
     if not mail:
@@ -587,6 +597,13 @@ async def run_email_scan():
     except Exception as e:
         logger.error(f"Gmail scan failed: {e}")
     finally:
+        # Clean up lock
+        try:
+            lock_file = Path("/tmp/datacron_scan.lock") if os.name != 'nt' else Path("datacron_scan.lock")
+            if lock_file.exists():
+                lock_file.unlink()
+        except:
+            pass
         try:
             mail.close()
             mail.logout()
