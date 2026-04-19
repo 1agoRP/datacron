@@ -127,6 +127,9 @@ async def _check_pdf_failure(fatura: Fatura, db: AsyncSession) -> Optional[Alert
                 f"PDF da fatura {fatura.referencia} não pôde ser desbloqueado automaticamente. "
                 "Verifique a regra de senha da concessionária."
             ),
+            email_remetente=fatura.email_remetente,
+            email_assunto=fatura.email_assunto,
+            # We don't have fatura.email_data directly, but created_at is usually the same or we could add it
         )
         db.add(alert)
         logger.info(f"Alert created: PDF unlock failure for fatura {fatura.id}")
@@ -268,6 +271,16 @@ async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura]
         f"Mensagem: {alert.mensagem}",
         f"",
     ]
+
+    # Add Email Metadata if present
+    if alert.email_remetente or alert.email_assunto:
+        body.extend([
+            f"--- Detalhes do E-mail Original ---",
+            f"Remetente: {alert.email_remetente or 'N/D'}",
+            f"Assunto: {alert.email_assunto or 'N/D'}",
+            f"Data: {alert.email_data.strftime('%d/%m/%Y %H:%M') if alert.email_data else 'N/D'}",
+            f"",
+        ])
     
     attachments = []
     in_reply_to = None

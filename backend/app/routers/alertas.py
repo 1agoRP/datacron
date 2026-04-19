@@ -79,7 +79,14 @@ async def resolve_alerta(
         raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
     
     # Send emails in background to avoid "Failed to fetch" (timeouts)
-    background_tasks.add_task(process_alert_resolution_emails, a.tipo, a.mensagem, current_user.email)
+    background_tasks.add_task(
+        process_alert_resolution_emails, 
+        a.tipo, 
+        a.mensagem, 
+        current_user.email,
+        a.email_remetente,
+        a.email_assunto
+    )
     
     a.lido = True
     a.resolvido = True
@@ -88,7 +95,7 @@ async def resolve_alerta(
     return a
 
 
-def process_alert_resolution_emails(alerta_tipo: str, alerta_mensagem: str, manager_email: str):
+def process_alert_resolution_emails(alerta_tipo: str, alerta_mensagem: str, manager_email: str, email_remetente: str = None, email_assunto: str = None):
     """Handles all email notifications related to an alert resolution."""
     try:
         # 1. Reply to sender if it was an unidentified email
@@ -96,14 +103,14 @@ def process_alert_resolution_emails(alerta_tipo: str, alerta_mensagem: str, mana
             import re
             sender_match = re.search(r"de '([^']+)'", alerta_mensagem)
             subject_match = re.search(r"assunto '([^']+)'", alerta_mensagem)
-            sender = sender_match.group(1) if sender_match else None
-            subject = subject_match.group(1) if subject_match else "Fatura"
+            sender = email_remetente or (sender_match.group(1) if sender_match else None)
+            subject = email_assunto or (subject_match.group(1) if subject_match else "Fatura")
             
             if sender:
                 _send_reply_to_sender(sender, subject)
         
         # 2. Notify the manager
-        _send_manager_confirmation(manager_email, alerta_tipo, alerta_mensagem)
+        _send_manager_confirmation(manager_email, alerta_tipo, alerta_mensagem, email_remetente, email_assunto)
     except Exception as e:
         import logging
         logging.error(f"Error in background alert emails: {e}")
@@ -147,20 +154,35 @@ def _send_reply_to_sender(recipient: str, original_subject: str):
     )
 
 
-def _send_manager_confirmation(recipient: str, alerta_tipo: str, alerta_mensagem: str):
+def _send_manager_confirmation(recipient: str, alerta_tipo: str, alerta_mensagem: str, email_remetente: str = None, email_assunto: str = None):
     subject = f"✅ Pendência Resolvida: {alerta_tipo.replace('_', ' ').title()}"
     
+    email_info_html = ""
+    if email_remetente or email_assunto:
+        email_info_html = f"""
+        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px;">E-mail Original</div>
+            <div style="font-size: 13px; color: #475569;">
+                <strong>De:</strong> {email_remetente or 'N/D'}<br>
+                <strong>Assunto:</strong> {email_assunto or 'N/D'}
+            </div>
+        </div>
+        """
+
     body_html = f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <body style="font-family: sans-serif; padding: 20px; color: #334155;">
     <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px;">
-        <h2 style="color: #16a34a; margin-top: 0;">Resolução Confirmada</h2>
+        <div style="background: #f0fdf4; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+             <h2 style="color: #16a34a; margin: 0; font-size: 18px;">Resolução Confirmada</h2>
+        </div>
         <p>O alerta abaixo foi marcado como <strong>resolvido</strong>:</p>
         <div style="background: #f8fafc; padding: 16px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #16a34a;">
-            <div style="font-size: 12px; color: #64748b; text-transform: uppercase;">Tipo</div>
-            <div style="font-weight: bold; margin-bottom: 8px;">{alerta_tipo.upper()}</div>
-            <div style="font-size: 12px; color: #64748b; text-transform: uppercase;">Mensagem</div>
-            <div>{alerta_mensagem}</div>
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Tipo do Alerta</div>
+            <div style="font-weight: bold; margin-bottom: 8px; color: #1e293b;">{alerta_tipo.upper()}</div>
+            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Mensagem</div>
+            <div style="color: #475569; font-size: 14px; line-height: 1.5;">{alerta_mensagem}</div>
+            {email_info_html}
         </div>
         <p style="font-size: 12px; color: #94a3b8;">Sistema Datacron - {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>
     </div>

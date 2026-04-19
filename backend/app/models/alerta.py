@@ -33,6 +33,11 @@ class Alerta(Base):
     lido: Mapped[bool] = mapped_column(Boolean, default=False)
     resolvido: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Email Metadata for traceability
+    email_remetente: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email_assunto: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    email_data: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -366,6 +366,9 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             tipo="email_nao_identificado",
             gravidade="media",
             mensagem=f"E-mail recebido de '{sender}' com assunto '{subject}' nao foi identificado como concessionaria cadastrada.",
+            email_remetente=sender,
+            email_assunto=subject,
+            email_data=received_at
         )
         db.add(alert)
         await db.flush()
