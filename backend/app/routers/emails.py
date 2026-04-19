@@ -44,6 +44,8 @@ async def get_email_logs(
             d.fatura_valor = fatura.valor
             d.fatura_vencimento = fatura.vencimento
             d.dados_extraidos = fatura.dados_extraidos
+        else:
+            d.dados_extraidos = log.dados_extraidos
         response_list.append(d)
         
     return response_list

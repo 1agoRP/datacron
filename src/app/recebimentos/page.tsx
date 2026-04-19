@@ -228,14 +228,6 @@ export default function RecebimentosPage() {
                 <div className="dc-proc-sender-info">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                     <div className="dc-proc-dest-label">E-mail</div>
-                    <a 
-                      href={`https://mail.google.com/mail/u/0/#search/rfc822msgid:${item.gmail_message_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: '0.65rem', color: '#2563eb', fontWeight: 600, textDecoration: 'underline' }}
-                    >
-                      Ver no Gmail
-                    </a>
                   </div>
                   <div className="dc-proc-sender-name" title={item.remetente}>{item.remetente}</div>
                   <div className="dc-proc-sender-time" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
@@ -251,6 +243,22 @@ export default function RecebimentosPage() {
                       ID: {item.gmail_message_id.substring(0, 10)}...
                     </span>
                   </div>
+                  
+                  {/* Códigos Extraídos do Corpo */}
+                  {(item.dados_extraidos?.instalacao || item.dados_extraidos?.num_cliente) && (
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {item.dados_extraidos?.instalacao && (
+                        <div style={{ fontSize: '0.7rem', color: '#1e293b', fontWeight: 800, background: '#f0f9ff', border: '1px solid #bae6fd', padding: '4px 8px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 4, width: 'fit-content' }}>
+                          <span style={{ color: '#0369a1' }}>N° DA INSTALAÇÃO/UC:</span> {item.dados_extraidos.instalacao}
+                        </div>
+                      )}
+                      {item.dados_extraidos?.num_cliente && (
+                        <div style={{ fontSize: '0.7rem', color: '#1e293b', fontWeight: 800, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '4px 8px', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 4, width: 'fit-content' }}>
+                          <span style={{ color: '#15803d' }}>N° DO CLIENTE:</span> {item.dados_extraidos.num_cliente}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="dc-proc-subject" style={{ fontSize: '0.8rem', fontWeight: 500, color: '#475569', marginTop: 8, fontStyle: 'italic' }}>

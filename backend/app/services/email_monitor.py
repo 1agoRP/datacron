@@ -220,9 +220,16 @@ def _extract_identification_code(body_text: str, tipo: str) -> Optional[str]:
 
 
 def extract_data_from_body(body_text: str, tipo: str) -> dict:
-    """Extracts valor, vencimento, codigo_barras from the email body."""
+    """Extracts valor, vencimento, codigo_barras, num_cliente, and instalacao from the email body."""
     data = {}
     
+    # Generic extraction for UC/Instalacao and Cliente
+    m_uc = re.search(r'(?:INSTALA.{1,5}O|UC|UNIDADE CONSUMIDORA)[:\s]*(\d{6,15})', body_text, re.IGNORECASE)
+    if m_uc: data['instalacao'] = m_uc.group(1)
+    
+    m_client = re.search(r'(?:N.{1,3}|N[Uu]MERO)?\s*DO\s+CLIENTE[:\s]*(\d{6,15})', body_text, re.IGNORECASE)
+    if m_client: data['num_cliente'] = m_client.group(1)
+
     if tipo == 'Enel':
         m = re.search(r'[Qq]uanto.*?pagar.*?R\$\s*([\d.,]+)', body_text)
         if m:
@@ -389,7 +396,6 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             condo_name = f"{numero_pad} - {condo.nome}"
         password = conc.gerar_senha_pdf(condo.cnpj_digits if condo else "")
     
-    body_data = {}
     if conc:
         body_data = extract_data_from_body(body_text, conc.tipo)
     else:
@@ -397,6 +403,10 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             candidate = extract_data_from_body(body_text, t)
             if len(candidate) > len(body_data):
                 body_data = candidate
+    
+    # Save extracted data to log for traceability (manual JSON serialization if needed)
+    if body_data:
+        email_log.dados_extraidos = body_data
 
     attachments = get_pdf_attachments(msg)
     if not attachments:

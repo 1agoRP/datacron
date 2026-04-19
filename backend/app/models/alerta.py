@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import String, DateTime, Boolean, ForeignKey, Text, func, Uuid as UUID
+from sqlalchemy import String, DateTime, Boolean, ForeignKey, Text, func, Uuid as UUID, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -70,6 +70,7 @@ class EmailLog(Base):
         UUID(as_uuid=True), ForeignKey("faturas.id"), nullable=True
     )
     erro_msg: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    dados_extraidos: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True) # Stored as JSON
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
