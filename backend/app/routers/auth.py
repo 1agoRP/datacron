@@ -31,6 +31,7 @@ class RegisterRequest(BaseModel):
 class UserUpdate(BaseModel):
     nome: Optional[str] = None
     role: Optional[str] = None
+    whatsapp: Optional[int] = None
 
 
 def _validate_password(senha: str) -> None:

@@ -28,7 +28,8 @@ export default function ConfiguracoesPage() {
   const [form, setForm] = useState({
     nome: '',
     email: '',
-    cargo: ''
+    cargo: '',
+    whatsapp: ''
   });
 
   React.useEffect(() => {
@@ -36,7 +37,8 @@ export default function ConfiguracoesPage() {
       setForm({
         nome: user.nome,
         email: user.email,
-        cargo: user.role
+        cargo: user.role,
+        whatsapp: user.whatsapp ? String(user.whatsapp) : ''
       });
     }
   }, [user]);
@@ -82,7 +84,8 @@ export default function ConfiguracoesPage() {
       setIsSaving(true);
       await api.updateProfile({
         nome: form.nome,
-        role: form.cargo
+        role: form.cargo,
+        whatsapp: form.whatsapp ? parseInt(form.whatsapp.replace(/\D/g, ''), 10) : null
       });
       alert('Perfil atualizado com sucesso!');
     } catch (err: any) {
@@ -175,7 +178,9 @@ export default function ConfiguracoesPage() {
                         className="dc-form-input" 
                         style={{ width: '100%', paddingRight: '44px' }}
                         type="text" 
-                        defaultValue="11 91365-9493"
+                        placeholder="(00) 00000-0000"
+                        value={form.whatsapp}
+                        onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
                       />
                       <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>
                         <Pencil size={16} />

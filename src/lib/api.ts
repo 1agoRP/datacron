@@ -157,7 +157,7 @@ class ApiClient {
     return this.request<User>('/auth/me');
   }
 
-  async updateProfile(data: { nome: string; role: string }) {
+  async updateProfile(data: { nome: string; role: string; whatsapp?: number | null }) {
     return this.request('/auth/me', {
       method: 'PATCH',
       body: JSON.stringify(data),

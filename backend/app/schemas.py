@@ -22,6 +22,7 @@ class UserInToken(BaseModel):
     codigo_usuario: Optional[int] = None
     condominios_ids: list[str] = []
     codigo_condominio: Optional[str] = None
+    whatsapp: Optional[int] = None
     model_config = {"from_attributes": True}
 
 
