@@ -139,22 +139,29 @@ async def get_user_condo_ids(
                         pass
                 
                 # Query condominios that match either exact string or casted number
+                # We use trim() to handle accidental whitespace
+                trimmed_num = func.trim(Condominio.numero)
                 stmt = select(Condominio.id).where(Condominio.ativo == True)
-                filters = [Condominio.numero.in_(codes)]
+                
+                # Match exact string (with padding if already padded in codes)
+                filters = [trimmed_num.in_(codes)]
                 
                 if numeric_codes:
-                    # Regex check for digits only + cast match
+                    # Regex check for digits only (after trim) + cast match
+                    # This handles cases where DB has "0006" and codes has "6"
                     filters.append(
                         and_(
-                            Condominio.numero.op('~')('^[0-9]+$'),
-                            cast(Condominio.numero, Integer).in_(numeric_codes)
+                            trimmed_num.op('~')('^[0-9]+$'),
+                            cast(trimmed_num, Integer).in_(numeric_codes)
                         )
                     )
                 
                 res = await db.execute(stmt.where(or_(*filters)))
-                final_ids.update(res.scalars().all())
-        except Exception:
-            # Silent fail for carteira processing to avoid breaking login
+                ids_found = res.scalars().all()
+                final_ids.update(ids_found)
+        except Exception as e:
+            # Silent fail for carteira processing to avoid breaking login, but log if needed
+            print(f"DEBUG: Error in get_user_condo_ids carteira: {e}")
             pass
 
     # 2. UNIÃO com a tabela user_condominios (Relacionamentos específicos)

@@ -89,7 +89,7 @@ export default function Dashboard() {
     return Math.round((contasEsperadas.recebidas / contasEsperadas.total_esperadas) * 100);
   }, [contasEsperadas]);
 
-  if (loadingStats) {
+  if (loadingStats && !stats) {
     return (
       <Shell>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
