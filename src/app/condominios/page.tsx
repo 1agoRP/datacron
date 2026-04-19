@@ -748,7 +748,11 @@ export default function CondominiosPage() {
                       <Calendar size={14} /> Data de vencimento <ChevronLeft size={14} style={{ transform: 'rotate(-90deg)' }} />
                     </button>
                     <button className="dc-history-filter-btn">
-                      <Filter size={14} /> Situação <ChevronLeft size={14} style={{ transform: 'rota                  {/* TABS DE HISTÓRICO */}
+                      <Filter size={14} /> Situação <ChevronLeft size={14} style={{ transform: 'rotate(-90deg)' }} />
+                    </button>
+                  </div>
+
+                  {/* TABS DE HISTÓRICO */}
                   <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
                     <button 
                       onClick={() => setActiveHistoryTab('sistema')}
