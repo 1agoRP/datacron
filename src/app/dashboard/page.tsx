@@ -5,7 +5,8 @@ import Shell from '@/components/layout/Shell';
 import {
   Building2, Zap, FileText, AlertCircle,
   TrendingUp, Clock, CheckCircle2, ChevronRight,
-  Filter, Calendar, DollarSign, Download, Upload, ArrowUpRight
+  Filter, Calendar, DollarSign, Download, Upload, ArrowUpRight,
+  Mail
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
