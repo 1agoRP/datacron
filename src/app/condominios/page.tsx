@@ -920,13 +920,23 @@ export default function CondominiosPage() {
                       <FileSignature size={16} color="#3b82f6" /> Documentos Importantes
                     </h4>
                     <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
                           <FileText size={20} />
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, color: '#0f172a' }}>ATA de Eleição</div>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                          <div 
+                            style={{ 
+                              fontSize: '0.8rem', 
+                              color: '#64748b', 
+                              maxWidth: 300, 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap' 
+                            }} 
+                            title={detailsCondo.ata_eleicao_nome || ''}
+                          >
                             {detailsCondo.ata_eleicao_nome ? detailsCondo.ata_eleicao_nome : 'Nenhum documento enviado.'}
                           </div>
                         </div>
@@ -948,13 +958,23 @@ export default function CondominiosPage() {
                     </div>
 
                     <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0369a1' }}>
                           <ShieldCheck size={20} />
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, color: '#0f172a' }}>AVCB</div>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                          <div 
+                            style={{ 
+                              fontSize: '0.8rem', 
+                              color: '#64748b',
+                              maxWidth: 300, 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap'
+                            }}
+                            title={detailsCondo.avcb_url ? 'Documento vinculado' : 'Auto de Vistoria do Corpo de Bombeiros'}
+                          >
                             {detailsCondo.avcb_url ? 'Documento vinculado' : 'Auto de Vistoria do Corpo de Bombeiros'}
                           </div>
                         </div>
@@ -976,13 +996,23 @@ export default function CondominiosPage() {
                     </div>
 
                     <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 8, background: '#fdf2f8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#be185d' }}>
                           <HardHat size={20} />
                         </div>
                         <div>
                           <div style={{ fontWeight: 700, color: '#0f172a' }}>Apólice de Seguro</div>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                          <div 
+                            style={{ 
+                              fontSize: '0.8rem', 
+                              color: '#64748b',
+                              maxWidth: 300, 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap'
+                            }}
+                            title={detailsCondo.apolice_seguro_url ? 'Documento vinculado' : 'Seguro obrigatório do condomínio'}
+                          >
                             {detailsCondo.apolice_seguro_url ? 'Documento vinculado' : 'Seguro obrigatório do condomínio'}
                           </div>
                         </div>
