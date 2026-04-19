@@ -226,19 +226,36 @@ export default function RecebimentosPage() {
                   {item.status === 'ok' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
                 </div>
                 <div className="dc-proc-sender-info">
-                  <div className="dc-proc-dest-label" style={{ marginBottom: 2 }}>E-mail</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                    <div className="dc-proc-dest-label">E-mail</div>
+                    <a 
+                      href={`https://mail.google.com/mail/u/0/#search/rfc822msgid:${item.gmail_message_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: '0.65rem', color: '#2563eb', fontWeight: 600, textDecoration: 'underline' }}
+                    >
+                      Ver no Gmail
+                    </a>
+                  </div>
                   <div className="dc-proc-sender-name" title={item.remetente}>{item.remetente}</div>
-                  <div className="dc-proc-sender-time" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                    {item.recebido_em ? format(new Date(item.recebido_em), "dd/MM HH:mm") : '—'}
+                  <div className="dc-proc-sender-time" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                    <span style={{ color: '#475569', fontSize: '0.75rem' }}>
+                      {item.recebido_em ? format(new Date(item.recebido_em), "dd/MM HH:mm") : '—'}
+                    </span>
                     {item.codigo_identificacao && (
-                      <span style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, color: '#475569', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <FileDigit size={10} /> Código {item.codigo_identificacao}
+                      <span style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: 4, color: '#0f172a', fontWeight: 700, fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: 4, border: '1px solid #e2e8f0' }}>
+                        <FileDigit size={12} /> CÓDIGO {item.codigo_identificacao}
                       </span>
                     )}
+                    <span style={{ color: '#94a3b8', fontSize: '0.65rem', fontFamily: 'monospace' }}>
+                      ID: {item.gmail_message_id.substring(0, 10)}...
+                    </span>
                   </div>
                 </div>
               </div>
-              <div className="dc-proc-subject">"{item.assunto}"</div>
+              <div className="dc-proc-subject" style={{ fontSize: '0.8rem', fontWeight: 500, color: '#475569', marginTop: 8, fontStyle: 'italic' }}>
+                "{item.assunto}"
+              </div>
             </div>
 
             {/* Body column */}
@@ -248,7 +265,10 @@ export default function RecebimentosPage() {
                 {item.condominio_nome ? (
                   <><Layers size={15} style={{ color: '#2563eb' }} /> {item.condominio_nome}</>
                 ) : (
-                  <><AlertCircle size={15} style={{ color: '#dc2626' }} /> <span style={{ color: '#dc2626' }}>{item.status === 'ok' ? 'Processado' : 'Não Identificado'}</span></>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#dc2626' }}>
+                    <AlertCircle size={15} /> 
+                    <span style={{ fontWeight: 800 }}>Aguardando Vinculação</span>
+                  </div>
                 )}
               </div>
               <div className="dc-proc-steps" style={{ flexWrap: 'wrap' }}>
@@ -272,73 +292,47 @@ export default function RecebimentosPage() {
               </div>
             </div>
 
-            {/* Action */}
-            <div className="dc-proc-action-btn" style={{ position: 'relative' }}>
-              <button 
-                className="dc-icon-action" 
-                onClick={() => setMenuOpen(menuOpen === item.id ? null : item.id)}
-              >
-                <MoreVertical size={16} />
-              </button>
-              
-              {menuOpen === item.id && (
-                <div className="dc-dropdown-menu" style={{ position: 'absolute', right: 0, top: 30, display: 'block', minWidth: 220, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '6px 0', zIndex: 10, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
-                  <button 
-                    className="dc-dropdown-item"
-                    disabled={!item.fatura_url}
-                    onClick={() => {
-                      if (item.fatura_url) {
-                         const token = localStorage.getItem('datacron_token');
-                         fetch(`${API_BASE_URL}${item.fatura_url.replace('/api', '')}`, {
-                             headers: { 'Authorization': `Bearer ${token}` }
-                         }).then(resp => {
-                             if (!resp.ok) {
-                               throw new Error(resp.status === 404
-                                 ? 'PDF não encontrado no servidor. O arquivo pode ter sido removido após um redeploy.'
-                                 : `Erro ao baixar: ${resp.status}`);
-                             }
-                             return resp.blob();
-                         }).then(blob => {
-                             const url = window.URL.createObjectURL(blob);
-                             const a = document.createElement('a');
-                             a.href = url;
-                             a.download = `fatura_${item.codigo_identificacao || 'extraida'}.pdf`;
-                             document.body.appendChild(a);
-                             a.click();
-                             window.URL.revokeObjectURL(url);
-                             a.remove();
-                         }).catch(err => {
-                             alert('❌ ' + (err.message || 'Erro ao baixar fatura'));
-                         });
-                      }
-                      setMenuOpen(null);
-                    }}
-                    style={{ 
-                      opacity: item.fatura_url ? 1 : 0.5, 
-                      width: '100%', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      padding: '8px 16px',
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                      color: '#0f172a',
-                      cursor: item.fatura_url ? 'pointer' : 'not-allowed',
-                      textAlign: 'left'
-                    }}
-                    onMouseEnter={(e) => {
-                      if(item.fatura_url) e.currentTarget.style.background = '#f1f5f9';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'none';
-                    }}
-                  >
-                    <Download size={15} style={{ marginRight: 8, flexShrink: 0 }} />
-                    {item.fatura_url 
-                      ? (item.fatura_desbloqueada ? 'Baixar Fatura Desbloqueada' : 'Baixar Arquivo Original') 
-                      : 'Fatura Indisponível'}
-                  </button>
+            {/* Action Area */}
+            <div className="dc-proc-action-area" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {item.fatura_url ? (
+                <button 
+                  className="dc-btn dc-btn-light"
+                  style={{ 
+                    padding: '8px 16px', 
+                    fontSize: '0.8rem', 
+                    fontWeight: 700,
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: item.fatura_desbloqueada ? '#f0fdf4' : '#f8fafc',
+                    color: item.fatura_desbloqueada ? '#16a34a' : '#475569',
+                    border: `1px solid ${item.fatura_desbloqueada ? '#bbf7d0' : '#e2e8f0'}`,
+                  }}
+                  onClick={() => {
+                    const token = localStorage.getItem('datacron_token');
+                    fetch(`${API_BASE_URL}${item.fatura_url.replace('/api', '')}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }).then(resp => {
+                        if (!resp.ok) throw new Error('PDF não encontrado');
+                        return resp.blob();
+                    }).then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `fatura_${item.codigo_identificacao || 'extracao'}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                    }).catch(err => alert('Erro no download: ' + err.message));
+                  }}
+                >
+                  <Download size={14} />
+                  {item.fatura_desbloqueada ? 'Baixar Desbloqueada' : 'Baixar Original'}
+                </button>
+              ) : (
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, padding: '8px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                  Fatura Indisponível
                 </div>
               )}
             </div>
