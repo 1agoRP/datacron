@@ -361,11 +361,15 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         email_log.condominio_id = conc.condominio_id
     else:
         logger.warning(f"Sender '{sender}' not matched to any concessionaria")
-        db.add(Alerta(
+        alert = Alerta(
             tipo="email_nao_identificado",
             gravidade="media",
             mensagem=f"E-mail recebido de '{sender}' com assunto '{subject}' nao foi identificado como concessionaria cadastrada.",
-        ))
+        )
+        db.add(alert)
+        await db.flush()
+        from app.services.alert_manager import notify_alert
+        await notify_alert(db, alert)
 
     password = ""
     condo: Optional[Condominio] = None

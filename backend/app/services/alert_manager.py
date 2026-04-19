@@ -46,8 +46,8 @@ async def check_and_create_alerts(
         alerts.append(pdf_alert)
 
     # 3. Send emails for any new alerts
-    if alerts:
-        await _dispatch_alert_emails(alerts, fatura, conc)
+    for alert in alerts:
+        await notify_alert(db, alert, fatura)
 
 
 
@@ -187,7 +187,7 @@ async def check_missing_bills(db: AsyncSession) -> None:
 
         # Create alert
         condo_nome = conc.condominio.nome if conc.condominio else "Desconhecido"
-        db.add(Alerta(
+        alert = Alerta(
             condominio_id=conc.condominio_id,
             tipo="conta_nao_recebida",
             gravidade="alta",
@@ -195,71 +195,78 @@ async def check_missing_bills(db: AsyncSession) -> None:
                 f"Conta da {conc.tipo} do {condo_nome} ainda não foi recebida. "
                 f"Vencimento esperado: dia {conc.dia_vencimento}."
             ),
-        ))
+        )
+        db.add(alert)
+        await db.flush() # Get ID
+        await notify_alert(db, alert)
+        
         logger.info(f"Alert created: missing bill for concessionaria {conc.id}")
 
     await db.commit()
 
 
-async def _dispatch_alert_emails(alerts: list[Alerta], fatura: Fatura, conc: Concessionaria) -> None:
-    """Sends combined alert details via email to the expected recipient."""
-    # Use the expected email address registered with the concessionaire
-    recipient = conc.email_esperado
-    if not recipient:
-        logger.warning(f"Não foi possível enviar alerta por e-mail: Concessionária {conc.id} não possui 'email_esperado'.")
-        return
-
-    from sqlalchemy import select
-    from sqlalchemy.orm import selectinload
+async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura] = None) -> None:
+    """Sends alert details via email to the manager and optionally to the concessionaire contact."""
+    import os
+    manager_email = "assistente.gerencia4@propstarter.com.br"
+    
+    # 1. Gather context
     from app.models.condominio import Condominio
+    from app.models.concessionaria import Concessionaria
     
-    # Ensure condominio is loaded for the name
-    condo_name = conc.condominio.nome if conc.condominio else "N/A"
+    condo = None
+    if alert.condominio_id:
+        res = await db.execute(select(Condominio).where(Condominio.id == alert.condominio_id))
+        condo = res.scalar_one_or_none()
     
-    # Use original subject to ensure Gmail threading works perfectly
-    original_subject = fatura.email_assunto or f"Fatura - {condo_name}"
-    subject = original_subject
+    condo_name = condo.nome if condo else "Sistema"
+    subject = f"🔔 ALERTA [{alert.tipo.replace('_', ' ').upper()}] - {condo_name}"
     
-    body_lines = [
-        f"Olá,",
+    body = [
+        f"Alerta gerado no Datacron:",
         f"",
-        f"Foram identificados os seguintes alertas para o condomínio {condo_name}:",
+        f"Tipo: {alert.tipo.upper()}",
+        f"Gravidade: {alert.gravidade.upper()}",
+        f"Mensagem: {alert.mensagem}",
         f"",
     ]
     
-    for alert in alerts:
-        body_lines.append(f"• [{alert.tipo.upper()}] {alert.mensagem}")
+    attachments = []
+    in_reply_to = None
     
-    body_lines.extend([
-        f"",
-        f"Detalhes da Fatura:",
-        f"- Concessionária: {conc.tipo} ({conc.instalacao})",
-        f"- Referência: {fatura.referencia}",
-        f"- Valor: R$ {fatura.valor:.2f}",
-        f"- Vencimento: {fatura.vencimento.strftime('%d/%m/%Y') if fatura.vencimento else 'N/A'}",
-        f"",
-        f"Por favor, verifique o painel do Datacron para mais detalhes.",
-        f"",
-        f"Atenciosamente,",
-        f"Equipe Datacron"
-    ])
+    if fatura:
+        body.extend([
+            f"Fatura Relacionada:",
+            f"- Referência: {fatura.referencia}",
+            f"- Valor: R$ {fatura.valor:.2f}",
+            f"- Vencimento: {fatura.vencimento.strftime('%d/%m/%Y') if fatura.vencimento else 'N/D'}",
+            f"",
+        ])
+        in_reply_to = fatura.gmail_message_id
+        
+        # Attach PDF if unlocked (per user request)
+        if fatura.pdf_desbloqueado and fatura.pdf_path and os.path.exists(fatura.pdf_path):
+            try:
+                with open(fatura.pdf_path, "rb") as f:
+                    attachments.append((fatura.pdf_nome_original or "fatura.pdf", f.read()))
+            except Exception as e:
+                logger.error(f"Failed to read PDF for attachment: {e}")
+
+    body.append("Por favor, verifique a Central de Alertas no painel administrativo.")
     
-    body = "\n".join(body_lines)
-    
-    # Thread back to the original email Message-ID
-    msg_id = fatura.gmail_message_id
-    
+    # 2. Send to Manager
     success = send_notification_email(
-        to=recipient,
+        to=manager_email,
         subject=subject,
-        message_text=body,
-        in_reply_to=msg_id
+        message_text="\n".join(body),
+        in_reply_to=in_reply_to,
+        attachments=attachments if attachments else None
     )
     
     if success:
-        logger.info(f"E-mail de alerta enviado para {recipient} (Thread: {msg_id})")
+        logger.info(f"Notification for alert {alert.id} sent to manager.")
     else:
-        logger.error(f"Falha ao enviar e-mail de alerta para {recipient}")
+        logger.error(f"Failed to send alert notification to manager.")
 
 
 async def check_mandate_expirations(db: AsyncSession) -> None:
@@ -303,6 +310,8 @@ async def check_mandate_expirations(db: AsyncSession) -> None:
                 mensagem=msg
             )
             db.add(alert)
+            await db.flush()
+            await notify_alert(db, alert)
             
             # Send Email to all concessionaire contacts
             # Fetch email recipients from related concessionaires
