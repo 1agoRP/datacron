@@ -582,9 +582,28 @@ class ApiClient {
     return this.request<Fatura[]>(url);
   }
 
-  // Gmail History (Direct from folders)
   async getGmailHistory(condominioId: string, concessionariaId: string) {
     return this.request<any[]>(`/condominios/${condominioId}/gmail-history?concessionaria_id=${concessionariaId}`);
+  }
+
+  async downloadGmailFatura(messageId: string, filename: string) {
+    const response = await fetch(`${this.baseUrl}/faturas/gmail-download/${messageId}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+
+    if (!response.ok) throw new Error('Não foi possível baixar o arquivo do Gmail');
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   }
 
   // Contratos

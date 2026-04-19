@@ -76,7 +76,9 @@ export default function CondominiosPage() {
   // History modal
   const [historyConc, setHistoryConc] = useState<any>(null);
   const [historyFaturas, setHistoryFaturas] = useState<any[]>([]);
+  const [gmailHistory, setGmailHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [activeHistoryTab, setActiveHistoryTab] = useState<'sistema' | 'gmail'>('sistema');
   const [selectedHistory, setSelectedHistory] = useState<Set<string>>(new Set());
 
   // Removed manual fetchData in favor of useSWR
@@ -244,19 +246,25 @@ export default function CondominiosPage() {
   const handleOpenHistory = async (conc: any) => {
     setHistoryConc(conc);
     setSelectedHistory(new Set());
+    setGmailHistory([]);
+    setActiveHistoryTab('sistema');
     try {
       setLoadingHistory(true);
-      // Busca faturas exclusivamente do Banco de Dados
+      // 1. Fetch from Database
       const dbFaturas = await api.getFaturasByCondominio(detailsCondo.id, conc.id);
-
-      // Ordena por data (mais recente primeiro)
       dbFaturas.sort((a: any, b: any) => {
         const dateA = new Date(a.created_at || a.vencimento || 0);
         const dateB = new Date(b.created_at || b.vencimento || 0);
         return dateB.getTime() - dateA.getTime();
       });
-
       setHistoryFaturas(dbFaturas);
+
+      // 2. Fetch from Gmail (Background)
+      if (conc.instalacao) {
+        api.getGmailHistory(detailsCondo.id, conc.id).then(gmailFats => {
+          setGmailHistory(gmailFats);
+        }).catch(err => console.error("Gmail fetch error:", err));
+      }
     } catch (err) {
       console.error(err);
       setHistoryFaturas([]);
@@ -280,29 +288,29 @@ export default function CondominiosPage() {
     }
   };
 
-  const handleDownloadFatura = (faturaId: string, filename: string) => {
-    const token = localStorage.getItem('datacron_token');
-    fetch(`${API_BASE_URL}/faturas/${faturaId}/pdf`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    }).then(resp => {
-      if (!resp.ok) {
-        throw new Error(resp.status === 404
-          ? 'PDF não encontrado no servidor.'
-          : `Erro ao baixar: ${resp.status}`);
+  const handleDownloadFatura = async (faturaId: string, filename: string, source: 'sistema' | 'gmail' = 'sistema') => {
+    try {
+      if (source === 'sistema') {
+        const token = localStorage.getItem('datacron_token');
+        const resp = await fetch(`${API_BASE_URL}/faturas/${faturaId}/pdf`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resp.ok) throw new Error('Falha ao baixar do sistema');
+        const blob = await resp.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+      } else {
+        await api.downloadGmailFatura(faturaId, filename);
       }
-      return resp.blob();
-    }).then(blob => {
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename || `fatura_${faturaId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      a.remove();
-    }).catch(err => {
+    } catch (err: any) {
       alert('❌ ' + (err.message || 'Erro ao baixar fatura'));
-    });
+    }
   };
 
   const handleOpenEdit = (condo: any) => {
@@ -740,99 +748,143 @@ export default function CondominiosPage() {
                       <Calendar size={14} /> Data de vencimento <ChevronLeft size={14} style={{ transform: 'rotate(-90deg)' }} />
                     </button>
                     <button className="dc-history-filter-btn">
-                      <Filter size={14} /> Situação <ChevronLeft size={14} style={{ transform: 'rotate(-90deg)' }} />
+                      <Filter size={14} /> Situação <ChevronLeft size={14} style={{ transform: 'rota                  {/* TABS DE HISTÓRICO */}
+                  <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
+                    <button 
+                      onClick={() => setActiveHistoryTab('sistema')}
+                      style={{ 
+                        padding: '12px 24px', fontSize: '0.85rem', fontWeight: 700, 
+                        borderBottom: `3px solid ${activeHistoryTab === 'sistema' ? '#2563eb' : 'transparent'}`,
+                        color: activeHistoryTab === 'sistema' ? '#1e3a8a' : '#64748b',
+                        background: 'none', transition: 'all 0.2s', cursor: 'pointer'
+                      }}
+                    >
+                      Sistema ({historyFaturas.length})
+                    </button>
+                    <button 
+                      onClick={() => setActiveHistoryTab('gmail')}
+                      style={{ 
+                        padding: '12px 24px', fontSize: '0.85rem', fontWeight: 700, 
+                        borderBottom: `3px solid ${activeHistoryTab === 'gmail' ? '#2563eb' : 'transparent'}`,
+                        color: activeHistoryTab === 'gmail' ? '#1e3a8a' : '#64748b',
+                        background: 'none', transition: 'all 0.2s', cursor: 'pointer'
+                      }}
+                    >
+                      Gmail Archive ({gmailHistory.length})
                     </button>
                   </div>
 
-                  {loadingHistory ? (
+                  {loadingHistory && activeHistoryTab === 'sistema' ? (
                     <div style={{ padding: 40, textAlign: 'center' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
-                  ) : historyFaturas.length === 0 ? (
-                    <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-                      <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-                      <div style={{ fontWeight: 700 }}>Nenhuma fatura registrada para esta concessionária</div>
-                    </div>
+                  ) : activeHistoryTab === 'sistema' ? (
+                    historyFaturas.length === 0 ? (
+                      <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+                        <FileText size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+                        <div style={{ fontWeight: 700 }}>Nenhuma fatura registrada no banco de dados</div>
+                        <div style={{ fontSize: '0.8rem', marginTop: 4 }}>Tente consultar a aba "Gmail Archive".</div>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ overflowX: 'auto', border: '1px solid #f1f5f9', borderRadius: 12 }}>
+                          <table className="dc-table" style={{ fontSize: '0.85rem', border: 'none' }}>
+                            <thead style={{ background: '#fff' }}>
+                              <tr>
+                                <th style={{ width: 40 }}>
+                                  <input 
+                                    type="checkbox" 
+                                    className="dc-checkbox"
+                                    checked={selectedHistory.size === historyFaturas.length && historyFaturas.length > 0}
+                                    onChange={toggleSelectAll}
+                                  />
+                                </th>
+                                <th>Mês</th>
+                                <th>Vencimento</th>
+                                <th>Situação</th>
+                                <th>Valor</th>
+                                <th style={{ textAlign: 'right' }}>Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {historyFaturas.map(f => {
+                                const isPaid = f.status === 'processada';
+                                const isSelected = selectedHistory.has(f.id);
+                                return (
+                                  <tr key={f.id} style={{ background: isSelected ? '#f8fafc' : 'transparent' }}>
+                                    <td>
+                                      <input 
+                                        type="checkbox" 
+                                        className="dc-checkbox"
+                                        checked={isSelected}
+                                        onChange={() => toggleSelectFatura(f.id)}
+                                      />
+                                    </td>
+                                    <td><div style={{ fontWeight: 600 }}>{f.referencia ? formatReferencia(f.referencia) : '—'}</div></td>
+                                    <td>{f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}</td>
+                                    <td>
+                                      <span className={`dc-status-dot ${isPaid ? 'dc-status-dot-green' : 'dc-status-dot-orange'}`}>
+                                        {f.status}
+                                      </span>
+                                    </td>
+                                    <td><div style={{ fontWeight: 800 }}>{formatCurrencyCeil(f.valor || 0)}</div></td>
+                                    <td style={{ textAlign: 'right' }}>
+                                      <button 
+                                        onClick={() => handleDownloadFatura(f.id, f.pdf_nome_original || 'fatura.pdf', 'sistema')}
+                                        disabled={!f.pdf_path}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: f.pdf_path ? '#2563eb' : '#cbd5e1' }}
+                                        title={f.pdf_path ? "Download" : "PDF Indisponível"}
+                                      >
+                                        <Download size={18} />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    )
                   ) : (
-                    <>
-                      <div style={{ overflowX: 'auto', border: '1px solid #f1f5f9', borderRadius: 12 }}>
-                        <table className="dc-table" style={{ fontSize: '0.85rem', border: 'none' }}>
-                          <thead style={{ background: '#fff' }}>
-                            <tr>
-                              <th style={{ width: 40 }}>
-                                <input 
-                                  type="checkbox" 
-                                  className="dc-checkbox"
-                                  checked={selectedHistory.size === historyFaturas.length && historyFaturas.length > 0}
-                                  onChange={toggleSelectAll}
-                                />
-                              </th>
-                              <th>Mês</th>
-                              <th>Vencimento</th>
-                              <th>Situação</th>
-                              <th>Emissão</th>
-                              <th>Valor</th>
-                              <th style={{ textAlign: 'right' }}></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {historyFaturas.map(f => {
-                              const isPaid = f.status === 'processada';
-                              const isSelected = selectedHistory.has(f.id);
-                              
-                              // Mock emission date based on creation or vencimiento -5 days
-                              const emissionDate = f.created_at ? new Date(f.created_at) : (f.vencimento ? new Date(new Date(f.vencimento).getTime() - 5*24*60*60*1000) : null);
-
-                              return (
-                                <tr key={f.id} style={{ background: isSelected ? '#f8fafc' : 'transparent' }}>
-                                  <td>
-                                    <input 
-                                      type="checkbox" 
-                                      className="dc-checkbox"
-                                      checked={isSelected}
-                                      onChange={() => toggleSelectFatura(f.id)}
-                                    />
-                                  </td>
-                                  <td>
-                                    <div style={{ fontWeight: 600, color: '#1e293b' }}>
-                                      {f.referencia ? formatReferencia(f.referencia) : '—'}
-                                    </div>
-                                  </td>
-                                  <td style={{ color: '#475569' }}>
-                                    {f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
-                                  </td>
-                                  <td>
-                                    <span className={`dc-status-dot ${isPaid ? 'dc-status-dot-green' : 'dc-status-dot-orange'}`}>
-                                      {isPaid ? 'Paga' : 'Em aberto'}
-                                    </span>
-                                  </td>
-                                  <td style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
-                                    {emissionDate ? format(emissionDate, 'dd/MM/yyyy') : '—'}
-                                  </td>
-                                  <td>
-                                    <div style={{ fontWeight: 800, color: '#0f172a' }}>
-                                      {formatCurrencyCeil(f.valor || 0)}
-                                    </div>
-                                  </td>
-                                  <td>
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                                      <button 
-                                        onClick={() => handleDownloadFatura(f.id, f.pdf_nome_original || 'fatura.pdf')}
-                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-                                        title="Download"
-                                      >
-                                        <Download size={16} />
-                                      </button>
-                                      <button 
-                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-                                        title="Pagar"
-                                      >
-                                        <CreditCard size={16} />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
+                    /* GMAIL ARCHIVE TAB */
+                    <div className="dc-space-y-3">
+                      {gmailHistory.length === 0 ? (
+                        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+                          <Mail size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+                          <div style={{ fontWeight: 700 }}>Nenhum e-mail recente encontrado</div>
+                          <div style={{ fontSize: '0.8rem', marginTop: 4 }}>Buscamos na pasta do condomínio e globalmente.</div>
+                        </div>
+                      ) : (
+                        gmailHistory.map((g, idx) => (
+                          <div key={idx} style={{ 
+                            padding: 14, background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Mail size={18} />
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {g.referencia}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                  Recebido em: {new Date(g.created_at).toLocaleString('pt-BR')}
+                                </div>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => handleDownloadFatura(g.id, g.pdf_nome_original || 'fatura_gmail.pdf', 'gmail')}
+                              className="dc-btn dc-btn-secondary" 
+                              style={{ height: 32, fontSize: '0.72rem', gap: 6 }}
+                            >
+                              <Download size={13} /> Baixar
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+              </tbody>
                         </table>
                       </div>
 

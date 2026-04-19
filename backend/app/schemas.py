@@ -226,7 +226,9 @@ class FaturaResponse(BaseModel):
     email_remetente: Optional[str]
     email_assunto: Optional[str]
     pdf_desbloqueado: bool
-    variacao_percentual: Optional[float]
+    pdf_nome_original: Optional[str] = None
+    pdf_path: Optional[str] = None
+    variacao_percentual: Optional[float] = None
     debito_automatico: bool = False
     created_at: datetime
     updated_at: datetime

@@ -50,21 +50,30 @@ def get_imap_connection():
         return None
 
 
+import unicodedata
+
 def ensure_gmail_label(mail: imaplib.IMAP4_SSL, label_name: str) -> bool:
     """Creates a Gmail label via IMAP if it doesn't exist."""
     try:
+        # Normaliza para remover acentos e caracteres especiais que quebram o imaplib (que usa ascii por padrão)
+        normalized = unicodedata.normalize('NFKD', label_name)
+        safe_label = "".join([c for c in normalized if not unicodedata.combining(c)])
+        
+        # Substitui outros caracteres não-ascii por espaço ou remove
+        safe_label = safe_label.encode('ascii', 'ignore').decode('ascii')
+        
         # Check if label already exists
-        status, labels = mail.list('""', f'"{label_name}"')
+        status, labels = mail.list('""', f'"{safe_label}"')
         if status == "OK" and labels and labels[0] is not None and labels[0] != b'()':
             return True  # already exists
 
         # Create the label
-        status, _ = mail.create(f'"{label_name}"')
+        status, _ = mail.create(f'"{safe_label}"')
         if status == "OK":
-            logger.info(f"Label '{label_name}' criado com sucesso no Gmail.")
+            logger.info(f"Label '{safe_label}' verificado/criado com sucesso no Gmail.")
             return True
         else:
-            logger.warning(f"Falha ao criar label '{label_name}': status={status}")
+            logger.warning(f"Falha ao criar label '{safe_label}': status={status}")
             return False
     except Exception as e:
         logger.error(f"Erro ao criar label '{label_name}': {e}")
@@ -572,55 +581,61 @@ def get_gmail_history(label_name: str, filter_text: str) -> list[dict]:
     history = []
     try:
         # Codifica label para evitar problemas de acento (IMAP UTF-7)
-        # Se falhar ou não achar a pasta, retorna vazio
-        status, _ = mail.select(f'"{label_name}"')
+        # Se falhar ou não achar a pasta, tenta o fallback manual
+        status, _ = mail.select(f'"{label_name}"', readonly=True)
         if status != "OK":
-            logger.warning(f"Label '{label_name}' não encontrada ou vazia no Gmail.")
-            return []
-
+            logger.info(f"Label '{label_name}' não encontrada. Buscando globalmente por '{filter_text}'")
+            # Fallback global
+            status, _ = mail.select('"[Gmail]/Todos os e-mails"', readonly=True)
+            if status != "OK":
+                mail.select("INBOX", readonly=True)
+        
         # Busca e-mails que contenham o texto de filtro (ex: número da UC)
-        # Gmail IMAP supports 'BODY' and 'SUBJECT' filters
-        status, messages = mail.search(None, f'(OR (SUBJECT "{filter_text}") (BODY "{filter_text}"))')
+        # Note: Gmail IMAP filter is powerful
+        status, messages = mail.uid('search', None, f'(OR (SUBJECT "{filter_text}") (BODY "{filter_text}"))')
+        
         if status != "OK" or not messages[0]:
             return []
 
-        msg_ids = messages[0].split()
-        for m_id in reversed(msg_ids): # Mais novos primeiro
+        msg_uids = messages[0].split()
+        for m_uid in reversed(msg_uids): # Mais novos primeiro
             try:
+                m_uid_str = m_uid.decode('utf-8')
                 # Pegamos apenas o Header para ser rápido
-                res, data = mail.fetch(m_id, "(BODY[HEADER.FIELDS (SUBJECT DATE MESSAGE-ID)])")
+                res, data = mail.uid('fetch', m_uid, "(BODY[HEADER.FIELDS (SUBJECT DATE MESSAGE-ID)])")
                 if res == "OK":
                     msg = email.message_from_bytes(data[0][1])
                     subject = _decode_header_value(msg.get("Subject", "Sem Assunto"))
                     date_str = msg.get("Date", "")
-                    msg_id = msg.get("Message-ID", "").strip()
                     
                     history.append({
-                        "id": msg_id,
-                        "referencia": subject, # Usamos o assunto como referência visual
+                        "id": m_uid_str, # Usamos o UID para download posterior
+                        "referencia": subject,
                         "vencimento": date_str,
                         "status": "gmail_archive",
-                        "valor": 0.0, # Valor não extraído em tempo real para performance
-                        "pdf_nome_original": subject,
+                        "valor": 0.0,
+                        "pdf_nome_original": subject if subject.lower().endswith('.pdf') else f"{subject}.pdf",
                         "created_at": date_str,
                         "_parsed_date": parsedate_to_datetime(date_str) if date_str else datetime.min.replace(tzinfo=timezone.utc)
                     })
-            except:
+                    
+                    # Limitar a 10 resultados do Gmail para não travar
+                    if len(history) >= 10:
+                        break
+            except Exception as e:
+                logger.debug(f"Pulando mensagem IMAP: {e}")
                 continue
 
     except Exception as e:
         logger.error(f"Erro ao buscar histórico no Gmail: {e}")
     finally:
         try:
-            mail.close()
             mail.logout()
         except:
             pass
 
-    # Organizar por mais recentes primeiro (usando a data real do cabeçalho)
-    history.sort(key=lambda x: x["_parsed_date"], reverse=True)
+    history.sort(key=lambda x: x["_parsed_date"] if isinstance(x["_parsed_date"], datetime) else datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     
-    # Remover o campo temporário antes de enviar ao frontend
     for item in history:
         item.pop("_parsed_date", None)
 

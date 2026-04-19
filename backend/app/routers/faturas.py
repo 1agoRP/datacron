@@ -215,6 +215,73 @@ async def download_fatura_pdf(
     )
 
 
+@router.get("/gmail-download/{message_id}")
+async def download_gmail_fatura(
+    message_id: str,
+    _: User = Depends(get_current_user),
+):
+    """Downloads a PDF attachment directly from Gmail by message ID."""
+    from app.services.email_monitor import get_imap_connection
+    import email
+    import base64
+
+    def _get_pdf_from_gmail():
+        mail = get_imap_connection()
+        if not mail:
+            raise Exception("Não foi possível conectar ao Gmail")
+        
+        try:
+            # Seleciona [Gmail]/Todos os e-mails para garantir que encontre
+            mail.select('"[Gmail]/Todos os e-mails"', readonly=True)
+            res, msg_data = mail.uid('fetch', message_id, '(RFC822)')
+            if res != 'OK' or not msg_data[0]:
+                # Tenta INBOX se o anterior falhar (algumas contas em português usam nomes diferentes)
+                mail.select("INBOX", readonly=True)
+                res, msg_data = mail.uid('fetch', message_id, '(RFC822)')
+            
+            if res != 'OK' or not msg_data[0]:
+                raise Exception("Mensagem não encontrada no Gmail")
+
+            raw_email = msg_data[0][1]
+            msg = email.message_from_bytes(raw_email)
+            
+            pdf_content = None
+            filename = "fatura_gmail.pdf"
+
+            for part in msg.walk():
+                if part.get_content_maintype() == 'multipart':
+                    continue
+                if part.get('Content-Disposition') is None:
+                    continue
+                
+                part_filename = part.get_filename()
+                if part_filename and part_filename.lower().endswith('.pdf'):
+                    pdf_content = part.get_payload(decode=True)
+                    filename = part_filename
+                    break
+            
+            if not pdf_content:
+                raise Exception("Nenhum anexo PDF encontrado neste e-mail")
+
+            return pdf_content, filename
+        finally:
+            try:
+                mail.logout()
+            except:
+                pass
+
+    try:
+        content, filename = await run_in_threadpool(_get_pdf_from_gmail)
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        logger.error(f"Erro ao baixar fatura do Gmail: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.put("/{id}/status", response_model=FaturaResponse)
 async def update_fatura_status(
     id: uuid.UUID,
