@@ -80,6 +80,7 @@ export interface User {
   nome: string;
   email: string;
   role: string;
+  whatsapp?: string | null;
   administradora?: string | null;
   codigo_usuario?: number | null;
   condominios_ids?: string[];
