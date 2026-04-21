@@ -4,7 +4,7 @@ from datetime import datetime
 
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, and_, extract
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -286,6 +286,8 @@ async def get_condominio_gmail_history(
 @router.post("/{id}/ata-eleicao")
 async def upload_ata_eleicao(
     id: uuid.UUID,
+    data_inicio: Optional[datetime] = Form(None),
+    data_fim: Optional[datetime] = Form(None),
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
@@ -312,6 +314,8 @@ async def upload_ata_eleicao(
 
     condo.ata_eleicao_base64 = b64_data
     condo.ata_eleicao_nome = pdf_file.filename or 'ata_eleicao.pdf'
+    condo.ata_eleicao_inicio = data_inicio
+    condo.ata_eleicao_fim = data_fim
     
     try:
         await db.commit()
@@ -357,6 +361,8 @@ async def download_ata_eleicao(
 @router.post("/{id}/avcb")
 async def upload_avcb(
     id: uuid.UUID,
+    data_inicio: Optional[datetime] = Form(None),
+    data_fim: Optional[datetime] = Form(None),
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
@@ -376,6 +382,8 @@ async def upload_avcb(
     pdf_bytes = await pdf_file.read()
     b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
     condo.avcb_url = b64_data
+    condo.avcb_inicio = data_inicio
+    condo.avcb_fim = data_fim
     
     await db.commit()
     await db.refresh(condo)
@@ -408,6 +416,8 @@ async def download_avcb(
 @router.post("/{id}/apolice")
 async def upload_apolice(
     id: uuid.UUID,
+    data_inicio: Optional[datetime] = Form(None),
+    data_fim: Optional[datetime] = Form(None),
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
@@ -427,6 +437,8 @@ async def upload_apolice(
     pdf_bytes = await pdf_file.read()
     b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
     condo.apolice_seguro_url = b64_data
+    condo.apolice_seguro_inicio = data_inicio
+    condo.apolice_seguro_fim = data_fim
     
     await db.commit()
     await db.refresh(condo)
@@ -454,3 +466,55 @@ async def download_apolice(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="Apolice_{condo.nome}.pdf"'},
     )
+
+@router.delete("/{id}/ata-eleicao", status_code=204)
+async def delete_ata_eleicao(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_write()),
+):
+    """Exclui a ATA de Eleição do condomínio."""
+    result = await db.execute(select(Condominio).where(Condominio.id == id))
+    condo = result.scalar_one_or_none()
+    if not condo:
+        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    
+    condo.ata_eleicao_base64 = None
+    condo.ata_eleicao_nome = None
+    condo.ata_eleicao_inicio = None
+    condo.ata_eleicao_fim = None
+    await db.commit()
+
+@router.delete("/{id}/avcb", status_code=204)
+async def delete_avcb(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_write()),
+):
+    """Exclui o AVCB do condomínio."""
+    result = await db.execute(select(Condominio).where(Condominio.id == id))
+    condo = result.scalar_one_or_none()
+    if not condo:
+        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    
+    condo.avcb_url = None
+    condo.avcb_inicio = None
+    condo.avcb_fim = None
+    await db.commit()
+
+@router.delete("/{id}/apolice", status_code=204)
+async def delete_apolice(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_write()),
+):
+    """Exclui a Apólice de Seguro do condomínio."""
+    result = await db.execute(select(Condominio).where(Condominio.id == id))
+    condo = result.scalar_one_or_none()
+    if not condo:
+        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    
+    condo.apolice_seguro_url = None
+    condo.apolice_seguro_inicio = None
+    condo.apolice_seguro_fim = None
+    await db.commit()

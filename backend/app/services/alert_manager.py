@@ -391,3 +391,54 @@ async def check_mandate_expirations(db: AsyncSession) -> None:
 
     await db.commit()
 
+async def check_document_expirations_and_clean(db: AsyncSession) -> None:
+    """
+    Scheduled job: checks if any condominium document (Ata, AVCB, Apolice) 
+    has expired. If the expiration date is strictly before today, it removes 
+    the document automatically.
+    """
+    from datetime import date
+    
+    today = date.today()
+    
+    result = await db.execute(
+        select(Condominio)
+        .where(Condominio.ativo == True)
+    )
+    condos = result.scalars().all()
+    
+    for condo in condos:
+        updated = False
+        
+        # 1. ATA de Eleição
+        if condo.ata_eleicao_fim and condo.ata_eleicao_base64:
+            if condo.ata_eleicao_fim.date() < today:
+                condo.ata_eleicao_base64 = None
+                condo.ata_eleicao_nome = None
+                condo.ata_eleicao_inicio = None
+                condo.ata_eleicao_fim = None
+                updated = True
+                logger.info(f"ATA de Eleição expired for Condo {condo.id} - Document removed.")
+                
+        # 2. AVCB
+        if condo.avcb_fim and condo.avcb_url:
+            if condo.avcb_fim.date() < today:
+                condo.avcb_url = None
+                condo.avcb_inicio = None
+                condo.avcb_fim = None
+                updated = True
+                logger.info(f"AVCB expired for Condo {condo.id} - Document removed.")
+                
+        # 3. Apólice de Seguro
+        if condo.apolice_seguro_fim and condo.apolice_seguro_url:
+            if condo.apolice_seguro_fim.date() < today:
+                condo.apolice_seguro_url = None
+                condo.apolice_seguro_inicio = None
+                condo.apolice_seguro_fim = None
+                updated = True
+                logger.info(f"Apolice de Seguro expired for Condo {condo.id} - Document removed.")
+                
+        if updated:
+            db.add(condo)
+            
+    await db.commit()

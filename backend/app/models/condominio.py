@@ -28,8 +28,16 @@ class Condominio(Base):
     cpf_sindico: Mapped[Optional[str]] = mapped_column(String(14), nullable=True)
     ata_eleicao_base64: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ata_eleicao_nome: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    ata_eleicao_inicio: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ata_eleicao_fim: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    
     avcb_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    avcb_inicio: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    avcb_fim: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    
     apolice_seguro_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    apolice_seguro_inicio: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    apolice_seguro_fim: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     gerente_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     assistente_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     administradora: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)

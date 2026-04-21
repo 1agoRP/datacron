@@ -254,6 +254,10 @@ class ApiClient {
     document.body.removeChild(a);
   }
 
+  async deleteAtaEleicao(id: string) {
+    return this.request(`/condominios/${id}/ata-eleicao`, { method: 'DELETE' });
+  }
+
   async uploadAvcb(id: string, formData: FormData) {
     return this.requestMultipart(`/condominios/${id}/avcb`, formData, { method: 'POST' });
   }
@@ -288,6 +292,10 @@ class ApiClient {
     document.body.removeChild(a);
   }
 
+  async deleteAvcb(id: string) {
+    return this.request(`/condominios/${id}/avcb`, { method: 'DELETE' });
+  }
+
   async uploadApoliceSeguro(id: string, formData: FormData) {
     return this.requestMultipart(`/condominios/${id}/apolice`, formData, { method: 'POST' });
   }
@@ -320,6 +328,10 @@ class ApiClient {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  }
+
+  async deleteApoliceSeguro(id: string) {
+    return this.request(`/condominios/${id}/apolice`, { method: 'DELETE' });
   }
 
   // Concessionarias

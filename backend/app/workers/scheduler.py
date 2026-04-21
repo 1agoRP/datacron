@@ -19,7 +19,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import settings
 from app.services.email_monitor import run_email_scan
-from app.services.alert_manager import check_missing_bills, check_mandate_expirations
+from app.services.alert_manager import check_missing_bills, check_mandate_expirations, check_document_expirations_and_clean
 from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,14 @@ async def _run_mandate_check():
             await check_mandate_expirations(db)
     except Exception as e:
         logger.error(f"Mandate check failed: {e}")
+
+async def _run_document_clean_check():
+    """Wrapper for the document expiration check."""
+    try:
+        async with AsyncSessionLocal() as db:
+            await check_document_expirations_and_clean(db)
+    except Exception as e:
+        logger.error(f"Document expiration clean check failed: {e}")
 
 
 def start_scheduler():
@@ -119,6 +127,15 @@ def start_scheduler():
         trigger=CronTrigger(hour=8, minute=5), # Run 5 mins after missing bills
         id="mandate_check",
         name="Mandate Expiration Check",
+        replace_existing=True,
+    )
+
+    # Document expiration cleaner — daily at 00:05 BRT
+    scheduler.add_job(
+        _run_document_clean_check,
+        trigger=CronTrigger(hour=0, minute=5),
+        id="document_clean_check",
+        name="Document Expiration Cleaner",
         replace_existing=True,
     )
 

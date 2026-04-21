@@ -69,9 +69,10 @@ export default function CondominiosPage() {
   const [condoConcs, setCondoConcs] = useState<any[]>([]);
   const [condoContratos, setCondoContratos] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const [uploadingAta, setUploadingAta] = useState(false);
-  const [uploadingAvcb, setUploadingAvcb] = useState(false);
-  const [uploadingApolice, setUploadingApolice] = useState(false);
+  const [docUploadModal, setDocUploadModal] = useState<{ type: 'ata' | 'avcb' | 'apolice', condoId: string } | null>(null);
+  const [docUploadFile, setDocUploadFile] = useState<File | null>(null);
+  const [docDates, setDocDates] = useState({ inicio: '', fim: '' });
+  const [uploadingDoc, setUploadingDoc] = useState(false);
 
   // History modal
   const [historyConc, setHistoryConc] = useState<any>(null);
@@ -158,69 +159,75 @@ export default function CondominiosPage() {
     }
   };
 
-  const handleUploadAvcb = async (condoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+  const triggerUploadFlow = (type: 'ata' | 'avcb' | 'apolice', condoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setDocUploadFile(file);
+    setDocUploadModal({ type, condoId });
+    setDocDates({ inicio: '', fim: '' });
+    if (event.target) event.target.value = '';
+  };
 
+  const confirmDocUpload = async () => {
+    if (!docUploadFile || !docUploadModal) return;
+    if (!docDates.inicio || !docDates.fim) {
+      alert("Por favor, preencha as datas de início e fim da vigência.");
+      return;
+    }
+    const { type, condoId } = docUploadModal;
     try {
-      setUploadingAvcb(true);
+      setUploadingDoc(true);
       const formData = new FormData();
-      formData.append('pdf_file', file);
-      await api.uploadAvcb(condoId, formData);
-      alert('AVCB enviado com sucesso!');
-      mutate();
-      if (detailsCondo && detailsCondo.id === condoId) {
-        setDetailsCondo({ ...detailsCondo, avcb_url: 'uploaded' }); // Mark as uploaded to trigger UI change
+      formData.append('pdf_file', docUploadFile);
+      formData.append('data_inicio', docDates.inicio);
+      formData.append('data_fim', docDates.fim);
+
+      if (type === 'ata') {
+        await api.uploadAtaEleicao(condoId, formData);
+        if (detailsCondo && detailsCondo.id === condoId) {
+           setDetailsCondo({ ...detailsCondo, ata_eleicao_nome: docUploadFile.name, ata_eleicao_inicio: docDates.inicio, ata_eleicao_fim: docDates.fim });
+        }
+        alert('ATA enviada com sucesso!');
+      } else if (type === 'avcb') {
+        await api.uploadAvcb(condoId, formData);
+        if (detailsCondo && detailsCondo.id === condoId) {
+           setDetailsCondo({ ...detailsCondo, avcb_url: 'uploaded', avcb_inicio: docDates.inicio, avcb_fim: docDates.fim });
+        }
+        alert('AVCB enviado com sucesso!');
+      } else if (type === 'apolice') {
+        await api.uploadApoliceSeguro(condoId, formData);
+        if (detailsCondo && detailsCondo.id === condoId) {
+           setDetailsCondo({ ...detailsCondo, apolice_seguro_url: 'uploaded', apolice_seguro_inicio: docDates.inicio, apolice_seguro_fim: docDates.fim });
+        }
+        alert('Apólice enviada com sucesso!');
       }
+      mutate();
+      setDocUploadModal(null);
+      setDocUploadFile(null);
     } catch (err: any) {
-      alert(err.message || 'Erro ao enviar AVCB');
+      alert(err.message || 'Erro ao enviar documento');
     } finally {
-      setUploadingAvcb(false);
-      if (event.target) event.target.value = '';
+      setUploadingDoc(false);
     }
   };
 
-  const handleUploadApolice = async (condoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const handleDeleteDoc = async (condoId: string, type: 'ata' | 'avcb' | 'apolice') => {
+    if (!confirm('Deseja realmente excluir este documento?')) return;
     try {
-      setUploadingApolice(true);
-      const formData = new FormData();
-      formData.append('pdf_file', file);
-      await api.uploadApoliceSeguro(condoId, formData);
-      alert('Apólice de Seguro enviada com sucesso!');
-      mutate();
-      if (detailsCondo && detailsCondo.id === condoId) {
-        setDetailsCondo({ ...detailsCondo, apolice_seguro_url: 'uploaded' }); // Mark as uploaded to trigger UI change
-      }
+        if (type === 'ata') {
+            await api.deleteAtaEleicao(condoId);
+            if (detailsCondo) setDetailsCondo({ ...detailsCondo, ata_eleicao_nome: null, ata_eleicao_inicio: null, ata_eleicao_fim: null });
+        } else if (type === 'avcb') {
+            await api.deleteAvcb(condoId);
+            if (detailsCondo) setDetailsCondo({ ...detailsCondo, avcb_url: null, avcb_inicio: null, avcb_fim: null });
+        } else if (type === 'apolice') {
+            await api.deleteApoliceSeguro(condoId);
+            if (detailsCondo) setDetailsCondo({ ...detailsCondo, apolice_seguro_url: null, apolice_seguro_inicio: null, apolice_seguro_fim: null });
+        }
+        mutate();
+        alert('Documento excluído com sucesso.');
     } catch (err: any) {
-      alert(err.message || 'Erro ao enviar Apólice');
-    } finally {
-      setUploadingApolice(false);
-      if (event.target) event.target.value = '';
-    }
-  };
-
-  const handleUploadAta = async (condoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setUploadingAta(true);
-      const formData = new FormData();
-      formData.append('pdf_file', file);
-      await api.uploadAtaEleicao(condoId, formData);
-      alert('ATA de Eleição enviada com sucesso!');
-      mutate();
-      if (detailsCondo && detailsCondo.id === condoId) {
-        setDetailsCondo({ ...detailsCondo, ata_eleicao_nome: file.name });
-      }
-    } catch (err: any) {
-      alert(err.message || 'Erro ao enviar ATA');
-    } finally {
-      setUploadingAta(false);
-      if (event.target) event.target.value = '';
+        alert(err.message || 'Erro ao excluir documento');
     }
   };
 
@@ -1005,31 +1012,36 @@ export default function CondominiosPage() {
                         <div>
                           <div style={{ fontWeight: 700, color: '#0f172a' }}>ATA de Eleição</div>
                           <div
-                            style={{
-                              fontSize: '0.8rem',
-                              color: '#64748b',
-                              maxWidth: 300,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
-                            }}
+                            style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                             title={detailsCondo.ata_eleicao_nome || ''}
                           >
                             {detailsCondo.ata_eleicao_nome ? detailsCondo.ata_eleicao_nome : 'Nenhum documento enviado.'}
                           </div>
+                          {detailsCondo.ata_eleicao_nome && detailsCondo.ata_eleicao_inicio && detailsCondo.ata_eleicao_fim && (
+                            <div style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                               <Calendar size={12} /> Vigência: {format(new Date(detailsCondo.ata_eleicao_inicio + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(detailsCondo.ata_eleicao_fim + 'T12:00:00'), 'dd/MM/yyyy')}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 10 }}>
                         {detailsCondo.ata_eleicao_nome && (
-                          <button className="dc-btn dc-btn-secondary" onClick={() => handleDownloadAta(detailsCondo.id)}>
-                            <Download size={14} /> Baixar
-                          </button>
+                          <>
+                            <button className="dc-btn dc-btn-secondary" onClick={() => handleDownloadAta(detailsCondo.id)}>
+                              <Download size={14} /> Baixar
+                            </button>
+                            {!readOnly && (
+                              <button className="dc-btn dc-btn-danger" onClick={() => handleDeleteDoc(detailsCondo.id, 'ata')} style={{ padding: '0 10px' }} title="Excluir">
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </>
                         )}
                         {!readOnly && (
                           <label className="dc-btn dc-btn-primary" style={{ cursor: 'pointer' }}>
-                            {uploadingAta ? <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff' }} /> : <Upload size={14} />}
+                            <Upload size={14} />
                             {detailsCondo.ata_eleicao_nome ? 'Substituir' : 'Vincular'}
-                            <input type="file" accept="application/pdf" style={{ display: 'none' }} disabled={uploadingAta} onChange={(e) => handleUploadAta(detailsCondo.id, e)} />
+                            <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={(e) => triggerUploadFlow('ata', detailsCondo.id, e)} />
                           </label>
                         )}
                       </div>
@@ -1043,31 +1055,36 @@ export default function CondominiosPage() {
                         <div>
                           <div style={{ fontWeight: 700, color: '#0f172a' }}>AVCB</div>
                           <div
-                            style={{
-                              fontSize: '0.8rem',
-                              color: '#64748b',
-                              maxWidth: 300,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
-                            }}
+                            style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                             title={detailsCondo.avcb_url ? 'Documento vinculado' : 'Auto de Vistoria do Corpo de Bombeiros'}
                           >
                             {detailsCondo.avcb_url ? 'Documento vinculado' : 'Auto de Vistoria do Corpo de Bombeiros'}
                           </div>
+                          {detailsCondo.avcb_url && detailsCondo.avcb_inicio && detailsCondo.avcb_fim && (
+                            <div style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                               <Calendar size={12} /> Vigência: {format(new Date(detailsCondo.avcb_inicio + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(detailsCondo.avcb_fim + 'T12:00:00'), 'dd/MM/yyyy')}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 10 }}>
                         {detailsCondo.avcb_url && (
-                          <button className="dc-btn dc-btn-secondary" onClick={() => handleDownloadAvcb(detailsCondo.id)}>
-                            <Download size={14} /> Baixar
-                          </button>
+                          <>
+                            <button className="dc-btn dc-btn-secondary" onClick={() => handleDownloadAvcb(detailsCondo.id)}>
+                              <Download size={14} /> Baixar
+                            </button>
+                            {!readOnly && (
+                              <button className="dc-btn dc-btn-danger" onClick={() => handleDeleteDoc(detailsCondo.id, 'avcb')} style={{ padding: '0 10px' }} title="Excluir">
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </>
                         )}
                         {!readOnly && (
                           <label className="dc-btn dc-btn-primary" style={{ cursor: 'pointer' }}>
-                            {uploadingAvcb ? <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff' }} /> : <Upload size={14} />}
+                            <Upload size={14} />
                             {detailsCondo.avcb_url ? 'Substituir' : 'Vincular'}
-                            <input type="file" accept="application/pdf" style={{ display: 'none' }} disabled={uploadingAvcb} onChange={(e) => handleUploadAvcb(detailsCondo.id, e)} />
+                            <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={(e) => triggerUploadFlow('avcb', detailsCondo.id, e)} />
                           </label>
                         )}
                       </div>
@@ -1081,31 +1098,36 @@ export default function CondominiosPage() {
                         <div>
                           <div style={{ fontWeight: 700, color: '#0f172a' }}>Apólice de Seguro</div>
                           <div
-                            style={{
-                              fontSize: '0.8rem',
-                              color: '#64748b',
-                              maxWidth: 300,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
-                            }}
+                            style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                             title={detailsCondo.apolice_seguro_url ? 'Documento vinculado' : 'Seguro obrigatório do condomínio'}
                           >
                             {detailsCondo.apolice_seguro_url ? 'Documento vinculado' : 'Seguro obrigatório do condomínio'}
                           </div>
+                          {detailsCondo.apolice_seguro_url && detailsCondo.apolice_seguro_inicio && detailsCondo.apolice_seguro_fim && (
+                            <div style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                               <Calendar size={12} /> Vigência: {format(new Date(detailsCondo.apolice_seguro_inicio + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(detailsCondo.apolice_seguro_fim + 'T12:00:00'), 'dd/MM/yyyy')}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: 10 }}>
                         {detailsCondo.apolice_seguro_url && (
-                          <button className="dc-btn dc-btn-secondary" onClick={() => handleDownloadApolice(detailsCondo.id)}>
-                            <Download size={14} /> Baixar
-                          </button>
+                          <>
+                            <button className="dc-btn dc-btn-secondary" onClick={() => handleDownloadApolice(detailsCondo.id)}>
+                              <Download size={14} /> Baixar
+                            </button>
+                            {!readOnly && (
+                              <button className="dc-btn dc-btn-danger" onClick={() => handleDeleteDoc(detailsCondo.id, 'apolice')} style={{ padding: '0 10px' }} title="Excluir">
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </>
                         )}
                         {!readOnly && (
                           <label className="dc-btn dc-btn-primary" style={{ cursor: 'pointer' }}>
-                            {uploadingApolice ? <div className="dc-loading-spinner" style={{ width: 14, height: 14, borderWidth: 2, borderColor: '#fff' }} /> : <Upload size={14} />}
+                            <Upload size={14} />
                             {detailsCondo.apolice_seguro_url ? 'Substituir' : 'Vincular'}
-                            <input type="file" accept="application/pdf" style={{ display: 'none' }} disabled={uploadingApolice} onChange={(e) => handleUploadApolice(detailsCondo.id, e)} />
+                            <input type="file" accept="application/pdf" style={{ display: 'none' }} onChange={(e) => triggerUploadFlow('apolice', detailsCondo.id, e)} />
                           </label>
                         )}
                       </div>
@@ -1321,6 +1343,40 @@ export default function CondominiosPage() {
 
             <div className="dc-modal-footer">
               <button type="button" className="dc-btn dc-btn-secondary" style={{ width: '100%', height: 48 }} onClick={() => setIsStatusModalOpen(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Upload Documento */}
+      {docUploadModal && (
+        <div className="dc-modal-overlay" style={{ zIndex: 10001 }}>
+          <div className="dc-modal-content" style={{ maxWidth: 450 }}>
+            <div className="dc-modal-header">
+              <h2 className="dc-modal-title">Vigência do Documento</h2>
+              <button className="dc-modal-close" onClick={() => { setDocUploadModal(null); setDocUploadFile(null); }}><X size={20} /></button>
+            </div>
+            <div className="dc-modal-body dc-space-y-4">
+              <div style={{ padding: 12, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.85rem', color: '#475569', marginBottom: 6 }}>
+                <strong>Arquivo Selecionado:</strong> {docUploadFile?.name}
+              </div>
+              <div className="dc-form-group">
+                <label>Início da Vigência</label>
+                <input type="date" className="dc-form-input" value={docDates.inicio} onChange={e => setDocDates(prev => ({ ...prev, inicio: e.target.value }))} required />
+              </div>
+              <div className="dc-form-group">
+                <label>Fim da Vigência</label>
+                <input type="date" className="dc-form-input" value={docDates.fim} onChange={e => setDocDates(prev => ({ ...prev, fim: e.target.value }))} required />
+                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>
+                  Preencha corretamente, pois o documento será automaticamente removido na data de validade.
+                </div>
+              </div>
+            </div>
+            <div className="dc-modal-footer">
+              <button className="dc-btn dc-btn-secondary" onClick={() => { setDocUploadModal(null); setDocUploadFile(null); }}>Cancelar</button>
+              <button className="dc-btn dc-btn-primary" onClick={confirmDocUpload} disabled={uploadingDoc} style={{ minWidth: 140 }}>
+                 {uploadingDoc ? 'Enviando...' : 'Confirmar e Enviar'}
+              </button>
             </div>
           </div>
         </div>
