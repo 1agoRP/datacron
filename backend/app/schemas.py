@@ -282,6 +282,18 @@ class EmailLogResponse(BaseModel):
     fatura_valor: Optional[float] = None
     fatura_vencimento: Optional[date] = None
     dados_extraidos: Optional[dict[str, Any]] = None
+
+    @field_validator("dados_extraidos", mode="before")
+    @classmethod
+    def parse_dados_extraidos(cls, v):
+        if isinstance(v, str):
+            import json
+            try:
+                return json.loads(v)
+            except Exception:
+                return {}
+        return v
+
     model_config = {"from_attributes": True}
 
 
