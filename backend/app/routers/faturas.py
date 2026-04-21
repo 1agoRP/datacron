@@ -1,6 +1,9 @@
 import uuid
 import io
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -191,46 +194,57 @@ async def download_fatura_pdf(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Serves the processed (unlocked) PDF for download."""
+    """Serves the PDF for download. Priority: Supabase Storage → legacy base64 → local file."""
     import os
     import base64
+    from app.storage import get_file_content, get_signed_url
 
     result = await db.execute(select(Fatura).where(Fatura.id == id))
     f = result.scalar_one_or_none()
     if not f:
         raise HTTPException(status_code=404, detail="Fatura não encontrada")
 
-    # Prefer base64 from DB if available
+    filename = f.pdf_nome_original or f"fatura_{id}.pdf"
+
+    # 1. Try Supabase Storage (new preferred method)
+    if f.storage_path:
+        try:
+            pdf_data = await get_file_content(f.storage_path)
+            if pdf_data:
+                return StreamingResponse(
+                    io.BytesIO(pdf_data),
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": f"attachment; filename={filename}"},
+                )
+        except Exception as e:
+            logger.error(f"Supabase Storage download failed for fatura {id}: {e}")
+
+    # 2. Fallback to legacy base64 from database
     if f.pdf_base64:
         try:
             pdf_data = base64.b64decode(f.pdf_base64)
-            filename = f.pdf_nome_original or f"fatura_{id}.pdf"
             return StreamingResponse(
                 io.BytesIO(pdf_data),
                 media_type="application/pdf",
                 headers={"Content-Disposition": f"attachment; filename={filename}"},
             )
         except Exception as e:
-            logger.error(f"Erro ao decodificar base64 da fatura {id}: {e}")
+            logger.error(f"Base64 decode failed for fatura {id}: {e}")
 
-    # Fallback to local path
-    if not f.pdf_path:
-        raise HTTPException(status_code=404, detail="PDF não encontrado para esta fatura")
+    # 3. Fallback to local file on disk
+    if f.pdf_path and os.path.exists(f.pdf_path):
+        def file_iterator(path: str):
+            with open(path, "rb") as file:
+                while chunk := file.read(8192):
+                    yield chunk
 
-    if not os.path.exists(f.pdf_path):
-        raise HTTPException(status_code=404, detail="Arquivo PDF não encontrado no servidor e campo base64 vazio")
+        return StreamingResponse(
+            file_iterator(f.pdf_path),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
 
-    def file_iterator(path: str):
-        with open(path, "rb") as file:
-            while chunk := file.read(8192):
-                yield chunk
-
-    filename = f.pdf_nome_original or f"fatura_{id}.pdf"
-    return StreamingResponse(
-        file_iterator(f.pdf_path),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
+    raise HTTPException(status_code=404, detail="PDF não encontrado para esta fatura")
 
 
 @router.get("/gmail-download/{message_id}")
