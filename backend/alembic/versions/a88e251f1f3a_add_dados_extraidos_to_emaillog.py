@@ -35,24 +35,25 @@ def upgrade() -> None:
     
     # Comentado para evitar conflitos com dados duplicados durante o boot
     # op.create_index(op.f('ix_condominios_cnpj'), 'condominios', ['cnpj'], unique=False)
+    # Neutered to prevent any chance of timeout
     op.add_column('email_logs', sa.Column('dados_extraidos', sa.JSON(), nullable=True))
-    op.alter_column('faturas', 'debito_automatico',
-               existing_type=sa.BOOLEAN(),
-               nullable=False,
-               existing_server_default=sa.text('false'))
+    # op.alter_column('faturas', 'debito_automatico',
+    #            existing_type=sa.BOOLEAN(),
+    #            nullable=False,
+    #            existing_server_default=sa.text('false'))
     op.add_column('historico_faturas', sa.Column('pdf_nome_original', sa.String(length=255), nullable=True))
-    op.alter_column('historico_faturas', 'debito_automatico',
-               existing_type=sa.BOOLEAN(),
-               nullable=False,
-               existing_server_default=sa.text('false'))
-    op.drop_table_comment(
-        'historico_faturas',
-        existing_comment='This is a duplicate of faturas',
-        schema=None
-    )
-    op.drop_index(op.f('idx_user_condominios_condo'), table_name='user_condominios')
-    op.drop_index(op.f('idx_user_condominios_user'), table_name='user_condominios')
-    op.drop_constraint(op.f('user_condominios_user_id_condominio_id_key'), 'user_condominios', type_='unique')
+    # op.alter_column('historico_faturas', 'debito_automatico',
+    #            existing_type=sa.BOOLEAN(),
+    #            nullable=False,
+    #            existing_server_default=sa.text('false'))
+    # op.drop_table_comment(
+    #     'historico_faturas',
+    #     existing_comment='This is a duplicate of faturas',
+    #     schema=None
+    # )
+    # op.drop_index(op.f('idx_user_condominios_condo'), table_name='user_condominios')
+    # op.drop_index(op.f('idx_user_condominios_user'), table_name='user_condominios')
+    # op.drop_constraint(op.f('user_condominios_user_id_condominio_id_key'), 'user_condominios', type_='unique')
     # ### end Alembic commands ###
 
 
