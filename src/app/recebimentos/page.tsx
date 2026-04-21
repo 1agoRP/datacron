@@ -56,7 +56,7 @@ export default function RecebimentosPage() {
         <div>
           <h1 className="dc-page-title">Central de Recebimento</h1>
           <p className="dc-page-subtitle">
-            Status em tempo real do processamento de e-mails e faturas pelo Agente Datacron.
+            Faturas processadas automaticamente pelo Agente Datacron e disponíveis para download.
           </p>
         </div>
         <div className="dc-page-header-actions">
@@ -93,42 +93,11 @@ export default function RecebimentosPage() {
             </div>
           </div>
           <div>
-            <div className="dc-stat-label">FATURAS IDENTIFICADAS</div>
-            <div className="dc-stat-value">{logs.filter(l => l.condominio_nome).length}</div>
+            <div className="dc-stat-label">FATURAS PROCESSADAS</div>
+            <div className="dc-stat-value">{logs.length}</div>
           </div>
         </div>
 
-        <div className="dc-stat-card">
-          <div className="dc-stat-top">
-            <span className="dc-stat-badge" style={{ background: '#ecfeff', color: '#0891b2' }}>Cron</span>
-            <div className="dc-stat-icon" style={{ background: '#ecfeff', color: '#0891b2' }}>
-              <ShieldCheck size={24} />
-            </div>
-          </div>
-          <div>
-            <div className="dc-stat-label">ÚLTIMA VARREDURA</div>
-            <div className="dc-stat-value" style={{ fontSize: '1.65rem' }}>
-              {status?.jobs?.[0]?.next_run ? format(new Date(status.jobs[0].next_run), "HH:mm") : 'Em breve'}
-            </div>
-          </div>
-        </div>
-
-        <div className="dc-stat-card">
-          <div className="dc-stat-top">
-            <span className="dc-stat-badge" style={{ background: '#fef2f2', color: '#dc2626' }}>Falhas</span>
-            <div className="dc-stat-icon" style={{ background: '#fef2f2', color: '#dc2626' }}>
-              <AlertCircle size={24} />
-            </div>
-          </div>
-          <div>
-            <div className="dc-stat-label">ERROS DETECTADOS</div>
-            <div className="dc-stat-value" style={{ color: logs.filter(l => l.status === 'nao_identificado' || l.status === 'erro').length > 0 ? '#dc2626' : '#0f172a' }}>
-              {logs.filter(l => l.status === 'nao_identificado' || l.status === 'erro').length}
-            </div>
-          </div>
-        </div>
-
-        {/* NEW CARDS */}
         <div className="dc-stat-card">
           <div className="dc-stat-top">
             <span className="dc-stat-badge" style={{ background: '#faf5ff', color: '#9333ea' }}>PDFs</span>
@@ -137,8 +106,8 @@ export default function RecebimentosPage() {
             </div>
           </div>
           <div>
-            <div className="dc-stat-label">PDFs EXTRAÍDOS</div>
-            <div className="dc-stat-value">{logs.filter(l => l.fatura_url).length}</div>
+            <div className="dc-stat-label">PDFs DESBLOQUEADOS</div>
+            <div className="dc-stat-value">{logs.filter(l => l.fatura_desbloqueada).length}</div>
           </div>
         </div>
 
@@ -159,15 +128,15 @@ export default function RecebimentosPage() {
 
         <div className="dc-stat-card">
           <div className="dc-stat-top">
-            <span className="dc-stat-badge" style={{ background: '#f0fdf4', color: '#16a34a' }}>%</span>
-            <div className="dc-stat-icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
-              <CheckCircle2 size={24} />
+            <span className="dc-stat-badge" style={{ background: '#ecfeff', color: '#0891b2' }}>Cron</span>
+            <div className="dc-stat-icon" style={{ background: '#ecfeff', color: '#0891b2' }}>
+              <ShieldCheck size={24} />
             </div>
           </div>
           <div>
-            <div className="dc-stat-label">TAXA DE IDENTIFICAÇÃO</div>
-            <div className="dc-stat-value">
-              {logs.length > 0 ? Math.round((logs.filter(l => l.condominio_nome).length / logs.length) * 100) : 0}%
+            <div className="dc-stat-label">PRÓXIMA VARREDURA</div>
+            <div className="dc-stat-value" style={{ fontSize: '1.65rem' }}>
+              {status?.jobs?.[0]?.next_run ? format(new Date(status.jobs[0].next_run), "HH:mm") : 'Em breve'}
             </div>
           </div>
         </div>
@@ -349,7 +318,7 @@ export default function RecebimentosPage() {
 
         {!loading && logs.length === 0 && (
              <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
-                Nenhuma atividade registrada ainda.
+                Nenhuma fatura processada encontrada na sua carteira.
              </div>
         )}
       </div>

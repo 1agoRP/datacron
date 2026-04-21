@@ -18,7 +18,7 @@ from app.models.alerta import Alerta
 from app.models.concessionaria import Concessionaria
 from app.models.fatura import Fatura
 from app.models.condominio import Condominio
-from app.services.email_sender import send_notification_email
+from app.services.email_sender import send_notification_email, render_alert_email
 
 logger = logging.getLogger(__name__)
 
@@ -209,92 +209,96 @@ async def check_missing_bills(db: AsyncSession) -> None:
 
 
 async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura] = None) -> None:
-    """Sends alert details via email to the assigned users for the related condominium."""
+    """
+    Sends an alert notification to the PRIMARY RESPONSIBLE user for the condomínio.
+    Never sends alerts to all users — only to those explicitly assigned to this condo.
+    If no condominio_id is set (unidentified email), no notification is sent here
+    (that responsibility falls on process_email_message).
+    """
     import os
-    from sqlalchemy import select, or_
+    from sqlalchemy import select
     from app.models.condominio import Condominio
-    from app.models.user import User, ROLES_FULL_ACCESS
+    from app.models.user import User
     from app.models.user_condominio import UserCondominio
 
-    # 1. Determine recipients
+    # Alertas sem condomínio não disparam notificação em massa
+    if not alert.condominio_id:
+        logger.info(f"Alert {alert.id} has no condominio_id — skipping mass notification.")
+        return
+
+    # 1. Buscar APENAS o responsável principal do cond (primeiro usuário ativo vinculado)
+    res = await db.execute(
+        select(User)
+        .join(UserCondominio, UserCondominio.user_id == User.id)
+        .where(
+            UserCondominio.condominio_id == alert.condominio_id,
+            User.ativo == True,
+        )
+        .order_by(User.created_at.asc())  # o mais antigo é o principal
+        .limit(1)
+    )
+    primary_user = res.scalar_one_or_none()
+
+    # 2. Também incluir admins
+    res_admins = await db.execute(
+        select(User).where(User.role == "admin", User.ativo == True)
+    )
+    admins = res_admins.scalars().all()
+
     recipients = set()
-    
-    if alert.condominio_id:
-        # Find users with access to this specific condo
-        stmt = (
-            select(User.email)
-            .join(UserCondominio)
-            .where(
-                UserCondominio.condominio_id == alert.condominio_id,
-                User.ativo == True,
-                User.role.in_(ROLES_FULL_ACCESS)
-            )
-        )
-        res = await db.execute(stmt)
-        recipients.update(res.scalars().all())
-        
-        # Also include users with global access ("todos" or "admin" role)
-        stmt_global = select(User.email).where(
-            User.ativo == True,
-            or_(User.role == "admin", User.codigo_condominio == "todos")
-        )
-        res_global = await db.execute(stmt_global)
-        recipients.update(res_global.scalars().all())
-    
-    # If no specific users found (e.g. unidentified email or no mappings)
-    if not recipients:
-        stmt_fallback = select(User.email).where(
-            User.ativo == True,
-            User.role.in_(ROLES_FULL_ACCESS)
-        )
-        res_fallback = await db.execute(stmt_fallback)
-        recipients.update(res_fallback.scalars().all())
+    if primary_user:
+        recipients.add(primary_user.email)
+    for admin in admins:
+        recipients.add(admin.email)
 
-    # Final fallback if still empty
     if not recipients:
-        recipients.add("assistente.gerencia4@propstarter.com.br")
+        logger.warning(f"No recipients found for alert {alert.id} on condo {alert.condominio_id}")
+        return
 
-    # 2. Gather context
+    # 3. Buscar contexto
     condo = None
     if alert.condominio_id:
         res = await db.execute(select(Condominio).where(Condominio.id == alert.condominio_id))
         condo = res.scalar_one_or_none()
-    
-    condo_name = condo.nome if condo else "Sistema"
-    subject = f"🔔 ALERTA [{alert.tipo.replace('_', ' ').upper()}] - {condo_name}"
-    
-    body = [
-        f"Alerta gerado no Datacron:",
-        f"",
-        f"Tipo: {alert.tipo.upper()}",
-        f"Gravidade: {alert.gravidade.upper()}",
-        f"Mensagem: {alert.mensagem}",
-        f"",
-    ]
 
-    # Add Email Metadata if present
-    if alert.email_remetente or alert.email_assunto:
-        body.extend([
-            f"--- Detalhes do E-mail Original ---",
-            f"Remetente: {alert.email_remetente or 'N/D'}",
-            f"Assunto: {alert.email_assunto or 'N/D'}",
-            f"Data: {alert.email_data.strftime('%d/%m/%Y %H:%M') if alert.email_data else 'N/D'}",
-            f"",
-        ])
-    
+    condo_name = condo.nome if condo else "Sistema"
+    subject = f"🔔 Datacron — {alert.tipo.replace('_', ' ').title()} | {condo_name}"
+
+    # 4. Montar corpo em texto simples (fallback)
+    message_text = (
+        f"Alerta Datacron\n\n"
+        f"Tipo: {alert.tipo}\n"
+        f"Gravidade: {alert.gravidade}\n"
+        f"Condomínio: {condo_name}\n"
+        f"Mensagem: {alert.mensagem}\n"
+    )
+    if fatura:
+        message_text += (
+            f"\nFatura:\n"
+            f"  Referência: {fatura.referencia}\n"
+            f"  Valor: R$ {fatura.valor:.2f}\n"
+            f"  Vencimento: {fatura.vencimento}\n"
+        )
+
+    # 5. Montar HTML rico
+    html_body = render_alert_email(
+        tipo=alert.tipo,
+        gravidade=alert.gravidade,
+        mensagem=alert.mensagem,
+        condo_nome=condo_name,
+        email_remetente=getattr(alert, "email_remetente", None),
+        email_assunto=getattr(alert, "email_assunto", None),
+        email_data=getattr(alert, "email_data", None),
+        fatura_referencia=fatura.referencia if fatura else None,
+        fatura_valor=fatura.valor if fatura else None,
+        fatura_vencimento=fatura.vencimento if fatura else None,
+    )
+
+    # 6. Anexar PDF se disponível
     attachments = []
     in_reply_to = None
-    
     if fatura:
-        body.extend([
-            f"Fatura Relacionada:",
-            f"- Referência: {fatura.referencia}",
-            f"- Valor: R$ {fatura.valor:.2f}",
-            f"- Vencimento: {fatura.vencimento.strftime('%d/%m/%Y') if fatura.vencimento else 'N/D'}",
-            f"",
-        ])
         in_reply_to = fatura.gmail_message_id
-        
         if fatura.pdf_desbloqueado and fatura.pdf_path and os.path.exists(fatura.pdf_path):
             try:
                 with open(fatura.pdf_path, "rb") as f:
@@ -302,20 +306,18 @@ async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura]
             except Exception as e:
                 logger.error(f"Failed to read PDF for attachment: {e}")
 
-    body.append("Por favor, verifique a Central de Alertas no painel administrativo.")
-    message_text = "\n".join(body)
-    
-    # 3. Send to all identified users
+    # 7. Enviar
     for email in recipients:
         success = send_notification_email(
             to=email,
             subject=subject,
             message_text=message_text,
+            html_body=html_body,
             in_reply_to=in_reply_to,
-            attachments=attachments if attachments else None
+            attachments=attachments if attachments else None,
         )
         if success:
-            logger.info(f"Notification for alert {alert.id} sent to {email}.")
+            logger.info(f"Alert notification sent to {email} for alert {alert.id}.")
         else:
             logger.error(f"Failed to send alert notification to {email}.")
 

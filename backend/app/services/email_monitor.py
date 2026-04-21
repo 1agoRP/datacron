@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.models.user import User
 from app.models.alerta import Alerta, EmailLog
 from app.models.concessionaria import Concessionaria
 from app.models.condominio import Condominio
@@ -39,6 +40,36 @@ from app.storage import save_file as storage_save_file
 from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
+
+
+# ── Sender Validation Helpers ───────────────────────────────────────────
+async def _is_known_user_sender(sender_email: str, db: AsyncSession) -> bool:
+    """
+    Returns True if the sender is a registered and active user in the system.
+    Used to decide whether to send a 'not identified' reply.
+    """
+    result = await db.execute(
+        select(User).where(
+            User.email.ilike(sender_email.strip()),
+            User.ativo == True
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def _is_concessionaria_domain(sender_email: str, db: AsyncSession) -> bool:
+    """
+    Returns True if the sender's email domain matches any registered concessionária.
+    Used to allow e-mails from energy/water companies even without being system users.
+    """
+    domain = sender_email.split('@')[-1].lower()
+    result = await db.execute(
+        select(Concessionaria).where(
+            Concessionaria.email_esperado.ilike(f"%@{domain}%"),
+            Concessionaria.ativo == True
+        )
+    )
+    return result.scalar_one_or_none() is not None
 
 
 def get_imap_connection():
@@ -335,6 +366,18 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
     body_text = re.sub(r'<[^>]+>', ' ', raw_body)
     body_text = re.sub(r'\s+', ' ', body_text)
     
+    # ── GATE: verificar se o remetente é conhecido ─────────────────────
+    is_known_user = await _is_known_user_sender(sender, db)
+    is_conc_domain = await _is_concessionaria_domain(sender, db)
+
+    if not is_known_user and not is_conc_domain:
+        logger.info(
+            f"[IGNORE] E-mail de remetente desconhecido ignorado silenciosamente: '{sender}' "
+            f"(assunto: '{subject}'). Não consta em users nem em concessionárias cadastradas."
+        )
+        return None  # Para aqui — sem EmailLog, sem alerta, sem nada
+    # ──────────────────────────────────────────────────────────────────────
+
     existing_log = await db.execute(
         select(EmailLog).where(EmailLog.gmail_message_id == msg_id)
     )
@@ -373,18 +416,28 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         email_log.condominio_id = conc.condominio_id
     else:
         logger.warning(f"Sender '{sender}' not matched to any concessionaria")
-        alert = Alerta(
-            tipo="email_nao_identificado",
-            gravidade="media",
-            mensagem=f"E-mail recebido de '{sender}' com assunto '{subject}' nao foi identificado como concessionaria cadastrada.",
-            email_remetente=sender,
-            email_assunto=subject,
-            email_data=received_at
-        )
-        db.add(alert)
-        await db.flush()
-        from app.services.alert_manager import notify_alert
-        await notify_alert(db, alert)
+
+        # Somente notifica o próprio remetente se ele for usuário cadastrado
+        if is_known_user:
+            from app.services.email_sender import send_notification_email, render_not_identified_email
+            html = render_not_identified_email(
+                sender_name=sender,
+                original_subject=subject,
+                original_body=body_text,
+                received_at=received_at,
+            )
+            send_notification_email(
+                to=sender,
+                subject="Datacron: E-mail não identificado",
+                message_text=(
+                    f"Olá,\n\nRecebemos o e-mail que você encaminhou mas não conseguimos "
+                    f"identificar o condomínio automaticamente.\n\n"
+                    f"Assunto original: {subject}\n"
+                    f"Acesse o painel para vincular manualmente.\n\nEquipe Datacron"
+                ),
+                html_body=html,
+            )
+            logger.info(f"'Não identificado' reply sent to known user: {sender}")
 
     password = ""
     condo: Optional[Condominio] = None
