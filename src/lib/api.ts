@@ -218,6 +218,10 @@ class ApiClient {
     });
   }
 
+  async getStatusContas(condominioId: string) {
+    return this.request<any[]>(`/condominios/${condominioId}/status-contas`);
+  }
+
   async uploadAtaEleicao(id: string, formData: FormData) {
     return this.requestMultipart(`/condominios/${id}/ata-eleicao`, formData, { method: 'POST' });
   }

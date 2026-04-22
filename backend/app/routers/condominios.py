@@ -106,6 +106,75 @@ async def list_condominios(
     return responses
 
 
+@router.get("/{id}/status-contas")
+async def get_status_contas(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
+):
+    """Returns concessionárias with matched faturas for the current month (single query)."""
+    from app.models.concessionaria import Concessionaria
+
+    if allowed_condo_ids is not None and id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
+
+    # 1. Get active concessionárias for this condo
+    conc_result = await db.execute(
+        select(Concessionaria)
+        .where(Concessionaria.condominio_id == id, Concessionaria.ativo == True)
+        .order_by(Concessionaria.tipo)
+    )
+    concs = conc_result.scalars().all()
+
+    if not concs:
+        return []
+
+    # 2. Get faturas for this condo, current month
+    now = datetime.now()
+    fat_result = await db.execute(
+        select(Fatura)
+        .where(
+            Fatura.condominio_id == id,
+            extract("year", Fatura.created_at) == now.year,
+            extract("month", Fatura.created_at) == now.month,
+        )
+        .order_by(Fatura.created_at.desc())
+    )
+    faturas = fat_result.scalars().all()
+
+    # 3. Build a map: concessionaria_id -> first matching fatura
+    fatura_map = {}
+    for f in faturas:
+        if f.concessionaria_id and f.concessionaria_id not in fatura_map:
+            fatura_map[f.concessionaria_id] = f
+
+    # 4. Build response
+    items = []
+    for c in concs:
+        fat = fatura_map.get(c.id)
+        items.append({
+            "concessionaria": {
+                "id": str(c.id),
+                "tipo": c.tipo,
+                "nome_personalizado": getattr(c, "nome_personalizado", None),
+                "instalacao": c.instalacao,
+                "dia_vencimento": c.dia_vencimento,
+            },
+            "fatura": {
+                "id": str(fat.id),
+                "valor": fat.valor,
+                "created_at": fat.created_at.isoformat() if fat.created_at else None,
+                "pdf_nome_original": fat.pdf_nome_original,
+                "storage_path": fat.storage_path,
+                "concessionaria_id": str(fat.concessionaria_id) if fat.concessionaria_id else None,
+            } if fat else None,
+        })
+
+    # Sort: received first, then by tipo
+    items.sort(key=lambda x: (0 if x["fatura"] else 1, x["concessionaria"]["tipo"] or ""))
+    return items
+
 
 @router.post("", response_model=CondominioResponse, status_code=201)
 async def create_condominio(

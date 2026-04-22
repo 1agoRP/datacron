@@ -264,45 +264,12 @@ export default function CondominiosPage() {
     setStatusItems([]);
 
     try {
-      const condoId = String(condo.id).trim();
-
-      // Fetch concessionaires and invoices in parallel for speed
-      const [concsResult, invoicesResult] = await Promise.allSettled([
-        api.getConcessionarias({ condominio_id: condoId }),
-        api.getFaturas({ condominio_id: condoId, limit: 100 }),
-      ]);
-
-      if (concsResult.status === 'rejected') {
-        const msg = concsResult.reason?.message || '';
-        throw new Error(msg.includes('fetch') ? 'Servidor indisponível. Tente novamente em alguns segundos.' : msg || 'Erro ao buscar concessionárias');
-      }
-
-      const allConcs = concsResult.value;
-      const concs = allConcs.filter((c: any) => c.ativo === true || String(c.ativo) === 'true' || c.ativo === undefined);
-
-      // Invoices may fail independently — still show concs as "Pendente"
-      let currentMonthInvoices: any[] = [];
-      if (invoicesResult.status === 'fulfilled') {
-        const now = new Date();
-        currentMonthInvoices = (invoicesResult.value || []).filter((f: any) => {
-          if (!f.created_at) return false;
-          const d = new Date(f.created_at);
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        });
-      }
-
-      const items = concs.map((c: any) => {
-        const matchingFatura = currentMonthInvoices.find((f: any) => f.concessionaria_id === c.id);
-        return { concessionaria: c, fatura: matchingFatura || null };
-      }).sort((a: any, b: any) => {
-        if (!!a.fatura !== !!b.fatura) return a.fatura ? -1 : 1;
-        return (a.concessionaria.tipo || '').localeCompare(b.concessionaria.tipo || '');
-      });
-
+      const items = await api.getStatusContas(String(condo.id));
       setStatusItems(items);
     } catch (err: any) {
       console.error('Error loading status details:', err);
-      setStatusError(err.message || 'Falha ao carregar dados');
+      const msg = err.message || '';
+      setStatusError(msg.includes('fetch') ? 'Servidor indisponível. Tente novamente em alguns segundos.' : msg || 'Falha ao carregar dados');
     } finally {
       setLoadingStatus(false);
     }
