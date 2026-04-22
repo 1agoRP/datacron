@@ -185,19 +185,19 @@ export default function CondominiosPage() {
       if (type === 'ata') {
         await api.uploadAtaEleicao(condoId, formData);
         if (detailsCondo && detailsCondo.id === condoId) {
-           setDetailsCondo({ ...detailsCondo, ata_eleicao_nome: docUploadFile.name, ata_eleicao_inicio: docDates.inicio, ata_eleicao_fim: docDates.fim });
+          setDetailsCondo({ ...detailsCondo, ata_eleicao_nome: docUploadFile.name, ata_eleicao_inicio: docDates.inicio, ata_eleicao_fim: docDates.fim });
         }
         alert('ATA enviada com sucesso!');
       } else if (type === 'avcb') {
         await api.uploadAvcb(condoId, formData);
         if (detailsCondo && detailsCondo.id === condoId) {
-           setDetailsCondo({ ...detailsCondo, avcb_url: 'uploaded', avcb_inicio: docDates.inicio, avcb_fim: docDates.fim });
+          setDetailsCondo({ ...detailsCondo, avcb_url: 'uploaded', avcb_inicio: docDates.inicio, avcb_fim: docDates.fim });
         }
         alert('AVCB enviado com sucesso!');
       } else if (type === 'apolice') {
         await api.uploadApoliceSeguro(condoId, formData);
         if (detailsCondo && detailsCondo.id === condoId) {
-           setDetailsCondo({ ...detailsCondo, apolice_seguro_url: 'uploaded', apolice_seguro_inicio: docDates.inicio, apolice_seguro_fim: docDates.fim });
+          setDetailsCondo({ ...detailsCondo, apolice_seguro_url: 'uploaded', apolice_seguro_inicio: docDates.inicio, apolice_seguro_fim: docDates.fim });
         }
         alert('Apólice enviada com sucesso!');
       }
@@ -214,20 +214,20 @@ export default function CondominiosPage() {
   const handleDeleteDoc = async (condoId: string, type: 'ata' | 'avcb' | 'apolice') => {
     if (!confirm('Deseja realmente excluir este documento?')) return;
     try {
-        if (type === 'ata') {
-            await api.deleteAtaEleicao(condoId);
-            if (detailsCondo) setDetailsCondo({ ...detailsCondo, ata_eleicao_nome: null, ata_eleicao_inicio: null, ata_eleicao_fim: null });
-        } else if (type === 'avcb') {
-            await api.deleteAvcb(condoId);
-            if (detailsCondo) setDetailsCondo({ ...detailsCondo, avcb_url: null, avcb_inicio: null, avcb_fim: null });
-        } else if (type === 'apolice') {
-            await api.deleteApoliceSeguro(condoId);
-            if (detailsCondo) setDetailsCondo({ ...detailsCondo, apolice_seguro_url: null, apolice_seguro_inicio: null, apolice_seguro_fim: null });
-        }
-        mutate();
-        alert('Documento excluído com sucesso.');
+      if (type === 'ata') {
+        await api.deleteAtaEleicao(condoId);
+        if (detailsCondo) setDetailsCondo({ ...detailsCondo, ata_eleicao_nome: null, ata_eleicao_inicio: null, ata_eleicao_fim: null });
+      } else if (type === 'avcb') {
+        await api.deleteAvcb(condoId);
+        if (detailsCondo) setDetailsCondo({ ...detailsCondo, avcb_url: null, avcb_inicio: null, avcb_fim: null });
+      } else if (type === 'apolice') {
+        await api.deleteApoliceSeguro(condoId);
+        if (detailsCondo) setDetailsCondo({ ...detailsCondo, apolice_seguro_url: null, apolice_seguro_inicio: null, apolice_seguro_fim: null });
+      }
+      mutate();
+      alert('Documento excluído com sucesso.');
     } catch (err: any) {
-        alert(err.message || 'Erro ao excluir documento');
+      alert(err.message || 'Erro ao excluir documento');
     }
   };
 
@@ -854,7 +854,7 @@ export default function CondominiosPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       {historyFaturas.map(f => {
                         const hasAutoDebit = f.debito_automatico === true || String(f.debito_automatico) === 'true';
-                        
+
                         return (
                           <div key={f.id} style={{
                             display: 'flex',
@@ -868,14 +868,14 @@ export default function CondominiosPage() {
                             transition: 'transform 0.2s'
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                              <div style={{ 
-                                width: 48, 
-                                height: 48, 
-                                borderRadius: 12, 
-                                background: '#f0fdf4', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center', 
+                              <div style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 12,
+                                background: '#f0fdf4',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                                 color: '#10b981',
                                 border: '1px solid #d1fae5'
                               }}>
@@ -891,14 +891,14 @@ export default function CondominiosPage() {
                                   <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#cbd5e1' }} />
                                   <span>Registrado em {f.created_at ? format(new Date(f.created_at), 'dd/MM/yyyy') : '—'}</span>
                                 </div>
-                                
+
                                 {f.email_remetente && (
-                                  <div style={{ 
-                                    fontSize: '0.75rem', 
-                                    color: '#94a3b8', 
-                                    marginTop: 6, 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
+                                  <div style={{
+                                    fontSize: '0.75rem',
+                                    color: '#94a3b8',
+                                    marginTop: 6,
+                                    display: 'flex',
+                                    alignItems: 'center',
                                     gap: 5,
                                     borderTop: '1px dashed #f1f5f9',
                                     paddingTop: 6
@@ -911,21 +911,21 @@ export default function CondominiosPage() {
                                 )}
                               </div>
                             </div>
-                            
+
                             <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                               <div style={{ textAlign: 'right' }}>
                                 <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>{formatCurrencyCeil(f.valor || 0)}</div>
                                 <div style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 700 }}>PROCESSADA</div>
                               </div>
-                              <button 
+                              <button
                                 onClick={() => handleDownloadFatura(f, f.pdf_nome_original || `fatura_${f.referencia}.pdf`, 'sistema')}
                                 className="dc-btn"
-                                style={{ 
-                                  height: 44, 
-                                  width: 44, 
-                                  padding: 0, 
-                                  borderRadius: 12, 
-                                  background: '#fff', 
+                                style={{
+                                  height: 44,
+                                  width: 44,
+                                  padding: 0,
+                                  borderRadius: 12,
+                                  background: '#fff',
                                   border: '1px solid #e2e8f0',
                                   color: '#0f172a',
                                   boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
@@ -1015,11 +1015,11 @@ export default function CondominiosPage() {
                             style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                             title={detailsCondo.ata_eleicao_nome || ''}
                           >
-                            {detailsCondo.ata_eleicao_nome ? detailsCondo.ata_eleicao_nome : 'Nenhum documento enviado.'}
+                            {detailsCondo.ata_eleicao_nome ? 'Documento vinculado' : 'Nenhum documento enviado.'}
                           </div>
                           {detailsCondo.ata_eleicao_nome && detailsCondo.ata_eleicao_inicio && detailsCondo.ata_eleicao_fim && (
                             <div style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                               <Calendar size={12} /> Vigência: {format(new Date(String(detailsCondo.ata_eleicao_inicio).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(String(detailsCondo.ata_eleicao_fim).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')}
+                              <Calendar size={12} /> Vigência: {format(new Date(String(detailsCondo.ata_eleicao_inicio).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(String(detailsCondo.ata_eleicao_fim).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')}
                             </div>
                           )}
                         </div>
@@ -1062,7 +1062,7 @@ export default function CondominiosPage() {
                           </div>
                           {detailsCondo.avcb_url && detailsCondo.avcb_inicio && detailsCondo.avcb_fim && (
                             <div style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                               <Calendar size={12} /> Vigência: {format(new Date(String(detailsCondo.avcb_inicio).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(String(detailsCondo.avcb_fim).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')}
+                              <Calendar size={12} /> Vigência: {format(new Date(String(detailsCondo.avcb_inicio).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(String(detailsCondo.avcb_fim).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')}
                             </div>
                           )}
                         </div>
@@ -1105,7 +1105,7 @@ export default function CondominiosPage() {
                           </div>
                           {detailsCondo.apolice_seguro_url && detailsCondo.apolice_seguro_inicio && detailsCondo.apolice_seguro_fim && (
                             <div style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                               <Calendar size={12} /> Vigência: {format(new Date(String(detailsCondo.apolice_seguro_inicio).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(String(detailsCondo.apolice_seguro_fim).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')}
+                              <Calendar size={12} /> Vigência: {format(new Date(String(detailsCondo.apolice_seguro_inicio).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(String(detailsCondo.apolice_seguro_fim).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')}
                             </div>
                           )}
                         </div>
@@ -1375,7 +1375,7 @@ export default function CondominiosPage() {
             <div className="dc-modal-footer">
               <button className="dc-btn dc-btn-secondary" onClick={() => { setDocUploadModal(null); setDocUploadFile(null); }}>Cancelar</button>
               <button className="dc-btn dc-btn-primary" onClick={confirmDocUpload} disabled={uploadingDoc} style={{ minWidth: 140 }}>
-                 {uploadingDoc ? 'Enviando...' : 'Confirmar e Enviar'}
+                {uploadingDoc ? 'Enviando...' : 'Confirmar e Enviar'}
               </button>
             </div>
           </div>
