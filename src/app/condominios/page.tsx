@@ -1019,7 +1019,7 @@ export default function CondominiosPage() {
                           </div>
                           {detailsCondo.ata_eleicao_nome && detailsCondo.ata_eleicao_inicio && detailsCondo.ata_eleicao_fim && (
                             <div style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                               <Calendar size={12} /> Vigência: {format(new Date(detailsCondo.ata_eleicao_inicio + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(detailsCondo.ata_eleicao_fim + 'T12:00:00'), 'dd/MM/yyyy')}
+                               <Calendar size={12} /> Vigência: {format(new Date(String(detailsCondo.ata_eleicao_inicio).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(String(detailsCondo.ata_eleicao_fim).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')}
                             </div>
                           )}
                         </div>
@@ -1062,7 +1062,7 @@ export default function CondominiosPage() {
                           </div>
                           {detailsCondo.avcb_url && detailsCondo.avcb_inicio && detailsCondo.avcb_fim && (
                             <div style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                               <Calendar size={12} /> Vigência: {format(new Date(detailsCondo.avcb_inicio + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(detailsCondo.avcb_fim + 'T12:00:00'), 'dd/MM/yyyy')}
+                               <Calendar size={12} /> Vigência: {format(new Date(String(detailsCondo.avcb_inicio).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(String(detailsCondo.avcb_fim).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')}
                             </div>
                           )}
                         </div>
@@ -1105,7 +1105,7 @@ export default function CondominiosPage() {
                           </div>
                           {detailsCondo.apolice_seguro_url && detailsCondo.apolice_seguro_inicio && detailsCondo.apolice_seguro_fim && (
                             <div style={{ fontSize: '0.72rem', color: '#3b82f6', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                               <Calendar size={12} /> Vigência: {format(new Date(detailsCondo.apolice_seguro_inicio + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(detailsCondo.apolice_seguro_fim + 'T12:00:00'), 'dd/MM/yyyy')}
+                               <Calendar size={12} /> Vigência: {format(new Date(String(detailsCondo.apolice_seguro_inicio).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')} até {format(new Date(String(detailsCondo.apolice_seguro_fim).substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy')}
                             </div>
                           )}
                         </div>
