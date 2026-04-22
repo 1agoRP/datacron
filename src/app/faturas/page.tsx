@@ -11,6 +11,9 @@ import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import useSWR from 'swr';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function FaturasPage() {
   const { data: faturas = [], isLoading: loading } = useSWR(
@@ -18,6 +21,15 @@ export default function FaturasPage() {
     () => api.getFaturas(),
     { revalidateOnFocus: true }
   );
+  const { user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      router.replace('/dashboard');
+    }
+  }, [user, router]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(''); // e.g., "01", "02", ...

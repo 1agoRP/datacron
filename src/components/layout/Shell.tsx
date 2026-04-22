@@ -18,14 +18,14 @@ const allNav = [
   { href: '/contratos',      icon: FileSignature,label: 'Contratos',        module: null },
   { href: '/reajustes',      icon: TrendingUp,   label: 'Reajustes',        module: null },
   { href: '/recebimentos',   icon: Mail,         label: 'Recebimentos',     module: 'gmail' },
-  { href: '/faturas',        icon: FileText,     label: 'Faturas',          module: null },
+  { href: '/faturas',        icon: FileText,     label: 'Faturas',          module: 'faturas' },
   { href: '/alertas',        icon: AlertCircle,  label: 'Alertas',          module: null },
   { href: '/relatorios',     icon: BarChart2,    label: 'Relatórios',       module: 'relatorios' },
   { href: '/importacoes',    icon: Download,     label: 'Importações',      module: 'importacoes' },
   { href: '/configuracoes',  icon: Settings,     label: 'Configurações',    module: null },
 ];
 
-const ADMIN_ONLY_MODULES = new Set(['relatorios', 'importacoes', 'notificacoes', 'gmail']);
+const ADMIN_ONLY_MODULES = new Set(['relatorios', 'importacoes', 'notificacoes', 'gmail', 'faturas']);
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',
@@ -53,7 +53,6 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
     const role = user?.role || 'geral';
     if (role === 'admin') return allNav;
     return allNav.filter(item => {
-      if (item.module === 'gmail' && (role === 'gerencia' || role === 'assistente')) return true;
       if (item.module && ADMIN_ONLY_MODULES.has(item.module)) return false;
       return true;
     });

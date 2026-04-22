@@ -11,7 +11,9 @@ import { api, API_BASE_URL } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import useSWR from 'swr';
-
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 export default function RecebimentosPage() {
   // SWR for logs and status — automatic cache + background revalidation
   const { data: logs = [], isLoading: loading, mutate: mutateLogs } = useSWR(
@@ -24,6 +26,16 @@ export default function RecebimentosPage() {
     () => api.getAgentStatus(),
     { revalidateOnFocus: true }
   );
+  
+  const { user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      router.replace('/dashboard');
+    }
+  }, [user, router]);
+
   const { data: inboxData, mutate: mutateInbox } = useSWR(
     'inboxCount',
     () => api.getInboxCount(),
