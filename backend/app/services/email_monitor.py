@@ -590,7 +590,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
     return condo_name
 
 
-def _standardize_referencia(raw_ref: str | None, fallback_date: Optional[date] = None) -> str:
+def _standardize_referencia(raw_ref: Optional[str], fallback_date: Optional[date] = None) -> str:
     """Standardizes billing reference to 'Mês/Ano' format (e.g. Janeiro/2026)."""
     import re
     months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
