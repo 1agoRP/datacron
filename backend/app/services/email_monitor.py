@@ -511,7 +511,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             except ValueError:
                 pass
 
-        referencia = extracted.get("referencia") or _guess_referencia()
+        referencia = _standardize_referencia(extracted.get("referencia"), vencimento)
 
         fatura = Fatura(
             condominio_id=conc.condominio_id if conc else None,
@@ -590,12 +590,31 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
     return condo_name
 
 
-def _guess_referencia() -> str:
-    """Guesses billing reference as current month/year."""
-    now = datetime.now()
+def _standardize_referencia(raw_ref: str | None, fallback_date: Optional[date] = None) -> str:
+    """Standardizes billing reference to 'Mês/Ano' format (e.g. Janeiro/2026)."""
+    import re
     months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
               "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
-    return f"{months[now.month - 1]}/{now.year}"
+    
+    if raw_ref:
+        raw_ref = str(raw_ref).strip()
+        # Handle MM/YYYY or MM-YYYY
+        m = re.match(r"^(\d{1,2})[/\-](\d{4})$", raw_ref)
+        if m:
+            month, year = int(m.group(1)), int(m.group(2))
+            if 1 <= month <= 12:
+                return f"{months[month - 1]}/{year}"
+        
+        # Handle textual like Fev/2026 or Fevereiro/2026
+        m = re.match(r"^([a-zA-ZçÇ]+)[/\-](\d{4})$", raw_ref)
+        if m:
+            month_str, year = m.group(1).lower(), int(m.group(2))
+            for i, month_name in enumerate(months):
+                if month_name.lower().startswith(month_str[:3]):
+                    return f"{months[i]}/{year}"
+
+    dt = fallback_date or datetime.now()
+    return f"{months[dt.month - 1]}/{dt.year}"
 
 
 async def run_email_scan():
