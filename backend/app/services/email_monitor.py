@@ -14,7 +14,7 @@ import logging
 import os
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from pathlib import Path
 from typing import Optional
 
