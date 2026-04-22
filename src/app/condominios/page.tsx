@@ -1265,6 +1265,15 @@ export default function CondominiosPage() {
                         <div>
                           <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>
                             {item.concessionaria.tipo === 'Outros' ? item.concessionaria.nome_personalizado : item.concessionaria.tipo}
+                            {item.concessionaria.instalacao && (
+                              <span style={{ fontWeight: 500, color: '#64748b', fontSize: '0.85rem', marginLeft: 8 }}>
+                                {(() => {
+                                  if (item.concessionaria.tipo === 'Sabesp') return `(Fornecimento: ${item.concessionaria.instalacao})`;
+                                  if (item.concessionaria.tipo === 'Enel' || item.concessionaria.tipo === 'Comgás') return `(Instalação: ${item.concessionaria.instalacao})`;
+                                  return `(Código: ${item.concessionaria.instalacao})`;
+                                })()}
+                              </span>
+                            )}
                           </div>
                           <div style={{ fontSize: '0.85rem', color: item.fatura ? '#059669' : '#64748b', fontWeight: 500 }}>
                             {item.fatura ? `Recebida em ${format(new Date(item.fatura.created_at), 'dd/MM/yyyy')}` : `Vencimento planejado: Dia ${item.concessionaria.dia_vencimento}`}
