@@ -86,7 +86,10 @@ export default function LandingPage() {
       await login({ email, senha: password });
       clearTimeout(timeout);
       clearTimeout(warningTimeout);
-      router.push('/dashboard');
+      
+      const searchParams = new URL(window.location.href).searchParams;
+      const redirectPath = searchParams.get('redirect') || '/dashboard';
+      window.location.href = redirectPath;
     } catch (err: unknown) {
       clearTimeout(timeout);
       clearTimeout(warningTimeout);
