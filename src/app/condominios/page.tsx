@@ -264,35 +264,37 @@ export default function CondominiosPage() {
     setStatusItems([]);
 
     try {
-      // Small delay to ensure modal transition doesn't interfere with main thread
-      await new Promise(r => setTimeout(r, 100));
-
       const condoId = String(condo.id).trim();
 
-      // 1. Fetch concessionaires for this condo
-      const allConcs = await api.getConcessionarias({ condominio_id: condoId });
+      // Fetch concessionaires and invoices in parallel for speed
+      const [concsResult, invoicesResult] = await Promise.allSettled([
+        api.getConcessionarias({ condominio_id: condoId }),
+        api.getFaturas({ condominio_id: condoId, limit: 100 }),
+      ]);
 
-      // Filter active ones locally
-      const concs = allConcs.filter(c => c.ativo === true || String(c.ativo) === 'true' || c.ativo === undefined);
+      if (concsResult.status === 'rejected') {
+        const msg = concsResult.reason?.message || '';
+        throw new Error(msg.includes('fetch') ? 'Servidor indisponível. Tente novamente em alguns segundos.' : msg || 'Erro ao buscar concessionárias');
+      }
 
-      // 2. Get invoices received this month for this condo
-      const now = new Date();
-      const allInvoices = await api.getFaturas({ condominio_id: condo.id });
+      const allConcs = concsResult.value;
+      const concs = allConcs.filter((c: any) => c.ativo === true || String(c.ativo) === 'true' || c.ativo === undefined);
 
-      const currentMonthInvoices = allInvoices.filter((f: any) => {
-        if (!f.created_at) return false;
-        const d = new Date(f.created_at);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      });
+      // Invoices may fail independently — still show concs as "Pendente"
+      let currentMonthInvoices: any[] = [];
+      if (invoicesResult.status === 'fulfilled') {
+        const now = new Date();
+        currentMonthInvoices = (invoicesResult.value || []).filter((f: any) => {
+          if (!f.created_at) return false;
+          const d = new Date(f.created_at);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+      }
 
-      // 3. Merge
       const items = concs.map((c: any) => {
         const matchingFatura = currentMonthInvoices.find((f: any) => f.concessionaria_id === c.id);
-        return {
-          concessionaria: c,
-          fatura: matchingFatura || null
-        };
-      }).sort((a, b) => {
+        return { concessionaria: c, fatura: matchingFatura || null };
+      }).sort((a: any, b: any) => {
         if (!!a.fatura !== !!b.fatura) return a.fatura ? -1 : 1;
         return (a.concessionaria.tipo || '').localeCompare(b.concessionaria.tipo || '');
       });
