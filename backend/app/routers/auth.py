@@ -70,7 +70,6 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
             "email": user.email, 
             "role": user.role, 
             "nome": user.nome, 
-            "condominios_ids": condo_ids
         },
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
