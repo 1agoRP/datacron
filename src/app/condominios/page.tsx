@@ -388,8 +388,6 @@ export default function CondominiosPage() {
     try {
       setCreating(true);
       const payload: any = {
-        nome: editCondo.nome,
-        endereco: editCondo.endereco,
         sindico: editCondo.sindico,
         cpf_sindico: editCondo.cpf_sindico,
         mandato_inicio: editCondo.mandato_inicio,
@@ -398,6 +396,8 @@ export default function CondominiosPage() {
       };
 
       if (isAdmin) {
+        payload.nome = editCondo.nome;
+        payload.endereco = editCondo.endereco;
         payload.numero = editCondo.numero;
         payload.cnpj = editCondo.cnpj;
       }

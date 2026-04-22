@@ -113,14 +113,14 @@ async def get_user_condo_ids(
     db: AsyncSession = Depends(get_db),
 ) -> list[uuid.UUID] | None:
     """Returns list of condominio IDs the user can access.
-    Returns None if the user is admin (unrestricted access)."""
-    if user.role == "admin":
+    Returns None if the user is admin or supervisor (unrestricted access)."""
+    if user.role in ("admin", "supervisor"):
         return None
 
     from app.models.condominio import Condominio
     from app.models.user_condominio import UserCondominio
     
-    if user.role == 'admin':
+    if user.role in ('admin', 'supervisor'):
         return None
         
     final_ids = set()

@@ -11,13 +11,13 @@ if TYPE_CHECKING:
     from app.models.user_condominio import UserCondominio
 
 # Valid roles for the system
-VALID_ROLES = {"admin", "gerencia", "assistente", "contabilidade", "financeiro", "providencias", "geral"}
+VALID_ROLES = {"admin", "supervisor", "gerencia", "assistente", "concessionarias", "contabilidade", "orçamento", "emissao", "financeiro", "providencias", "geral"}
 
 # Roles that have full read+write access (except admin-only modules)
-ROLES_FULL_ACCESS = {"admin", "gerencia", "assistente"}
+ROLES_FULL_ACCESS = {"admin", "supervisor", "gerencia", "assistente"}
 
 # Roles that are read-only (view + download only)
-ROLES_READ_ONLY = {"contabilidade", "financeiro", "providencias", "geral"}
+ROLES_READ_ONLY = {"concessionarias", "contabilidade", "orçamento", "emissao", "financeiro", "providencias", "geral"}
 
 # Modules restricted to admin only
 ADMIN_ONLY_MODULES = {"relatorios", "importacoes", "notificacoes", "gmail"}

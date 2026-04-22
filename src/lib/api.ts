@@ -711,7 +711,7 @@ class ApiClient {
   // Reajustes Mercado
   async getReajustesMercado(categoria?: string) {
     const param = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
-    return this.request<ReajusteMercado[]>(`/reajustes/${param}`);
+    return this.request<ReajusteMercado[]>(`/reajustes${param}`);
   }
 
   async createReajusteMercado(formData: FormData) {

@@ -126,10 +126,12 @@ export default function Dashboard() {
             <Clock size={16} style={{ color: '#2563eb' }} />
             {format(currentTime, "dd 'de' MMMM '·' HH:mm", { locale: ptBR })}
           </div>
-          <button className="dc-btn dc-btn-primary" onClick={() => router.push('/importacoes')}>
-            <Upload size={16} />
-            Importar
-          </button>
+          {user?.role === 'admin' && (
+            <button className="dc-btn dc-btn-primary" onClick={() => router.push('/importacoes')}>
+              <Upload size={16} />
+              Importar
+            </button>
+          )}
         </div>
       </div>
 

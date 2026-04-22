@@ -88,7 +88,7 @@ export interface User {
 }
 
 // Helper to check if user role is read-only
-export const READ_ONLY_ROLES = new Set(['contabilidade', 'financeiro', 'providencias', 'geral']);
+export const READ_ONLY_ROLES = new Set(['concessionarias', 'contabilidade', 'orçamento', 'emissao', 'financeiro', 'providencias', 'geral']);
 export const isReadOnly = (user: User | null): boolean => {
   if (!user) return true;
   return READ_ONLY_ROLES.has(user.role);

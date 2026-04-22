@@ -29,9 +29,13 @@ const ADMIN_ONLY_MODULES = new Set(['relatorios', 'importacoes', 'notificacoes',
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',
+  supervisor: 'Supervisor',
   gerencia: 'Gerência',
   assistente: 'Assistente',
+  concessionarias: 'Concessionárias',
   contabilidade: 'Contabilidade',
+  'orçamento': 'Orçamento',
+  emissao: 'Emissão',
   financeiro: 'Financeiro',
   providencias: 'Providências',
   geral: 'Geral',
@@ -54,6 +58,13 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
     if (role === 'admin') return allNav;
     return allNav.filter(item => {
       if (item.module && ADMIN_ONLY_MODULES.has(item.module)) return false;
+      
+      const restrictedRoles = ['concessionarias', 'contabilidade', 'orçamento', 'emissao', 'financeiro', 'providencias', 'geral'];
+      if (restrictedRoles.includes(role)) {
+         const restrictedLinks = ['/dashboard', '/contratos', '/reajustes', '/alertas'];
+         if (restrictedLinks.includes(item.href)) return false;
+      }
+      
       return true;
     });
   }, [user?.role]);
