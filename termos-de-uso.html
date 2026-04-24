@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Termos de Uso · Datacron</title>
+<meta name="description" content="Termos e condições de uso da plataforma Datacron para administradoras de condomínio.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #04090f; --bg2: #080f1a; --bg3: #0c1624;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.14);
+    --accent: #00c6ff; --accent2: #0057ff;
+    --text: #e8f0fe; --text2: #8aa3c4; --text3: #4d6b8f;
+    --font-head: 'Syne', sans-serif; --font-body: 'DM Sans', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 16px; line-height: 1.8; }
+
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 5%; height: 68px;
+    background: rgba(4,9,15,0.9); backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo { font-family: var(--font-head); font-size: 1.2rem; font-weight: 800; color: var(--text); text-decoration: none; }
+  .nav-logo span { color: var(--accent); }
+  .nav-back { color: var(--text2); text-decoration: none; font-size: 0.85rem; transition: color .2s; }
+  .nav-back:hover { color: var(--accent); }
+
+  .doc-hero {
+    padding: 120px 5% 60px;
+    border-bottom: 1px solid var(--border);
+  }
+  .doc-label { font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 1rem; font-weight: 600; }
+  .doc-title { font-family: var(--font-head); font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 1rem; }
+  .doc-meta { font-size: 0.85rem; color: var(--text3); }
+
+  .doc-layout {
+    display: grid; grid-template-columns: 240px 1fr;
+    gap: 4rem; padding: 4rem 5%; max-width: 1200px; margin: 0 auto;
+  }
+  .doc-nav { position: sticky; top: 90px; align-self: start; }
+  .doc-nav-title { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 1rem; font-weight: 600; }
+  .doc-nav ul { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+  .doc-nav a { color: var(--text2); text-decoration: none; font-size: 0.82rem; padding: 0.3rem 0.8rem; display: block; border-left: 2px solid transparent; transition: all .2s; }
+  .doc-nav a:hover { color: var(--accent); border-left-color: var(--accent); }
+
+  .doc-content h2 { font-family: var(--font-head); font-size: 1.4rem; font-weight: 700; margin-top: 3rem; margin-bottom: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--text); }
+  .doc-content h2:first-child { margin-top: 0; border-top: none; padding-top: 0; }
+  .doc-content h3 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.6rem; color: var(--text); }
+  .doc-content p { color: var(--text2); margin-bottom: 1rem; }
+  .doc-content ul { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+  .doc-content ul li { color: var(--text2); display: flex; align-items: flex-start; gap: 10px; }
+  .doc-content ul li::before { content: '·'; color: var(--accent); font-weight: 700; flex-shrink: 0; margin-top: 1px; font-size: 1.2rem; }
+  .doc-content strong { color: var(--text); font-weight: 600; }
+
+  .highlight-box { background: rgba(0,87,255,0.06); border: 1px solid rgba(0,87,255,0.2); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; }
+  .highlight-box p { color: var(--text2); margin: 0; }
+  .warning-box { background: rgba(255,179,64,0.05); border: 1px solid rgba(255,179,64,0.2); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; }
+  .warning-box p { color: var(--text2); margin: 0; }
+  .danger-box { background: rgba(255,79,79,0.05); border: 1px solid rgba(255,79,79,0.2); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; }
+  .danger-box p { color: var(--text2); margin: 0; }
+
+  .contact-box { background: var(--bg3); border: 1px solid var(--border2); border-radius: 14px; padding: 2rem; margin-top: 2rem; text-align: center; }
+  .contact-box h3 { font-family: var(--font-head); font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .contact-box p { color: var(--text2); margin-bottom: 1rem; }
+  .contact-box a.btn { display: inline-block; padding: 0.7rem 1.8rem; background: linear-gradient(135deg, var(--accent2), var(--accent)); border-radius: 8px; color: #fff; text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+
+  footer { border-top: 1px solid var(--border); padding: 2rem 5%; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  footer span { font-size: 0.8rem; color: var(--text3); }
+  .footer-links { display: flex; gap: 1.5rem; }
+  .footer-links a { color: var(--text3); text-decoration: none; font-size: 0.8rem; transition: color .2s; }
+  .footer-links a:hover { color: var(--text); }
+
+  @media (max-width: 768px) {
+    .doc-layout { grid-template-columns: 1fr; }
+    .doc-nav { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="datacron-landing.html" class="nav-logo">DATA<span>CRON</span></a>
+  <a href="datacron-landing.html" class="nav-back">← Voltar ao site</a>
+</nav>
+
+<div class="doc-hero">
+  <div class="doc-label">Documentos Legais</div>
+  <h1 class="doc-title">Termos de Uso</h1>
+  <p class="doc-meta">Última atualização: Janeiro de 2026 &nbsp;·&nbsp; Versão 1.0</p>
+</div>
+
+<div class="doc-layout">
+  <aside class="doc-nav">
+    <div class="doc-nav-title">Sumário</div>
+    <ul>
+      <li><a href="#intro">Introdução</a></li>
+      <li><a href="#definicoes">1. Definições</a></li>
+      <li><a href="#aceite">2. Aceite e Modificações</a></li>
+      <li><a href="#cadastro">3. Cadastro do Usuário</a></li>
+      <li><a href="#funcionalidades">4. Funcionalidades</a></li>
+      <li><a href="#responsabilidades">5. Responsabilidades do Usuário</a></li>
+      <li><a href="#responsabilidades-dc">6. Responsabilidades do Datacron</a></li>
+      <li><a href="#relacao">7. Relação com Concessionárias</a></li>
+      <li><a href="#propriedade">8. Propriedade Intelectual</a></li>
+      <li><a href="#limitacao">9. Limitação de Responsabilidade</a></li>
+      <li><a href="#seguranca">10. Segurança e Credenciais</a></li>
+      <li><a href="#dados">11. Tratamento de Dados</a></li>
+      <li><a href="#cancelamento">12. Cancelamento</a></li>
+      <li><a href="#suporte">13. Suporte</a></li>
+      <li><a href="#legislacao">14. Legislação e Foro</a></li>
+      <li><a href="#disposicoes">15. Disposições Finais</a></li>
+    </ul>
+  </aside>
+
+  <main class="doc-content">
+    <div id="intro">
+      <div class="highlight-box">
+        <p>Bem-vindo ao <strong>Datacron</strong>. Estes Termos de Uso regulam o acesso e a utilização da plataforma de automação de gestão de faturas de concessionárias para administradoras de condomínio. Ao utilizar o Datacron, você declara ter lido, compreendido e concordado integralmente com estes Termos.</p>
+      </div>
+      <div class="danger-box">
+        <p><strong>Atenção:</strong> Caso não concorde com qualquer condição aqui prevista, não utilize a plataforma.</p>
+      </div>
+    </div>
+
+    <h2 id="definicoes">1. Definições</h2>
+    <p>Para fins destes Termos:</p>
+    <ul>
+      <li><strong>Datacron</strong> — Plataforma de automação RPA para monitoramento, extração, processamento e análise de faturas de concessionárias de serviços públicos destinadas a condomínios.</li>
+      <li><strong>Usuário</strong> — Toda pessoa física ou jurídica (administradora, síndico ou gestor) que acessa ou utiliza a plataforma Datacron.</li>
+      <li><strong>Administradora</strong> — Empresa contratante responsável pela gestão dos condomínios cadastrados na plataforma.</li>
+      <li><strong>Condomínio</strong> — Empreendimento residencial ou comercial cadastrado pelo usuário para fins de monitoramento de faturas.</li>
+      <li><strong>Concessionária</strong> — Empresa prestadora de serviços públicos (energia elétrica, água, gás, entre outros) cujas faturas são processadas pelo Datacron.</li>
+      <li><strong>Fatura</strong> — Documento de cobrança emitido pela concessionária, em formato PDF, recebido por e-mail e processado automaticamente pela plataforma.</li>
+      <li><strong>Agente RPA</strong> — Componente automatizado do Datacron responsável pelo monitoramento de caixas de e-mail, extração OCR e auditoria de faturas.</li>
+    </ul>
+
+    <h2 id="aceite">2. Aceite e Modificações</h2>
+    <p>O uso do Datacron implica aceitação plena e irrestrita destes Termos, que podem ser alterados a qualquer momento para refletir mudanças na legislação, na plataforma ou nas condições comerciais.</p>
+    <p>Alterações relevantes serão comunicadas com pelo menos 15 (quinze) dias de antecedência por e-mail ou notificação na plataforma. A continuidade do uso após a vigência das novas regras implica concordância com as mesmas.</p>
+
+    <h2 id="cadastro">3. Cadastro do Usuário</h2>
+    <p>Para acessar as funcionalidades do Datacron, o usuário deve realizar um cadastro fornecendo informações verdadeiras, completas e atualizadas. O usuário:</p>
+    <ul>
+      <li>É responsável pela veracidade e atualização dos dados informados</li>
+      <li>Deve manter suas credenciais de acesso (login e senha) em sigilo absoluto</li>
+      <li>Assume integral responsabilidade por atividades realizadas sob sua conta</li>
+      <li>Deve notificar imediatamente o Datacron em caso de uso não autorizado de sua conta</li>
+    </ul>
+    <p>O Datacron poderá, a seu critério, recusar ou cancelar cadastros que violem estes Termos ou representem risco à plataforma ou a outros usuários.</p>
+
+    <h2 id="funcionalidades">4. Funcionalidades da Plataforma</h2>
+    <p>O Datacron oferece, sem limitação:</p>
+    <ul>
+      <li>Monitoramento automatizado de caixas de e-mail (IMAP/POP3) com varredura periódica</li>
+      <li>Reconhecimento e captura automática de faturas de concessionárias</li>
+      <li>Desbloqueio automático de PDFs protegidos por senha</li>
+      <li>Extração OCR de campos críticos: instalação, valor, vencimento e código de barras</li>
+      <li>Categorização e armazenamento estruturado em banco de dados</li>
+      <li>Análise de variações de consumo e geração de alertas inteligentes</li>
+      <li>Notificações em caso de não recebimento de faturas nas datas previstas</li>
+      <li>Dashboard em tempo real e geração de relatórios</li>
+      <li>Exportação em XLSX/CSV e integração via API REST</li>
+    </ul>
+    <p>O Datacron poderá alterar, incluir ou remover funcionalidades a seu critério, comunicando os usuários com razoável antecedência quando as mudanças forem relevantes.</p>
+
+    <h2 id="responsabilidades">5. Responsabilidades do Usuário</h2>
+    <p>Ao utilizar o Datacron, o usuário se compromete a:</p>
+    <ul>
+      <li>Utilizar a plataforma em conformidade com a legislação vigente e estes Termos</li>
+      <li>Fornecer credenciais de e-mail apenas de caixas postais que possui autorização legal para monitorar</li>
+      <li>Não utilizar a plataforma para fins ilícitos ou que violem direitos de terceiros</li>
+      <li>Não tentar acessar sistemas ou dados além do escopo contratado</li>
+      <li>Não realizar engenharia reversa, descompilar ou modificar a plataforma</li>
+      <li>Manter atualizadas as configurações de calendário para correto funcionamento dos alertas</li>
+      <li>Não inserir conteúdos falsos, ofensivos ou que violem direitos de terceiros</li>
+    </ul>
+    <div class="danger-box">
+      <p><strong>Atenção:</strong> O descumprimento destas obrigações poderá resultar em suspensão ou encerramento imediato da conta, sem direito a reembolso proporcional, além de responsabilização civil e criminal cabível.</p>
+    </div>
+
+    <h2 id="responsabilidades-dc">6. Responsabilidades do Datacron</h2>
+    <p>O Datacron se compromete a:</p>
+    <ul>
+      <li>Manter a plataforma disponível e funcional, conforme o SLA contratado</li>
+      <li>Processar as faturas com o nível de precisão informado e aprimorar continuamente os modelos</li>
+      <li>Proteger os dados do usuário conforme a Política de Privacidade e a LGPD</li>
+      <li>Corrigir falhas e erros identificados no menor prazo possível</li>
+      <li>Comunicar incidentes de segurança que possam afetar os usuários</li>
+    </ul>
+    <p>O Datacron <strong>não se responsabiliza</strong> por:</p>
+    <ul>
+      <li>Falhas, erros ou atrasos nos e-mails enviados pelas concessionárias</li>
+      <li>Indisponibilidades causadas por terceiros (provedores de e-mail, concessionárias, infraestrutura de nuvem)</li>
+      <li>Decisões tomadas pelo usuário com base nos dados e alertas gerados pela plataforma</li>
+      <li>Informações incorretas inseridas pelo usuário no cadastro de condomínios ou configurações</li>
+      <li>Perdas decorrentes de interrupções programadas de manutenção, com aviso prévio</li>
+    </ul>
+
+    <h2 id="relacao">7. Relação com Concessionárias</h2>
+    <p>O Datacron atua como uma ferramenta tecnológica de automação e <strong>não possui qualquer relação comercial, contratual ou jurídica com as concessionárias de serviços públicos</strong> cujas faturas são processadas.</p>
+    <p>A plataforma:</p>
+    <ul>
+      <li>Apenas processa documentos recebidos nos e-mails autorizados pelo usuário</li>
+      <li>Não realiza pagamentos, negociações ou contato com as concessionárias em nome do usuário</li>
+      <li>Não é responsável por eventuais cobranças indevidas, erros de faturamento ou disputas com concessionárias</li>
+      <li>Não garante a conformidade ou autenticidade das faturas recebidas</li>
+    </ul>
+    <p>Eventuais conflitos com concessionárias devem ser tratados diretamente pelo usuário com a empresa responsável.</p>
+
+    <h2 id="propriedade">8. Propriedade Intelectual</h2>
+    <p>Todos os elementos da plataforma Datacron — incluindo código-fonte, algoritmos de OCR e RPA, modelos de inteligência artificial, interfaces, logotipos, textos, banco de dados e marca — são de propriedade exclusiva do Datacron ou licenciados adequadamente.</p>
+    <p>É expressamente proibido:</p>
+    <ul>
+      <li>Copiar, reproduzir ou redistribuir qualquer componente da plataforma</li>
+      <li>Realizar engenharia reversa dos algoritmos e modelos</li>
+      <li>Criar produtos ou serviços derivados sem autorização expressa por escrito</li>
+      <li>Utilizar a marca Datacron sem prévia autorização</li>
+    </ul>
+    <div class="warning-box">
+      <p><strong>Aviso:</strong> A violação de direitos de propriedade intelectual poderá gerar responsabilidade civil e criminal, conforme a legislação brasileira.</p>
+    </div>
+
+    <h2 id="limitacao">9. Limitação de Responsabilidade</h2>
+    <p>Na máxima extensão permitida pela legislação aplicável, o Datacron não será responsável por:</p>
+    <ul>
+      <li>Danos indiretos, incidentais ou consequenciais decorrentes do uso da plataforma</li>
+      <li>Lucros cessantes ou perda de oportunidades de negócio</li>
+      <li>Erros de leitura OCR em faturas com qualidade gráfica abaixo do mínimo necessário</li>
+      <li>Falhas em alertas decorrentes de configurações incorretas pelo usuário</li>
+      <li>Dados não processados em decorrência de alterações nos formatos de fatura das concessionárias</li>
+    </ul>
+    <p>Em nenhuma hipótese a responsabilidade total do Datacron excederá o valor pago pelo usuário nos últimos 3 (três) meses de serviço.</p>
+
+    <h2 id="seguranca">10. Segurança e Credenciais de E-mail</h2>
+    <p>Para o funcionamento do serviço, o usuário fornecerá credenciais de acesso às caixas de e-mail monitoradas. O usuário declara e garante que:</p>
+    <ul>
+      <li>Possui plena autorização para compartilhar essas credenciais com a plataforma</li>
+      <li>As caixas de e-mail são de titularidade ou estão sob responsabilidade da administradora contratante</li>
+      <li>Cumprirá com as políticas de uso aceitável do provedor de e-mail utilizado</li>
+    </ul>
+    <p>O Datacron armazena todas as credenciais de e-mail com criptografia de ponta e não as compartilha com terceiros. O acesso é realizado exclusivamente pelo Agente RPA para fins de monitoramento contratado.</p>
+
+    <h2 id="dados">11. Tratamento de Dados Pessoais</h2>
+    <p>O uso da plataforma Datacron envolve o tratamento de dados pessoais conforme detalhado na <strong>Política de Privacidade</strong>, que é parte integrante e inseparável destes Termos.</p>
+    <p>Ao utilizar o Datacron, o usuário declara estar ciente e de acordo com o tratamento dos dados para as finalidades descritas na Política de Privacidade, em conformidade com a LGPD.</p>
+
+    <h2 id="cancelamento">12. Cancelamento e Encerramento da Conta</h2>
+    <p>O usuário pode solicitar o cancelamento do serviço a qualquer momento pelo canal de suporte.</p>
+    <p>O Datacron poderá:</p>
+    <ul>
+      <li>Suspender ou encerrar contas que violem estes Termos, com ou sem aviso prévio conforme a gravidade</li>
+      <li>Encerrar contas inativas por período superior a 12 (doze) meses</li>
+      <li>Encerrar o serviço mediante aviso prévio de 30 (trinta) dias por motivo comercial</li>
+    </ul>
+    <p>Após o encerramento, os dados operacionais serão mantidos pelo prazo legal e então excluídos ou anonimizados, conforme a Política de Privacidade.</p>
+
+    <h2 id="suporte">13. Suporte Técnico</h2>
+    <p>O suporte ao usuário é oferecido por e-mail e WhatsApp, nos horários divulgados no site. O Datacron envidará esforços razoáveis para responder no menor prazo possível, observando as prioridades de atendimento por plano contratado.</p>
+    <p>Usuários do plano Enterprise contam com gerente de conta dedicado e SLA de atendimento garantido em contrato.</p>
+
+    <h2 id="legislacao">14. Legislação Aplicável e Foro</h2>
+    <p>Estes Termos são regidos exclusivamente pelas leis da República Federativa do Brasil, incluindo a LGPD (Lei nº 13.709/2018) e o Marco Civil da Internet (Lei nº 12.965/2014).</p>
+    <p>Para resolver eventuais conflitos decorrentes destes Termos, fica eleito o foro da comarca de <strong>São Paulo/SP</strong>, com renúncia expressa de qualquer outro foro, por mais privilegiado que seja.</p>
+
+    <h2 id="disposicoes">15. Disposições Finais</h2>
+    <ul>
+      <li>A nulidade ou invalidade de qualquer cláusula não afeta a validade das demais</li>
+      <li>O não exercício de qualquer direito pelo Datacron não implica renúncia ao mesmo</li>
+      <li>Estes Termos constituem o acordo integral entre as partes sobre seu objeto</li>
+      <li>A Política de Privacidade é parte integrante destes Termos</li>
+    </ul>
+
+    <div class="contact-box">
+      <h3>Dúvidas sobre os Termos de Uso?</h3>
+      <p>Nossa equipe está disponível para esclarecer qualquer dúvida sobre as condições de uso da plataforma.</p>
+      <a href="mailto:contato@datacron.com.br" class="btn">contato@datacron.com.br</a>
+      <p style="margin-top:1rem;font-size:0.8rem;color:var(--text3)">Veja também nossa <a href="politica-de-privacidade.html" style="color:var(--accent);text-decoration:none">Política de Privacidade</a></p>
+    </div>
+  </main>
+</div>
+
+<footer>
+  <span>© 2026 Datacron RPA · Todos os direitos reservados.</span>
+  <div class="footer-links">
+    <a href="datacron-landing.html">Início</a>
+    <a href="politica-de-privacidade.html">Política de Privacidade</a>
+    <a href="termos-de-uso.html">Termos de Uso</a>
+  </div>
+</footer>
+
+</body>
+</html>

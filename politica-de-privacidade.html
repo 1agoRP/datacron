@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política de Privacidade · Datacron</title>
+<meta name="description" content="Saiba como o Datacron coleta, utiliza e protege seus dados pessoais, em conformidade com a LGPD.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #04090f; --bg2: #080f1a; --bg3: #0c1624;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.14);
+    --accent: #00c6ff; --accent2: #0057ff;
+    --text: #e8f0fe; --text2: #8aa3c4; --text3: #4d6b8f;
+    --font-head: 'Syne', sans-serif; --font-body: 'DM Sans', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 16px; line-height: 1.8; }
+
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 5%; height: 68px;
+    background: rgba(4,9,15,0.9); backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo { font-family: var(--font-head); font-size: 1.2rem; font-weight: 800; color: var(--text); text-decoration: none; }
+  .nav-logo span { color: var(--accent); }
+  .nav-back { color: var(--text2); text-decoration: none; font-size: 0.85rem; transition: color .2s; }
+  .nav-back:hover { color: var(--accent); }
+
+  .doc-hero {
+    padding: 120px 5% 60px;
+    border-bottom: 1px solid var(--border);
+  }
+  .doc-label {
+    font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 1rem; font-weight: 600;
+  }
+  .doc-title {
+    font-family: var(--font-head);
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 800; letter-spacing: -0.04em; line-height: 1.1;
+    margin-bottom: 1rem;
+  }
+  .doc-meta { font-size: 0.85rem; color: var(--text3); }
+
+  .doc-layout {
+    display: grid; grid-template-columns: 240px 1fr;
+    gap: 4rem; padding: 4rem 5%; max-width: 1200px; margin: 0 auto;
+  }
+  .doc-nav {
+    position: sticky; top: 90px; align-self: start;
+  }
+  .doc-nav-title { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 1rem; font-weight: 600; }
+  .doc-nav ul { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+  .doc-nav a {
+    color: var(--text2); text-decoration: none; font-size: 0.82rem;
+    padding: 0.3rem 0; display: block; border-left: 2px solid transparent;
+    padding-left: 0.8rem; transition: all .2s;
+  }
+  .doc-nav a:hover { color: var(--accent); border-left-color: var(--accent); }
+
+  .doc-content h2 {
+    font-family: var(--font-head); font-size: 1.4rem; font-weight: 700;
+    margin-top: 3rem; margin-bottom: 1rem; padding-top: 1rem;
+    border-top: 1px solid var(--border); color: var(--text);
+  }
+  .doc-content h2:first-child { margin-top: 0; border-top: none; padding-top: 0; }
+  .doc-content h3 { font-family: var(--font-head); font-size: 1rem; font-weight: 700; margin-top: 1.5rem; margin-bottom: 0.6rem; color: var(--text); }
+  .doc-content p { color: var(--text2); margin-bottom: 1rem; }
+  .doc-content ul { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+  .doc-content ul li { color: var(--text2); display: flex; align-items: flex-start; gap: 10px; }
+  .doc-content ul li::before { content: '·'; color: var(--accent); font-weight: 700; flex-shrink: 0; margin-top: 1px; font-size: 1.2rem; }
+  .doc-content strong { color: var(--text); font-weight: 600; }
+  .highlight-box {
+    background: rgba(0,87,255,0.06);
+    border: 1px solid rgba(0,87,255,0.2);
+    border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0;
+  }
+  .highlight-box p { color: var(--text2); margin: 0; }
+  .warning-box {
+    background: rgba(255,179,64,0.05);
+    border: 1px solid rgba(255,179,64,0.2);
+    border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0;
+  }
+  .contact-box {
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 14px; padding: 2rem; margin-top: 2rem;
+    text-align: center;
+  }
+  .contact-box h3 { font-family: var(--font-head); font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .contact-box p { color: var(--text2); margin-bottom: 1rem; }
+  .contact-box a {
+    display: inline-block; padding: 0.7rem 1.8rem;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    border-radius: 8px; color: #fff; text-decoration: none;
+    font-weight: 600; font-size: 0.9rem;
+  }
+
+  footer { border-top: 1px solid var(--border); padding: 2rem 5%; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  footer span { font-size: 0.8rem; color: var(--text3); }
+  .footer-links { display: flex; gap: 1.5rem; }
+  .footer-links a { color: var(--text3); text-decoration: none; font-size: 0.8rem; transition: color .2s; }
+  .footer-links a:hover { color: var(--text); }
+
+  @media (max-width: 768px) {
+    .doc-layout { grid-template-columns: 1fr; }
+    .doc-nav { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="datacron-landing.html" class="nav-logo">DATA<span>CRON</span></a>
+  <a href="datacron-landing.html" class="nav-back">← Voltar ao site</a>
+</nav>
+
+<div class="doc-hero">
+  <div class="doc-label">Documentos Legais</div>
+  <h1 class="doc-title">Política de Privacidade</h1>
+  <p class="doc-meta">Última atualização: Janeiro de 2026 &nbsp;·&nbsp; Versão 1.0</p>
+</div>
+
+<div class="doc-layout">
+  <aside class="doc-nav">
+    <div class="doc-nav-title">Sumário</div>
+    <ul>
+      <li><a href="#intro">Introdução</a></li>
+      <li><a href="#controlador">1. Controlador dos Dados</a></li>
+      <li><a href="#dados">2. Dados que Coletamos</a></li>
+      <li><a href="#finalidades">3. Finalidades do Tratamento</a></li>
+      <li><a href="#bases">4. Bases Legais</a></li>
+      <li><a href="#compartilhamento">5. Compartilhamento</a></li>
+      <li><a href="#armazenamento">6. Armazenamento e Retenção</a></li>
+      <li><a href="#seguranca">7. Segurança</a></li>
+      <li><a href="#direitos">8. Seus Direitos (LGPD)</a></li>
+      <li><a href="#cookies">9. Cookies</a></li>
+      <li><a href="#internacional">10. Transferência Internacional</a></li>
+      <li><a href="#alteracoes">11. Alterações</a></li>
+      <li><a href="#contato-dpo">12. Contato</a></li>
+    </ul>
+  </aside>
+
+  <main class="doc-content">
+    <div id="intro">
+      <div class="highlight-box">
+        <p>O <strong>Datacron</strong> está comprometido com a privacidade e a proteção dos seus dados pessoais. Esta Política explica, de forma transparente, como coletamos, utilizamos, armazenamos e protegemos suas informações, em conformidade com a <strong>Lei Geral de Proteção de Dados (LGPD · Lei nº 13.709/2018)</strong>.</p>
+      </div>
+      <p>Ao utilizar a plataforma Datacron, você declara ter lido, compreendido e concordado com os termos desta Política. Caso não concorde, por favor, não utilize nossos serviços.</p>
+    </div>
+
+    <h2 id="controlador">1. Controlador dos Dados</h2>
+    <p>O controlador responsável pelo tratamento das informações coletadas por meio da plataforma Datacron é a empresa responsável pelo serviço, com sede no Brasil, acessível em <strong>www.datacron.com.br</strong>.</p>
+    <p>Para dúvidas relacionadas ao tratamento de dados, entre em contato pelo e-mail: <strong>privacidade@datacron.com.br</strong></p>
+
+    <h2 id="dados">2. Dados que Coletamos</h2>
+
+    <h3>2.1 Dados fornecidos diretamente pelo usuário</h3>
+    <ul>
+      <li>Nome completo do responsável e da administradora</li>
+      <li>Endereço de e-mail</li>
+      <li>Telefone e WhatsApp</li>
+      <li>CNPJ da administradora e dos condomínios cadastrados</li>
+      <li>Credenciais de acesso às caixas de e-mail (armazenadas com criptografia)</li>
+      <li>Informações inseridas em formulários de contato ou configuração</li>
+    </ul>
+
+    <h3>2.2 Dados coletados automaticamente pela plataforma</h3>
+    <ul>
+      <li>Endereço IP e informações de dispositivo de acesso</li>
+      <li>Dados de navegação e uso do sistema (logs de operação)</li>
+      <li>Informações extraídas das faturas processadas (valores, vencimentos, instalações, consumos)</li>
+      <li>Metadados dos e-mails monitorados (remetente, data, assunto)</li>
+      <li>Cookies e tecnologias similares de sessão</li>
+    </ul>
+
+    <h3>2.3 Dados de terceiros</h3>
+    <p>O Datacron pode receber dados contidos em faturas de concessionárias de serviços públicos (energia elétrica, água, gás) enviadas para as caixas de e-mail monitoradas, no âmbito da prestação do serviço contratado.</p>
+
+    <h2 id="finalidades">3. Finalidades do Tratamento</h2>
+    <p>Os dados pessoais são utilizados exclusivamente para:</p>
+    <ul>
+      <li>Criação, validação e manutenção da conta do usuário</li>
+      <li>Operação das funcionalidades de monitoramento, extração OCR e processamento de faturas</li>
+      <li>Geração de alertas, relatórios e exportações no âmbito do serviço contratado</li>
+      <li>Envio de notificações operacionais e avisos relevantes ao serviço</li>
+      <li>Melhoria contínua da plataforma e de suas funcionalidades</li>
+      <li>Suporte técnico e atendimento ao cliente</li>
+      <li>Cumprimento de obrigações legais e regulatórias</li>
+      <li>Prevenção de fraudes e garantia da segurança da plataforma</li>
+    </ul>
+    <div class="warning-box">
+      <p><strong>Importante:</strong> O Datacron <strong>não utiliza os dados das suas faturas para nenhuma finalidade além da prestação do serviço contratado</strong>. Informações de consumo, valores e CNPJs são tratados de forma estritamente confidencial.</p>
+    </div>
+
+    <h2 id="bases">4. Bases Legais Utilizadas</h2>
+    <p>O tratamento de dados pessoais pelo Datacron é realizado com fundamento nas bases legais previstas na LGPD:</p>
+    <ul>
+      <li><strong>Execução de contrato</strong> — para operar as funcionalidades contratadas</li>
+      <li><strong>Cumprimento de obrigação legal</strong> — para atender exigências regulatórias</li>
+      <li><strong>Legítimo interesse do controlador</strong> — para aprimoramento e segurança da plataforma, sempre respeitando direitos e liberdades do titular</li>
+      <li><strong>Consentimento</strong> — quando aplicável, como para comunicações de marketing</li>
+    </ul>
+
+    <h2 id="compartilhamento">5. Compartilhamento de Dados</h2>
+    <p>O Datacron poderá compartilhar dados pessoais apenas com:</p>
+    <ul>
+      <li><strong>Provedores de infraestrutura tecnológica</strong> (hospedagem, banco de dados, processamento em nuvem), sob contrato de confidencialidade</li>
+      <li><strong>Ferramentas de suporte e comunicação</strong> utilizadas internamente pela equipe Datacron</li>
+      <li><strong>Autoridades públicas e judiciais</strong>, exclusivamente quando exigido por lei ou determinação judicial</li>
+    </ul>
+    <div class="highlight-box">
+      <p><strong>Em nenhuma hipótese o Datacron vende, aluga ou comercializa dados pessoais ou informações de faturas dos seus usuários.</strong></p>
+    </div>
+
+    <h2 id="armazenamento">6. Armazenamento e Retenção</h2>
+    <p>Os dados são armazenados em servidores seguros, com criptografia em repouso, e mantidos pelo prazo necessário para:</p>
+    <ul>
+      <li>Cumprimento das finalidades descritas nesta Política</li>
+      <li>Atendimento a obrigações legais e fiscais</li>
+      <li>Preservação de direitos do controlador em eventuais disputas</li>
+    </ul>
+    <p>Após o encerramento do contrato, os dados operacionais serão mantidos por até 5 (cinco) anos, conforme exigências legais, e então excluídos ou anonimizados de forma segura.</p>
+
+    <h2 id="seguranca">7. Segurança da Informação</h2>
+    <p>O Datacron adota medidas técnicas e administrativas para proteger os dados pessoais, incluindo:</p>
+    <ul>
+      <li>Criptografia de dados em repouso e em trânsito (TLS/SSL)</li>
+      <li>Controle de acesso baseado em perfis de usuário com autenticação segura</li>
+      <li>Armazenamento de credenciais de e-mail com criptografia de ponta</li>
+      <li>Monitoramento contínuo de acessos e registros de auditoria</li>
+      <li>Backups automáticos com redundância geográfica</li>
+    </ul>
+    <p>Entretanto, nenhum sistema é completamente inviolável. Em caso de incidente de segurança que afete dados pessoais, o Datacron notificará os usuários afetados e a ANPD conforme exigido pela LGPD.</p>
+
+    <h2 id="direitos">8. Seus Direitos (LGPD)</h2>
+    <p>Nos termos da Lei Geral de Proteção de Dados, você possui os seguintes direitos em relação aos seus dados pessoais:</p>
+    <ul>
+      <li><strong>Confirmação</strong> da existência de tratamento de dados</li>
+      <li><strong>Acesso</strong> aos dados pessoais tratados</li>
+      <li><strong>Correção</strong> de dados incompletos, inexatos ou desatualizados</li>
+      <li><strong>Anonimização, bloqueio ou eliminação</strong> de dados desnecessários ou excessivos</li>
+      <li><strong>Portabilidade</strong> dos dados a outro fornecedor de serviço</li>
+      <li><strong>Eliminação</strong> dos dados tratados com base no consentimento</li>
+      <li><strong>Informação</strong> sobre compartilhamento com terceiros</li>
+      <li><strong>Revogação do consentimento</strong> a qualquer tempo</li>
+    </ul>
+    <p>Para exercer qualquer um desses direitos, entre em contato pelo e-mail <strong>privacidade@datacron.com.br</strong>. Responderemos em até 15 (quinze) dias úteis.</p>
+
+    <h2 id="cookies">9. Cookies e Tecnologias de Rastreamento</h2>
+    <p>O Datacron utiliza cookies e identificadores de sessão para:</p>
+    <ul>
+      <li>Manter a sessão autenticada do usuário</li>
+      <li>Lembrar preferências de configuração da plataforma</li>
+      <li>Analisar o uso e desempenho da plataforma</li>
+    </ul>
+    <p>Você pode gerenciar ou bloquear cookies nas configurações do seu navegador. Algumas funcionalidades da plataforma podem ser afetadas caso os cookies sejam desativados.</p>
+
+    <h2 id="internacional">10. Transferência Internacional de Dados</h2>
+    <p>Os dados podem ser armazenados ou processados em servidores fora do Brasil (por exemplo, em provedores de nuvem com infraestrutura nos EUA ou Europa). Quando isso ocorrer, o Datacron garante que os padrões adequados de proteção de dados são observados, em conformidade com a LGPD e as diretrizes da ANPD.</p>
+
+    <h2 id="alteracoes">11. Alterações a Esta Política</h2>
+    <p>O Datacron pode atualizar esta Política de Privacidade a qualquer momento para refletir mudanças legais, técnicas ou operacionais. Alterações relevantes serão comunicadas ao usuário por meio da plataforma ou por e-mail com pelo menos 15 (quinze) dias de antecedência.</p>
+    <p>A continuidade do uso da plataforma após a data de vigência das novas regras será interpretada como concordância com as alterações.</p>
+
+    <h2 id="contato-dpo">12. Contato e Encarregado de Dados (DPO)</h2>
+    <div class="contact-box">
+      <h3>Dúvidas ou Solicitações sobre seus Dados?</h3>
+      <p>Entre em contato com nosso time de privacidade. Respondemos todas as solicitações dentro do prazo legal.</p>
+      <a href="mailto:privacidade@datacron.com.br">privacidade@datacron.com.br</a>
+      <p style="margin-top:1rem;font-size:0.8rem;color:var(--text3)">Ou acesse: <a href="https://www.datacron.com.br" style="color:var(--accent);text-decoration:none">www.datacron.com.br</a></p>
+    </div>
+  </main>
+</div>
+
+<footer>
+  <span>© 2026 Datacron RPA · Todos os direitos reservados.</span>
+  <div class="footer-links">
+    <a href="datacron-landing.html">Início</a>
+    <a href="politica-de-privacidade.html">Política de Privacidade</a>
+    <a href="termos-de-uso.html">Termos de Uso</a>
+  </div>
+</footer>
+
+</body>
+</html>

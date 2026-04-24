@@ -4,30 +4,17 @@ import { useState, FormEvent, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import {
   ArrowRight,
-  Database,
   Lock,
   X,
-  FileSpreadsheet,
   Zap,
-  ShieldCheck,
   CheckCircle2,
-  Mail,
-  ChevronDown,
-  Cpu,
-  BarChart3,
-  Globe,
   AlertTriangle,
-  Activity,
-  Layers,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import '@/styles/globals.css';
-import '@/styles/app.css';
+import Link from 'next/link';
 import '@/styles/landing.css';
-
-
-/* ─── ANIMATED COUNTER ─── */
 
 /* ─── ANIMATED COUNTER ─── */
 function Counter({ end, suffix = '', duration = 2 }: { end: number; suffix?: string; duration?: number }) {
@@ -62,6 +49,7 @@ export default function LandingPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const { login } = useAuth();
   const router = useRouter();
@@ -71,636 +59,416 @@ export default function LandingPage() {
     setError(null);
     setIsLoading(true);
 
-    // 60-second absolute timeout for cold starts on free tiers
-    const timeout = setTimeout(() => {
-      setError('Tempo limite excedido. Verifique sua conexão e tente novamente.');
-      setIsLoading(false);
-    }, 60000);
-
-    // 5-second gentle warning
-    const warningTimeout = setTimeout(() => {
-      setError('Por favor, aguarde...');
-    }, 10000);
-
     try {
       await login({ email, senha: password });
-      clearTimeout(timeout);
-      clearTimeout(warningTimeout);
-      
       const searchParams = new URL(window.location.href).searchParams;
       const redirectPath = searchParams.get('redirect') || '/dashboard';
       window.location.href = redirectPath;
-    } catch (err: unknown) {
-      clearTimeout(timeout);
-      clearTimeout(warningTimeout);
-      const errorMsg = err instanceof Error ? err.message : 'Falha na autenticação';
-      const isNetworkError = err instanceof Error && (
-        err.message.toLowerCase().includes('failed to fetch') || 
-        err.message.toLowerCase().includes('networkerror') ||
-        err.message.toLowerCase().includes('falha ao buscar')
-      );
-                          
-      if (isNetworkError) {
-        setError('O servidor não respondeu. Verifique se o Backend está rodando ou se há bloqueio de rede.');
-      } else {
-        setError(errorMsg);
-      }
+    } catch (err: any) {
+      setError(err.message || 'Falha na autenticação');
       setIsLoading(false);
     }
   };
 
-  const fadeUp: Variants = {
-    hidden: { opacity: 0, y: 28 },
-    visible: (i = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: i * 0.1 } })
+  const toggleFaq = (index: number) => {
+    setOpenFaq(openFaq === index ? null : index);
   };
 
-  const marqueeItems = [
-    { icon: <Zap size={14} />, label: 'ENEL AUTOMAÇÃO' },
-    { icon: <Activity size={14} />, label: 'SABESP OCR' },
-    { icon: <Database size={14} />, label: 'COMGÁS RPA' },
-    { icon: <Globe size={14} />, label: 'CPFL MONITOR' },
-    { icon: <BarChart3 size={14} />, label: 'RELATÓRIOS ERP' },
-    { icon: <ShieldCheck size={14} />, label: 'ANTI-FRAUDE AI' },
-    { icon: <Cpu size={14} />, label: 'PROCESSAMENTO 24/7' },
-    { icon: <Mail size={14} />, label: 'INBOX SCANNER' },
-  ];
-
-  /* Use logo from public if it exists, otherwise show icon */
-  const LogoElement = ({ size = 38 }: { size?: number }) => (
-    <div className="lp-logo-icon" style={{ width: size, height: size }}>
-      <Layers size={size * 0.55} />
-    </div>
-  );
-
   return (
-    <>
+    <div className="landing-page-root">
+      {/* ── NAV ── */}
+      <nav className="lp-nav">
+        <Link href="/" className="nav-logo">DATA<span>CRON</span></Link>
+        <ul className="nav-links">
+          <li><a href="#funcionalidades">Funcionalidades</a></li>
+          <li><a href="#como-funciona">Como funciona</a></li>
+          <li><a href="#planos">Planos</a></li>
+          <li><a href="#contato">Contato</a></li>
+        </ul>
+        <div className="nav-cta">
+          <button className="btn-outline" onClick={() => setIsLoginView(true)}>Entrar</button>
+          <a href="#contato" className="btn-primary">Fale Conosco</a>
+        </div>
+      </nav>
 
-      <div style={{ background: 'var(--slate-50)', minHeight: '100vh', fontFamily: 'var(--font-body)' }}>
-
-        {/* ─── NAV ─── */}
-        <nav className="lp-nav">
-          <div className="lp-logo-text">
-            <LogoElement />
-            DATACRON
-          </div>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <button className="lp-btn-primary" onClick={() => setIsLoginView(true)}>
-              <Lock size={14} /> Acesso Restrito
-            </button>
-          </div>
-        </nav>
-
-        {/* ─── HERO ─── */}
-        <section style={{
-          maxWidth: 1200, margin: '0 auto', padding: '7rem 2rem 4rem',
-          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center',
-        }} className="hero-grid">
-          {/* Left */}
-          <motion.div initial="hidden" animate="visible" style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-            <motion.div variants={fadeUp} custom={0}>
-              <span className="lp-tag">
-                <span className="lp-tag-dot" />
-                SISTEMA OPERACIONAL RPA
-              </span>
-            </motion.div>
-            <motion.h1 variants={fadeUp} custom={1} style={{
-              fontFamily: 'var(--font-display)', fontSize: 'clamp(2.6rem, 4vw, 3.8rem)',
-              fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.05, color: 'var(--slate-900)'
-            }}>
-              Do Caos das Planilhas ao{' '}
-              <span style={{
-                background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}>
-                Controle Absoluto.
-              </span>
-            </motion.h1>
-            <motion.p variants={fadeUp} custom={2} style={{
-              fontSize: '1.1rem', color: 'var(--slate-500)', lineHeight: 1.7, maxWidth: 480,
-              fontWeight: 400,
-            }}>
-              O Datacron automatiza a captura, leitura e inteligência de faturas de todas as suas concessionárias.
-              Sem digitação manual, sem erros — apenas resultados processados em milissegundos.
-            </motion.p>
-            <motion.div variants={fadeUp} custom={3} className="hero-btns" style={{ display: 'flex', gap: '0.875rem' }}>
-              <button className="lp-btn-primary" style={{ padding: '0.8rem 1.75rem', fontSize: '0.95rem' }} onClick={() => setIsLoginView(true)}>
-                Acessar Sistema <ArrowRight size={16} />
-              </button>
-              <button className="lp-btn-ghost" style={{ padding: '0.8rem 1.75rem', fontSize: '0.95rem' }}
-                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>
-                Ver Módulos <ChevronDown size={16} />
-              </button>
-            </motion.div>
-            {/* Mini stats row */}
-            <motion.div variants={fadeUp} custom={4} style={{
-              display: 'flex', gap: '2rem', paddingTop: '0.5rem',
-              borderTop: '1px solid var(--slate-200)',
-            }}>
-              {[
-                { n: '99.9', s: '%', label: 'Precisão OCR' },
-                { n: '5', s: 'min', label: 'Ciclo de varredura' },
-                { n: '24', s: '/7', label: 'Monitoramento' },
-              ].map((stat) => (
-                <div key={stat.label}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 800, color: 'var(--slate-900)', letterSpacing: '-0.03em' }}>
-                    {stat.n}<span style={{ color: 'var(--blue-500)' }}>{stat.s}</span>
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--slate-500)', fontWeight: 500 }}>{stat.label}</div>
-                </div>
-              ))}
-            </motion.div>
-          </motion.div>
-
-          {/* Right — dashboard mockup */}
-          <motion.div initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            style={{ position: 'relative' }}>
-            <div style={{
-              background: 'var(--white)', border: '1px solid var(--slate-200)', borderRadius: 20,
-              overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.1), 0 0 0 1px rgba(226,232,240,0.5)',
-              animation: 'float 4s ease-in-out infinite',
-            }}>
-              {/* Mockup header */}
-              <div style={{ background: 'var(--slate-900)', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                {['#ef4444', '#f59e0b', '#22c55e'].map(c => (
-                  <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c }} />
-                ))}
-                <div style={{ marginLeft: 8, background: 'rgba(255,255,255,0.07)', borderRadius: 6, padding: '0.25rem 0.75rem', flex: 1, maxWidth: 200 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--slate-400)' }}>datacron.app/dashboard</span>
-                </div>
-              </div>
-              {/* Mockup body */}
-              <div style={{ padding: '1.5rem', background: 'var(--slate-50)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', fontWeight: 700, color: 'var(--slate-900)' }}>Faturas Processadas Hoje</span>
-                  <span className="lp-tag" style={{ fontSize: '0.68rem', padding: '0.2rem 0.6rem' }}>
-                    <span className="lp-tag-dot" /> AO VIVO
-                  </span>
-                </div>
-                {/* Fake chart bars */}
-                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80, marginBottom: '1rem' }}>
-                  {[40, 65, 50, 80, 70, 90, 85, 100, 78, 92, 88, 95].map((h, i) => (
-                    <div key={i} style={{
-                      flex: 1, height: `${h}%`, borderRadius: 4,
-                      background: `linear-gradient(to top, #2563eb, #60a5fa)`,
-                      opacity: i === 11 ? 1 : 0.4 + (i / 20),
-                    }} />
-                  ))}
-                </div>
-                {/* Fake rows */}
-                {[
-                  { conc: 'ENEL-SP', valor: 'R$ 2.840,00', status: 'ok' },
-                  { conc: 'SABESP', valor: 'R$ 1.120,00', status: 'ok' },
-                  { conc: 'COMGÁS', valor: 'R$ 892,00', status: 'warn' },
-                  { conc: 'CPFL', valor: 'R$ 3.410,00', status: 'ok' },
-                ].map((row) => (
-                  <div key={row.conc} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '0.5rem 0.75rem', borderRadius: 8, marginBottom: 4,
-                    background: 'var(--white)', border: '1px solid var(--slate-100)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: row.status === 'ok' ? '#22c55e' : '#f59e0b' }} />
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 600, color: 'var(--slate-700)' }}>{row.conc}</span>
-                    </div>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--slate-500)', fontWeight: 500 }}>{row.valor}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* Floating badge */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.8, duration: 0.4 }}
-              style={{
-                position: 'absolute', bottom: -16, left: -16,
-                background: 'var(--white)', border: '1px solid var(--slate-200)',
-                borderRadius: 12, padding: '0.75rem 1rem',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-                display: 'flex', alignItems: 'center', gap: 10,
-              }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CheckCircle2 size={18} color="#22c55e" />
-              </div>
-              <div>
-                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--slate-900)' }}>247 faturas</div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--slate-400)', fontWeight: 500 }}>processadas hoje</div>
-              </div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1.0, duration: 0.4 }}
-              style={{
-                position: 'absolute', top: 60, right: -20,
-                background: 'var(--white)', border: '1px solid rgba(239,68,68,0.2)',
-                borderRadius: 12, padding: '0.75rem 1rem',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-                display: 'flex', alignItems: 'center', gap: 10,
-              }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <AlertTriangle size={18} color="#ef4444" />
-              </div>
-              <div>
-                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--slate-900)' }}>Alerta Variação</div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--red-500)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>+47% COMGÁS</div>
-              </div>
-            </motion.div>
-          </motion.div>
-        </section>
-
-        {/* ─── MARQUEE TICKER ─── */}
-        <div style={{ background: 'var(--slate-900)', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)', padding: '0.85rem 0', overflow: 'hidden' }}>
-          <div className="marquee-track">
-            {[...marqueeItems, ...marqueeItems, ...marqueeItems, ...marqueeItems].map((item, i) => (
-              <div key={i} className="marquee-item">
-                <span style={{ color: 'var(--blue-400)' }}>{item.icon}</span>
-                {item.label}
-                <span style={{ color: 'rgba(255,255,255,0.1)', marginLeft: '1.5rem' }}>◆</span>
-              </div>
-            ))}
+      {/* ── HERO ── */}
+      <section className="hero">
+        <div className="hero-content">
+          <div className="hero-badge">Automação para Condomínios · RPA Inteligente</div>
+          <h1 className="hero-title">
+            Controle <em>total</em> das faturas<br />
+            <span className="line2">do seu condomínio</span>
+          </h1>
+          <p className="hero-desc">
+            O Datacron monitora automaticamente sua caixa de entrada, reconhece faturas de concessionárias, realiza o desbloqueio, organiza, salva no banco de dados e alerta quando algo foge do padrão — 24 horas por dia, sem intervenção humana.
+          </p>
+          <div className="hero-actions">
+            <a href="#contato" className="btn-hero">
+              <ArrowRight />
+              Solicitar Demonstração
+            </a>
+            <a href="https://wa.me/55XXXXXXXXXXX" className="btn-wpp" target="_blank" rel="noopener noreferrer">
+              💬 Falar no WhatsApp
+            </a>
           </div>
         </div>
 
-        {/* ─── STATS ─── */}
-        <section style={{ maxWidth: 1200, margin: '5rem auto', padding: '0 2rem' }}>
-          <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem' }}>
-            {[
-              { n: 99.9, s: '%', label: 'Precisão de leitura OCR', delta: '+0.2% vs v1', icon: <Cpu size={20} color="#2563eb" /> },
-              { n: 5, s: 'min', label: 'Ciclo máximo de varredura', delta: '-8min vs manual', icon: <Activity size={20} color="#22c55e" /> },
-              { n: 30, s: '%', label: 'Limiar de alerta de variação', delta: 'Configurável', icon: <AlertTriangle size={20} color="#f59e0b" /> },
-              { n: 100, s: '%', label: 'Uptime do agente RPA', delta: '↑ SLA garantido', icon: <ShieldCheck size={20} color="#8b5cf6" /> },
-            ].map((s) => (
-              <motion.div key={s.label} className="stat-card"
-                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}>
-                <div style={{ marginBottom: '0.25rem' }}>{s.icon}</div>
-                <div className="stat-number"><Counter end={s.n} suffix={s.s} /></div>
-                <div className="stat-label">{s.label}</div>
-                <div className="stat-delta">↗ {s.delta}</div>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-
-        {/* ─── BEFORE / AFTER ─── */}
-        <section style={{ background: 'var(--slate-900)', padding: '6rem 2rem' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
-              style={{ textAlign: 'center', marginBottom: '4rem' }}>
-              <span className="lp-tag" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--blue-300)', borderColor: 'rgba(59,130,246,0.3)', marginBottom: '1rem', display: 'inline-flex' }}>
-                COMPARATIVO OPERACIONAL
-              </span>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 3vw, 2.8rem)', fontWeight: 800, color: 'var(--white)', marginTop: '1rem', letterSpacing: '-0.03em' }}>
-                Sua operação antes e depois do Datacron
-              </h2>
-              <p style={{ color: 'var(--slate-400)', fontSize: '1.05rem', marginTop: '0.75rem' }}>A diferença entre dias de trabalho e segundos de processamento.</p>
-            </motion.div>
-
-            <div className="compare-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              {/* Caos */}
-              <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 18, padding: '2.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '2rem' }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <FileSpreadsheet size={22} color="#ef4444" />
-                  </div>
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 800, color: 'var(--white)' }}>O Caos do Passado</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--slate-500)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>Processo manual e ineficiente</div>
-                  </div>
+        <div className="hero-visual">
+          <div className="dashboard-mock">
+            <div className="mock-topbar">
+              <div className="mock-dots">
+                <div className="mock-dot r"></div>
+                <div className="mock-dot y"></div>
+                <div className="mock-dot g"></div>
+              </div>
+              <div className="mock-title-bar">DATACRON · PAINEL DE FATURAS</div>
+              <div className="mock-badge-live">AO VIVO</div>
+            </div>
+            <div className="mock-body">
+              <div className="mock-stats">
+                <div className="mock-stat">
+                  <div className="mock-stat-val accent">247</div>
+                  <div className="mock-stat-label">Faturas hoje</div>
                 </div>
-                {[
-                  'Varredura manual de dezenas de e-mails por dia',
-                  'Digitação linha a linha no Excel por horas',
-                  'Dias perdidos por mês fechando caixas de condomínio',
-                  'Alto risco de erros, multas e retrabalho',
-                  'Zero visibilidade sobre variações abusivas',
-                ].map((txt) => (
-                  <div key={txt} className="compare-row">
-                    <X size={16} color="#ef4444" style={{ flexShrink: 0, marginTop: 2 }} />
-                    <span style={{ color: 'var(--slate-400)', fontSize: '0.92rem', lineHeight: 1.5 }}>{txt}</span>
-                  </div>
-                ))}
-              </motion.div>
-
-              {/* Controle */}
-              <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}
-                style={{
-                  background: 'linear-gradient(135deg, rgba(30,58,138,0.6) 0%, rgba(37,99,235,0.25) 100%)',
-                  border: '1px solid rgba(59,130,246,0.4)', borderRadius: 18, padding: '2.5rem',
-                  position: 'relative', overflow: 'hidden',
-                }}>
-                <div style={{ position: 'absolute', top: -40, right: -40, opacity: 0.04 }}>
-                  <Zap size={220} color="white" />
+                <div className="mock-stat">
+                  <div className="mock-stat-val success">99.9%</div>
+                  <div className="mock-stat-label">Precisão OCR</div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '2rem', position: 'relative', zIndex: 1 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(37,99,235,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <CheckCircle2 size={22} color="#60a5fa" />
-                  </div>
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 800, color: 'var(--white)' }}>O Controle Datacron</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--blue-300)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>Automação total e inteligente</div>
-                  </div>
+                <div className="mock-stat">
+                  <div className="mock-stat-val warn">3</div>
+                  <div className="mock-stat-label">Alertas ativos</div>
                 </div>
-                {[
-                  'Robôs varrem centenas de inboxes 24/7 automaticamente',
-                  'Extração OCR com 99.9% de precisão óptica comprovada',
-                  'Exportação instantânea ERP-Ready com um clique',
-                  'Auditoria inteligente: bloqueia faturas com variação anormal',
-                  'Dashboard em tempo real com alertas configuráveis',
-                ].map((txt) => (
-                  <div key={txt} className="compare-row" style={{ position: 'relative', zIndex: 1 }}>
-                    <CheckCircle2 size={16} color="#60a5fa" style={{ flexShrink: 0, marginTop: 2 }} />
-                    <span style={{ color: 'var(--blue-100)', fontSize: '0.92rem', lineHeight: 1.5 }}>{txt}</span>
-                  </div>
-                ))}
-              </motion.div>
+                <div className="mock-stat">
+                  <div className="mock-stat-val">5min</div>
+                  <div className="mock-stat-label">Ciclo varredura</div>
+                </div>
+              </div>
+              <div className="mock-table-head">
+                <span>Concessionária</span><span>Condomínio</span><span>Valor</span><span>Status</span>
+              </div>
+              <div className="mock-row">
+                <span><div className="mock-tag">ENEL-SP</div></span>
+                <span style={{ color: 'var(--text2)', fontSize: '0.75rem' }}>Edifício Alfa</span>
+                <span style={{ color: 'var(--text)', fontWeight: 600 }}>R$ 2.840</span>
+                <span><div className="mock-pill pill-ok">✓ Processada</div></span>
+              </div>
+              <div className="mock-row">
+                <span><div className="mock-tag">SABESP</div></span>
+                <span style={{ color: 'var(--text2)', fontSize: '0.75rem' }}>Cond. Primavera</span>
+                <span style={{ color: 'var(--text)', fontWeight: 600 }}>R$ 1.120</span>
+                <span><div className="mock-pill pill-ok">✓ Processada</div></span>
+              </div>
+              <div className="mock-row">
+                <span><div className="mock-tag">COMGÁS</div></span>
+                <span style={{ color: 'var(--text2)', fontSize: '0.75rem' }}>Torre Business</span>
+                <span style={{ color: 'var(--danger)', fontWeight: 600 }}>R$ 892</span>
+                <span><div className="mock-pill pill-alert">⚠ Alerta +47%</div></span>
+              </div>
+              <div className="mock-alert-banner">
+                <div className="alert-icon">!</div>
+                <div className="alert-text"><strong>Alerta de variação:</strong> COMGÁS · Torre Business com consumo 47% acima da média.</div>
+              </div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* ─── FEATURES BENTO ─── */}
-        <section id="features" style={{ maxWidth: 1200, margin: '6rem auto', padding: '0 2rem' }}>
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
-            style={{ marginBottom: '3.5rem' }}>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--blue-500)', fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.78rem' }}>
-              MÓDULOS DE ALTA PERFORMANCE
-            </span>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 3vw, 2.8rem)', fontWeight: 800, color: 'var(--slate-900)', marginTop: '0.6rem', letterSpacing: '-0.03em', maxWidth: 600 }}>
-              Uma suíte completa para administradoras de Condomínios.
-            </h2>
-          </motion.div>
-
-          <div className="bento-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '1.25rem' }}>
-            {/* Big card — Varredura */}
-            <motion.div className="lp-card" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
-              style={{ gridColumn: 'span 7', padding: '2.5rem' }}>
-              <div className="feat-icon" style={{ background: '#eff6ff' }}>
-                <Mail size={24} color="#2563eb" />
-              </div>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--slate-900)', marginBottom: '0.6rem', letterSpacing: '-0.02em' }}>
-                Varredura Serverless de E-mail
-              </h3>
-              <p style={{ color: 'var(--slate-500)', fontSize: '0.95rem', lineHeight: 1.7, maxWidth: 460 }}>
-                Um agente Python de alta velocidade monitora suas caixas IMAP várias vezes ao dia. Ele identifica automaticamente faturas de Enel, Sabesp, Comgás e outras concessionárias, descartando spam e capturando apenas os PDFs essenciais.
-              </p>
-              <div style={{ marginTop: '1.75rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                {['IMAP / POP3', 'Multi-inbox', 'PDF Detector', 'Senha Auto'].map(tag => (
-                  <span key={tag} style={{ background: 'var(--blue-50)', color: 'var(--blue-600)', border: '1px solid var(--blue-200)', borderRadius: 8, padding: '0.3rem 0.7rem', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Anti-Fraude */}
-            <motion.div className="lp-card" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }}
-              style={{ gridColumn: 'span 5', padding: '2.5rem' }}>
-              <div className="feat-icon" style={{ background: '#fef2f2' }}>
-                <ShieldCheck size={24} color="#ef4444" />
-              </div>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--slate-900)', marginBottom: '0.6rem', letterSpacing: '-0.02em' }}>
-                Alertas Anti-Fraude
-              </h3>
-              <p style={{ color: 'var(--slate-500)', fontSize: '0.95rem', lineHeight: 1.7 }}>
-                Variações superiores a 20% no consumo disparam red-flags autônomas, prevenindo pagamentos de vazamentos estruturais ocultos.
-              </p>
-              <div style={{ marginTop: '1.5rem', background: 'var(--slate-50)', borderRadius: 10, padding: '0.875rem', border: '1px solid var(--slate-100)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--slate-500)' }}>Variação detectada</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#ef4444', fontWeight: 700 }}>+47%</span>
-                </div>
-                <div style={{ height: 6, borderRadius: 99, background: 'var(--slate-200)', overflow: 'hidden' }}>
-                  <div style={{ width: '47%', height: '100%', background: 'linear-gradient(90deg, #ef4444, #f87171)', borderRadius: 99 }} />
-                </div>
-              </div>
-            </motion.div>
-
-            {/* OCR */}
-            <motion.div className="lp-card" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.15 }}
-              style={{ gridColumn: 'span 5', padding: '2.5rem' }}>
-              <div className="feat-icon" style={{ background: '#fef3c7' }}>
-                <Zap size={24} color="#d97706" />
-              </div>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--slate-900)', marginBottom: '0.6rem', letterSpacing: '-0.02em' }}>
-                OCR de Alta Precisão
-              </h3>
-              <p style={{ color: 'var(--slate-500)', fontSize: '0.95rem', lineHeight: 1.7 }}>
-                Modelos treinados para extrair referências de instalação, vencimentos e código de barras — com quebra automática de senhas baseada no CNPJ do Condomínio.
-              </p>
-            </motion.div>
-
-            {/* PostgreSQL */}
-            <motion.div className="lp-card" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.2 }}
-              style={{ gridColumn: 'span 7', padding: '2.5rem' }}>
-              <div className="feat-icon" style={{ background: '#f0fdf4' }}>
-                <Database size={24} color="#16a34a" />
-              </div>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: 'var(--slate-900)', marginBottom: '0.6rem', letterSpacing: '-0.02em' }}>
-                PostgreSQL Unificado & ERP Ready
-              </h3>
-              <p style={{ color: 'var(--slate-500)', fontSize: '0.95rem', lineHeight: 1.7, maxWidth: 480 }}>
-                Um banco relacional arquitetado para milhões de faturas. Exportações inteligentes em XLSX e integrações de API ultra-rápidas prontas para conectar à sua contabilidade.
-              </p>
-              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1.5rem' }}>
-                {[{ label: 'Exportação', v: 'XLSX / CSV' }, { label: 'API', v: 'REST Ready' }, { label: 'Backup', v: 'Automático' }].map(item => (
-                  <div key={item.label}>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 700, color: 'var(--slate-900)' }}>{item.v}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--slate-400)', marginTop: 2 }}>{item.label}</div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* ─── HOW IT WORKS ─── */}
-        <section style={{ background: 'var(--slate-900)', padding: '6rem 2rem' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}
-              style={{ textAlign: 'center', marginBottom: '4rem' }}>
-              <span className="lp-tag" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--blue-300)', borderColor: 'rgba(59,130,246,0.3)', marginBottom: '1rem', display: 'inline-flex' }}>
-                FLUXO DE OPERAÇÃO
-              </span>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 3vw, 2.8rem)', fontWeight: 800, color: 'var(--white)', marginTop: '1rem', letterSpacing: '-0.03em' }}>
-                Como o Datacron funciona
-              </h2>
-              <p style={{ color: 'var(--slate-400)', fontSize: '1rem', marginTop: '0.75rem', maxWidth: 500, margin: '0.75rem auto 0' }}>
-                Do recebimento da fatura ao dado estruturado em segundos — sem intervenção humana.
-              </p>
-            </motion.div>
-
-            <div className="process-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
-              {[
-                { n: '01', title: 'Recebimento Automático', desc: 'O agente IMAP monitora as caixas de e-mail cadastradas a cada 5 minutos, identificando e baixando PDFs de faturas de concessionárias automaticamente.', icon: <Mail size={18} color="#60a5fa" /> },
-                { n: '02', title: 'Extração OCR', desc: 'Modelos de visão computacional extraem campos críticos: referência de instalação, valor, vencimento, código de barras e consumo com 99.9% de precisão.', icon: <Cpu size={18} color="#34d399" /> },
-                { n: '03', title: 'Auditoria Inteligente', desc: 'O motor de regras compara o consumo atual com o histórico. Variações acima do limiar configurado disparam alertas imediatos para o gestor.', icon: <AlertTriangle size={18} color="#fbbf24" /> },
-                { n: '04', title: 'Exportação & Integração', desc: 'Os dados validados são escritos no PostgreSQL e disponibilizados via API REST ou exportação XLSX para integração direta com seu ERP ou contabilidade.', icon: <BarChart3 size={18} color="#a78bfa" /> },
-              ].map((step) => (
-                <motion.div key={step.n} className="process-step" initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.4 }}>
-                  <div className="step-num">{step.n}</div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}>
-                      {step.icon}
-                      <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 800, color: 'var(--white)', letterSpacing: '-0.02em' }}>{step.title}</h3>
-                    </div>
-                    <p style={{ color: 'var(--slate-400)', fontSize: '0.9rem', lineHeight: 1.65 }}>{step.desc}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ─── CTA BANNER ─── */}
-        <section style={{ maxWidth: 1100, margin: '6rem auto', padding: '0 2rem' }}>
-          <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}
-            style={{
-              background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #3b82f6 100%)',
-              borderRadius: 24, padding: '4.5rem 3rem', textAlign: 'center',
-              position: 'relative', overflow: 'hidden',
-            }}>
-            <div style={{ position: 'absolute', top: -80, right: -80, opacity: 0.07 }}>
-              <Zap size={300} color="white" />
-            </div>
-            <div style={{ position: 'absolute', bottom: -60, left: -60, opacity: 0.05 }}>
-              <Database size={240} color="white" />
-            </div>
-
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <span className="lp-tag" style={{ background: 'rgba(255,255,255,0.15)', color: 'var(--white)', borderColor: 'rgba(255,255,255,0.3)', marginBottom: '1.5rem', display: 'inline-flex' }}>
-                PRONTO PARA ESCALAR
-              </span>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 3.5vw, 3rem)', fontWeight: 800, color: 'var(--white)', marginBottom: '1rem', letterSpacing: '-0.03em' }}>
-                Deixe o Datacron trabalhar por você.
-              </h2>
-              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1.1rem', marginBottom: '2.5rem', maxWidth: 540, margin: '0 auto 2.5rem' }}>
-                Sua equipe foca em relacionamento e estratégia enquanto o RPA cuida de cada fatura — 24 horas por dia.
-              </p>
-              <button
-                onClick={() => setIsLoginView(true)}
-                style={{
-                  background: 'var(--white)', color: 'var(--blue-600)',
-                  border: 'none', padding: '1rem 2.25rem', borderRadius: 12,
-                  fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 8,
-                  fontFamily: 'var(--font-body)',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
-                onMouseLeave={e => (e.currentTarget.style.transform = 'none')}
-              >
-                Autenticar no Sistema <ArrowRight size={17} />
-              </button>
-            </div>
-          </motion.div>
-        </section>
-
-        {/* ─── FOOTER ─── */}
-        <footer style={{ borderTop: '1px solid var(--slate-200)', padding: '2rem 3rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--slate-400)', fontSize: '0.85rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <LogoElement size={28} />
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--slate-800)', fontSize: '0.95rem' }}>DATACRON RPA</span>
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)' }}>© 2026 Todos os direitos reservados.</div>
-        </footer>
-
-        {/* ─── LOGIN MODAL ─── */}
-        <AnimatePresence>
-          {isLoginView && (
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setIsLoginView(false)}
-              style={{
-                position: 'fixed', inset: 0, zIndex: 100,
-                background: 'rgba(15, 23, 42, 0.65)',
-                backdropFilter: 'blur(10px)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
-              }}
-            >
-              <motion.div
-                initial={{ scale: 0.93, opacity: 0, y: 24 }}
-                animate={{ scale: 1, opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
-                exit={{ scale: 0.93, opacity: 0, y: 24, transition: { duration: 0.2 } }}
-                onClick={e => e.stopPropagation()}
-                style={{
-                  width: '100%', maxWidth: 420,
-                  background: 'var(--white)', borderRadius: 20,
-                  border: '1px solid var(--slate-200)',
-                  boxShadow: '0 32px 64px rgba(0,0,0,0.2)',
-                  overflow: 'hidden', position: 'relative',
-                }}
-              >
-                {/* Modal top accent */}
-                <div style={{ height: 4, background: 'linear-gradient(90deg, #2563eb, #60a5fa)' }} />
-                <div style={{ padding: '2.5rem' }}>
-                  <button onClick={() => setIsLoginView(false)} style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'none', border: 'none', color: 'var(--slate-400)', cursor: 'pointer', padding: 4, borderRadius: 8, transition: 'background 0.15s' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--slate-100)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
-                    <X size={18} />
-                  </button>
-
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.75rem' }}>
-                    <LogoElement size={64} />
-                  </div>
-
-                  <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                    <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--slate-900)', letterSpacing: '-0.02em' }}>
-                      Acesso Restrito
-                    </h3>
-                    <p style={{ color: 'var(--slate-400)', fontSize: '0.88rem', marginTop: '0.4rem' }}>
-                      Insira suas credenciais para continuar.
-                    </p>
-                  </div>
-
-                  <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {error && (
-                      <div style={{ background: '#fef2f2', color: '#ef4444', padding: '0.75rem 1rem', borderRadius: 10, fontSize: '0.85rem', fontWeight: 600, textAlign: 'center', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
-                        <AlertTriangle size={15} /> {error}
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <label className="lp-form-label">E-mail</label>
-                      <input type="email" className="lp-form-input" value={email} onChange={e => setEmail(e.target.value)} placeholder="seuemail@empresa.com" required />
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <label className="lp-form-label">Senha de Acesso</label>
-                      <input type="password" className="lp-form-input" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      style={{
-                        width: '100%', height: 46, marginTop: '0.5rem',
-                        background: isLoading ? 'var(--blue-300)' : 'var(--blue-500)',
-                        color: 'var(--white)', border: 'none', borderRadius: 11,
-                        fontFamily: 'var(--font-body)', fontSize: '0.95rem', fontWeight: 700,
-                        cursor: isLoading ? 'not-allowed' : 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                        transition: 'all 0.2s', letterSpacing: '-0.01em',
-                      }}
-                    >
-                      {isLoading ? (
-                        <><div className="lp-spinner" /> Autenticando...</>
-                      ) : (
-                        <><Lock size={15} /> Entrar no Sistema</>
-                      )}
-                    </button>
-                  </form>
-
-                  <div style={{ textAlign: 'center', marginTop: '1.25rem' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--slate-300)' }}>
-                      Acesso monitorado · Datacron RPA
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+      {/* ── STATS BAR ── */}
+      <div className="stats-bar">
+        <div className="stat-item">
+          <div className="stat-num"><Counter end={99} suffix=".9%" /></div>
+          <div className="stat-label">Precisão de leitura OCR</div>
+        </div>
+        <div className="stat-item">
+          <div className="stat-num"><span>&lt;</span><Counter end={5} suffix="min" /></div>
+          <div className="stat-label">Ciclo de varredura automática</div>
+        </div>
+        <div className="stat-item">
+          <div className="stat-num">24<span>/7</span></div>
+          <div className="stat-label">Monitoramento contínuo</div>
+        </div>
+        <div className="stat-item">
+          <div className="stat-num">0</div>
+          <div className="stat-label">Digitação manual necessária</div>
+        </div>
       </div>
-    </>
+
+      {/* ── PROBLEMA / SOLUÇÃO ── */}
+      <section className="lp-section" id="funcionalidades">
+        <div className="section-label">O Problema que Resolvemos</div>
+        <h2 className="section-title">Do caos da caixa de entrada<br />ao <em>controle absoluto</em></h2>
+        <p className="section-sub">Administradoras perdem horas preciosas todo mês fazendo manualmente o que o Datacron faz em segundos.</p>
+
+        <div className="compare-grid">
+          <div className="compare-card bad">
+            <div className="compare-head bad-head">✕ Sem o Datacron</div>
+            <ul className="compare-list">
+              <li><div className="ico ico-bad">✕</div>Varredura manual de dezenas de e-mails</li>
+              <li><div className="ico ico-bad">✕</div>Digitação linha a linha no Excel</li>
+              <li><div className="ico ico-bad">✕</div>Dias gastos fechando caixas</li>
+              <li><div className="ico ico-bad">✕</div>Risco alto de erros e multas</li>
+              <li><div className="ico ico-bad">✕</div>Zero visibilidade sobre variações</li>
+            </ul>
+          </div>
+          <div className="compare-card good">
+            <div className="compare-head good-head">✓ Com o Datacron</div>
+            <ul className="compare-list">
+              <li><div className="ico ico-good">✓</div>Robôs varrem centenas de inboxes</li>
+              <li><div className="ico ico-good">✓</div>Extração OCR com 99.9% de precisão</li>
+              <li><div className="ico ico-good">✓</div>Exportação instantânea para ERP</li>
+              <li><div className="ico ico-good">✓</div>Auditoria inteligente e automática</li>
+              <li><div className="ico ico-good">✓</div>Dashboard com alertas configuráveis</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* ── MÓDULOS ── */}
+      <section className="lp-section" style={{ background: 'var(--bg2)' }}>
+        <div className="section-label">Módulos da Plataforma</div>
+        <h2 className="section-title">Uma suíte completa para<br />administradoras de <em>condomínio</em></h2>
+        <div className="modules-grid">
+          <div className="module-card">
+            <div className="module-icon">📥</div>
+            <div className="module-title">Varredura de Inbox</div>
+            <p className="module-desc">Monitoramento IMAP/POP3 a cada 5 minutos. Identifica faturas automaticamente.</p>
+            <div className="module-tags"><span className="tag">IMAP/POP3</span><span className="tag">Auto-Scan</span></div>
+          </div>
+          <div className="module-card">
+            <div className="module-icon">🔓</div>
+            <div className="module-title">Desbloqueio Automático</div>
+            <p className="module-desc">Quebra automática de senhas baseada no CNPJ do condomínio.</p>
+            <div className="module-tags"><span className="tag">PDF Unlock</span><span className="tag">Secure</span></div>
+          </div>
+          <div className="module-card">
+            <div className="module-icon">🔍</div>
+            <div className="module-title">OCR de Precisão</div>
+            <p className="module-desc">Extração de valores, vencimentos e código de barras com 99.9% de acurácia.</p>
+            <div className="module-tags"><span className="tag">99.9% OCR</span><span className="tag">Data Intelligence</span></div>
+          </div>
+          <div className="module-card">
+            <div className="module-icon">🚨</div>
+            <div className="module-title">Alertas Inteligentes</div>
+            <p className="module-desc">Variações críticas disparam alertas imediatos via dashboard e e-mail.</p>
+            <div className="module-tags"><span className="tag">Anti-Fraud</span><span className="tag">Thresholds</span></div>
+          </div>
+          <div className="module-card">
+            <div className="module-icon">🗄️</div>
+            <div className="module-title">Exportação ERP</div>
+            <p className="module-desc">Dados estruturados em XLSX/CSV prontos para seu sistema de gestão.</p>
+            <div className="module-tags"><span className="tag">PostgreSQL</span><span className="tag">API REST</span></div>
+          </div>
+          <div className="module-card">
+            <div className="module-icon">📊</div>
+            <div className="module-title">Dashboard Real-time</div>
+            <p className="module-desc">Visibilidade total do consumo histórico e comparativos por período.</p>
+            <div className="module-tags"><span className="tag">Analytics</span><span className="tag">Live Data</span></div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── COMO FUNCIONA ── */}
+      <section className="lp-section" id="como-funciona">
+        <div className="section-label">Fluxo de Operação</div>
+        <h2 className="section-title">Do recebimento ao dado estruturado<br />em <em>segundos</em></h2>
+        <div className="flow">
+          <div className="flow-step">
+            <div className="flow-num">01</div>
+            <div className="flow-title">Monitoramento</div>
+            <p className="flow-desc">Agente monitora inboxes a cada 5 minutos e baixa PDFs.</p>
+          </div>
+          <div className="flow-step">
+            <div className="flow-num">02</div>
+            <div className="flow-title">Extração</div>
+            <p className="flow-desc">Senhas são quebradas e o OCR processa os dados.</p>
+          </div>
+          <div className="flow-step">
+            <div className="flow-num">03</div>
+            <div className="flow-title">Auditoria</div>
+            <p className="flow-desc">Motor de regras compara consumos e gera alertas.</p>
+          </div>
+          <div className="flow-step">
+            <div className="flow-num">04</div>
+            <div className="flow-title">Integração</div>
+            <p className="flow-desc">Dados são disponibilizados via API ou XLSX.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── PLANOS ── */}
+      <section className="lp-section" id="planos" style={{ background: 'var(--bg2)' }}>
+        <div className="section-label">Planos e Preços</div>
+        <h2 className="section-title">Escolha o plano ideal<br />para sua <em>operação</em></h2>
+        <div className="pricing-grid">
+          <div className="pricing-card">
+            <div className="plan-name">Starter</div>
+            <div className="plan-price">Sob consulta</div>
+            <ul className="plan-features">
+              <li>Até 5 condomínios</li>
+              <li>1 caixa de e-mail</li>
+              <li>OCR + Desbloqueio</li>
+              <li>Exportação XLSX</li>
+            </ul>
+            <a href="#contato" className="plan-cta cta-secondary">Solicitar Proposta</a>
+          </div>
+          <div className="pricing-card featured">
+            <div className="featured-badge">Mais Popular</div>
+            <div className="plan-name">Professional</div>
+            <div className="plan-price">Sob consulta</div>
+            <ul className="plan-features">
+              <li>Até 50 condomínios</li>
+              <li>Múltiplas caixas</li>
+              <li>Alertas configuráveis</li>
+              <li>API REST Ready</li>
+            </ul>
+            <a href="#contato" className="plan-cta cta-primary">Solicitar Proposta</a>
+          </div>
+          <div className="pricing-card">
+            <div className="plan-name">Enterprise</div>
+            <div className="plan-price">Personalizado</div>
+            <ul className="plan-features">
+              <li>Ilimitados</li>
+              <li>Suporte dedicado</li>
+              <li>Integração dedicada</li>
+              <li>SLA Garantido</li>
+            </ul>
+            <a href="#contato" className="plan-cta cta-secondary">Falar com Especialista</a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="lp-section">
+        <div style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
+          <div className="section-label">Perguntas Frequentes</div>
+          <h2 className="section-title">Tudo que você<br />precisa <em>saber</em></h2>
+        </div>
+        <div className="faq-list">
+          {[
+            { q: 'O Datacron funciona com qualquer e-mail?', a: 'Sim, utiliza protocolo IMAP/POP3, compatível com Gmail, Outlook e servidores corporativos.' },
+            { q: 'Quais concessionárias são suportadas?', a: 'Suportamos ENEL, SABESP, COMGÁS, CPFL, Light e as principais do país.' },
+            { q: 'Como funciona o desbloqueio com senha?', a: 'O sistema utiliza o CNPJ cadastrado do condomínio para realizar o desbloqueio automático do PDF.' },
+            { q: 'Os dados ficam seguros?', a: 'Sim, todos os dados são criptografados e seguimos as diretrizes da LGPD.' },
+          ].map((item, i) => (
+            <div key={i} className={`faq-item ${openFaq === i ? 'open' : ''}`}>
+              <div className="faq-q" onClick={() => toggleFaq(i)}>
+                {item.q}
+                <div className="faq-toggle">{openFaq === i ? '−' : '+'}</div>
+              </div>
+              <div className="faq-a">{item.a}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── CONTATO ── */}
+      <section className="lp-section" id="contato" style={{ background: 'var(--bg2)' }}>
+        <div className="section-label">Fale com a Gente</div>
+        <h2 className="section-title">Pronto para <em>automatizar</em><br />sua operação?</h2>
+        <div className="contact-layout">
+          <div>
+            <p style={{ color: 'var(--text2)', marginBottom: '2rem' }}>Respondemos seu contato em até 2 horas úteis.</p>
+            <ul className="contact-info-list">
+              <li>
+                <div className="contact-ico">✉️</div>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text3)' }}>E-mail</div>
+                  <a href="mailto:contato@datacron.com.br" className="contact-link">contato@datacron.com.br</a>
+                </div>
+              </li>
+              <li>
+                <div className="contact-ico">⏱️</div>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text3)' }}>Atendimento</div>
+                  <span style={{ color: 'var(--text2)', fontSize: '0.9rem' }}>Seg a Sex · 9h às 18h</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <div className="contact-form">
+            <div className="form-group">
+              <label className="form-label">Nome completo</label>
+              <input type="text" className="form-input" placeholder="Seu nome" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">E-mail corporativo</label>
+              <input type="email" className="form-input" placeholder="seu@email.com" />
+            </div>
+            <button className="form-submit" onClick={() => alert('Obrigado! Entraremos em contato.')}>Enviar Mensagem</button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer className="lp-footer">
+        <div>
+          <div className="footer-logo">DATA<span>CRON</span></div>
+          <p className="footer-copy">© 2026 Datacron RPA · Todos os direitos reservados.</p>
+        </div>
+        <div className="footer-links">
+          <Link href="/politica-de-privacidade">Privacidade</Link>
+          <Link href="/termos-de-uso">Termos de Uso</Link>
+        </div>
+      </footer>
+
+      {/* ── LOGIN MODAL ── */}
+      <AnimatePresence>
+        {isLoginView && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="modal-overlay"
+            onClick={() => setIsLoginView(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="modal-content"
+              onClick={e => e.stopPropagation()}
+            >
+              <button className="modal-close" onClick={() => setIsLoginView(false)}><X /></button>
+              <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+                <div className="nav-logo" style={{ fontSize: '2rem', marginBottom: '1rem' }}>DATA<span>CRON</span></div>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Acesso ao Sistema</h3>
+                <p style={{ color: 'var(--text3)', marginTop: '0.5rem' }}>Insira suas credenciais para continuar</p>
+              </div>
+
+              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {error && (
+                  <div style={{ background: 'rgba(255,79,79,0.1)', color: 'var(--danger)', padding: '1rem', borderRadius: '10px', fontSize: '0.85rem', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <AlertTriangle size={16} /> {error}
+                  </div>
+                )}
+                <div className="form-group">
+                  <label className="form-label">E-mail</label>
+                  <input
+                    type="email"
+                    className="form-input"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="exemplo@email.com"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Senha</label>
+                  <input
+                    type="password"
+                    className="form-input"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+                <button type="submit" className="form-submit" disabled={isLoading} style={{ marginTop: '1rem' }}>
+                  {isLoading ? 'Autenticando...' : 'Entrar no Sistema'}
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
