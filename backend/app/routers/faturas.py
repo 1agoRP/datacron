@@ -15,7 +15,10 @@ from app.database import get_db
 from app.dependencies import get_current_user, require_write, get_user_condo_ids
 from app.models.user import User
 from app.models.fatura import Fatura
+from app.models.concessionaria import Concessionaria
 from app.schemas import FaturaCreate, FaturaStatusUpdate, FaturaResponse
+from app.services.email_sender import send_notification_email
+from app.storage import get_file_content
 
 router = APIRouter(prefix="/faturas", tags=["Faturas"])
 
@@ -324,15 +327,90 @@ async def update_fatura_status(
     if body.status not in VALID_STATUSES:
         raise HTTPException(status_code=422, detail=f"Status inválido. Use: {VALID_STATUSES}")
 
-    result = await db.execute(select(Fatura).where(Fatura.id == id))
+    result = await db.execute(
+        select(Fatura)
+        .options(selectinload(Fatura.concessionaria).selectinload(Concessionaria.condominio))
+        .where(Fatura.id == id)
+    )
     f = result.scalar_one_or_none()
     if not f:
         raise HTTPException(status_code=404, detail="Fatura não encontrada")
 
+    old_status = f.status
     f.status = body.status
+    
+    # Automation: Leitura Individualizada notification
+    if old_status == "revisao" and body.status == "processada":
+        conc = f.concessionaria
+        if conc and conc.leitura_individualizada and conc.email_emissao:
+            try:
+                import base64
+                pdf_data = None
+                if f.storage_path:
+                    pdf_data = await get_file_content(f.storage_path)
+                elif f.pdf_base64:
+                    pdf_data = base64.b64decode(f.pdf_base64)
+                
+                if pdf_data:
+                    filename = f.pdf_nome_original or f"fatura_{f.id}.pdf"
+                    venc_str = f.vencimento.strftime("%d/%m/%Y") if f.vencimento else "Não informada"
+                    subject = f"Datacron: Fatura Desbloqueada - {f.condominio.nome} - Vencimento {venc_str}"
+                    message = f"Olá,\n\nA fatura de {conc.tipo} do condomínio {f.condominio.nome} (Vencimento: {venc_str}) foi desbloqueada e está anexa para emissão."
+                    
+                    send_notification_email(
+                        to=conc.email_emissao,
+                        subject=subject,
+                        message_text=message,
+                        attachments=[(filename, pdf_data)]
+                    )
+                    logger.info(f"E-mail de leitura individualizada enviado para {conc.email_emissao} (Fatura {f.id})")
+            except Exception as e:
+                logger.error(f"Falha ao enviar e-mail de leitura individualizada: {e}")
+
     await db.commit()
-    await db.refresh(f)
     return f
+
+@router.post("/download-lote")
+async def download_lote_faturas(
+    body: list[uuid.UUID],
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    import zipfile
+    import base64
+    from app.storage import get_file_content
+
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for fat_id in body:
+            res = await db.execute(select(Fatura).where(Fatura.id == fat_id))
+            f = res.scalar_one_or_none()
+            if not f:
+                continue
+            
+            pdf_data = None
+            if f.storage_path:
+                try:
+                    pdf_data = await get_file_content(f.storage_path)
+                except:
+                    pass
+            
+            if not pdf_data and f.pdf_base64:
+                try:
+                    pdf_data = base64.b64decode(f.pdf_base64)
+                except:
+                    pass
+            
+            if pdf_data:
+                filename = f.pdf_nome_original or f"fatura_{f.id}.pdf"
+                zip_file.writestr(filename, pdf_data)
+    
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=faturas_datacron.zip"},
+    )
 
 @router.get("/relatorio-analitico/download")
 async def download_relatorio_analitico(

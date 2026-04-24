@@ -192,7 +192,7 @@ async def criar_fornecedor(
                     :categoria,
                     :administradora,
                     'ATIVO',
-                    :user_id,
+                    :user_id::uuid,
                     NOW()
                 ) RETURNING *
             """),
@@ -204,16 +204,14 @@ async def criar_fornecedor(
                 "whatsapp": body.whatsappFornecedor,
                 "categoria": body.categoriaFornecedor,
                 "administradora": administradora,
-                "user_id": current_user.id,
+                "user_id": str(current_user.id),
             },
         )
         await db.commit()
         
-        row = result.fetchone()
+        row = result.mappings().first()
         if row:
-            # Convert row to dict, mapping CamelCase names if necessary, 
-            # though '*' should return them as defined in DB.
-            return dict(row._mapping)
+            return dict(row)
         
         # Fallback if fetchone fails but insert succeeded
         return {

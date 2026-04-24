@@ -277,20 +277,16 @@ export default function CondominiosPage() {
 
   const handleOpenHistory = async (conc: any) => {
     setHistoryConc(conc);
-    setSelectedHistory(new Set());
-    setGmailHistory([]);
+    setHistoryFaturas([]);
     setActiveHistoryTab('sistema');
     try {
       setLoadingHistory(true);
-      // 1. Fetch from Historico Table (New)
-      const dbFaturas = await api.getHistorico({
-        condominio_id: detailsCondo.id,
-        concessionaria_id: conc.id
-      });
+      // 1. Fetch from Historico Table (Combined current + legacy)
+      const dbFaturas = await api.getHistoricoFaturas(detailsCondo.id, conc.id);
 
       const sorted = [...dbFaturas].sort((a: any, b: any) => {
-        const dateA = new Date(a.vencimento || a.created_at || 0);
-        const dateB = new Date(b.vencimento || b.created_at || 0);
+        const dateA = new Date(a.vencimento || 0);
+        const dateB = new Date(b.vencimento || 0);
         return dateB.getTime() - dateA.getTime();
       });
       setHistoryFaturas(sorted);
@@ -852,7 +848,7 @@ export default function CondominiosPage() {
                               </div>
                               <div>
                                 <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  Ref: {f.referencia || '—'}
+                                  Vencimento: {f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
                                   {hasAutoDebit && <span style={{ padding: '2px 8px', borderRadius: 6, background: '#e0f2fe', color: '#0369a1', fontSize: '0.65rem', fontWeight: 800 }}>DÉBITO AUTO</span>}
                                 </div>
                                 <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1209,7 +1205,27 @@ export default function CondominiosPage() {
                   </div>
                 </div>
               </div>
-              <button className="dc-modal-close" onClick={() => setIsStatusModalOpen(false)}><X size={20} /></button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {statusItems.some(i => i.fatura) && (
+                  <button 
+                    className="dc-btn dc-btn-secondary" 
+                    style={{ height: 36, fontSize: '0.8rem', gap: 8, background: '#f8fafc' }}
+                    onClick={async () => {
+                      const ids = statusItems.filter(i => i.fatura).map(i => i.fatura.id);
+                      if (ids.length > 0) {
+                        try {
+                          await api.downloadLoteFaturas(ids);
+                        } catch (err: any) {
+                          alert(err.message);
+                        }
+                      }
+                    }}
+                  >
+                    <Download size={14} /> Baixar Todas
+                  </button>
+                )}
+                <button className="dc-modal-close" onClick={() => setIsStatusModalOpen(false)}><X size={20} /></button>
+              </div>
             </div>
 
             <div className="dc-modal-body" style={{ padding: '24px 0', minHeight: 400 }}>
@@ -1217,7 +1233,7 @@ export default function CondominiosPage() {
                 <div style={{ padding: 12, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Calendar size={16} color="#3b82f6" />
                   <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
-                    Referência: {format(new Date(), 'MMMM / yyyy', { locale: ptBR })}
+                    Referência (Vencimento): {format(new Date(), 'MMMM / yyyy', { locale: ptBR })}
                   </span>
                 </div>
               </div>

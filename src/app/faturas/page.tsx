@@ -73,21 +73,21 @@ export default function FaturasPage() {
       }
       
       if (selectedYear || selectedMonth) {
-        // Prioritize Referência for year/month filtering
-        let refMonth = '';
-        let refYear = '';
-        if (f.referencia && f.referencia.includes('/')) {
-          const parts = f.referencia.split('/');
-          refMonth = parts[0].padStart(2, '0');
-          refYear = parts[1];
+        // Prioritize Vencimento for year/month filtering
+        let vMonth = '';
+        let vYear = '';
+        if (f.vencimento) {
+          const d = new Date(f.vencimento + 'T12:00:00');
+          vMonth = (d.getMonth() + 1).toString().padStart(2, '0');
+          vYear = d.getFullYear().toString();
         } else if (f.created_at) {
           const d = new Date(f.created_at);
-          refMonth = (d.getMonth() + 1).toString().padStart(2, '0');
-          refYear = d.getFullYear().toString();
+          vMonth = (d.getMonth() + 1).toString().padStart(2, '0');
+          vYear = d.getFullYear().toString();
         }
 
-        if (selectedYear && refYear !== selectedYear) return false;
-        if (selectedMonth && refMonth !== selectedMonth) return false;
+        if (selectedYear && vYear !== selectedYear) return false;
+        if (selectedMonth && vMonth !== selectedMonth) return false;
       }
 
       return true;
@@ -130,11 +130,10 @@ export default function FaturasPage() {
     years.add((currentYear - 1).toString());
 
     faturas.forEach((f: any) => {
-      // From Referência (e.g., "03/2026")
-      if (f.referencia && f.referencia.includes('/')) {
-        const parts = f.referencia.split('/');
-        const y = parts[parts.length - 1];
-        if (y && y.length === 4) years.add(y);
+      // From Vencimento
+      if (f.vencimento) {
+        const d = new Date(f.vencimento + 'T12:00:00');
+        years.add(d.getFullYear().toString());
       }
       // From created_at as fallback
       if (f.created_at) {
@@ -345,9 +344,6 @@ export default function FaturasPage() {
                 <th onClick={() => handleSort('tipo')} style={{ cursor: 'pointer' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Tipo <SortIcon column="tipo" /></div>
                 </th>
-                <th onClick={() => handleSort('referencia')} style={{ cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Referência <SortIcon column="referencia" /></div>
-                </th>
                 <th onClick={() => handleSort('vencimento')} style={{ cursor: 'pointer' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Vencimento <SortIcon column="vencimento" /></div>
                 </th>
@@ -393,10 +389,7 @@ export default function FaturasPage() {
                        </span>
                     </td>
                     <td>
-                      <div className="dc-cell-primary" style={{ fontWeight: 600 }}>{formatReferencia(f.referencia)}</div>
-                    </td>
-                    <td>
-                      <div className="dc-cell-primary">{f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}</div>
+                      <div className="dc-cell-primary" style={{ fontWeight: 600 }}>{f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}</div>
                     </td>
                     <td>
                       <div className="dc-cell-primary" style={{ fontWeight: 700 }}>R$ {(Math.ceil((f.valor || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
@@ -489,7 +482,7 @@ export default function FaturasPage() {
                     Detalhes da Fatura
                   </div>
                   <div style={{ color: '#93c5fd', fontSize: '0.82rem', fontWeight: 600 }}>
-                    {selectedFatura.referencia} · ID: {selectedFatura.id?.substring(0, 8)}...
+                    Venc: {selectedFatura.vencimento ? format(new Date(selectedFatura.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'} · ID: {selectedFatura.id?.substring(0, 8)}...
                   </div>
                 </div>
               </div>
@@ -526,8 +519,8 @@ export default function FaturasPage() {
                 <DetailItem icon={<Mail size={16} />} label="Remetente" value={selectedFatura.email_remetente || '—'} />
                 <DetailItem icon={<FileText size={16} />} label="Assunto" value={selectedFatura.email_assunto || '—'} />
                 <DetailItem icon={<DollarSign size={16} />} label="Valor" value={`R$ ${(Math.ceil((selectedFatura.valor || 0) * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} highlight />
-                <DetailItem icon={<Calendar size={16} />} label="Vencimento" value={selectedFatura.vencimento ? format(new Date(selectedFatura.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'} />
-                <DetailItem icon={<Hash size={16} />} label="Referência" value={selectedFatura.referencia} />
+                <DetailItem icon={<Calendar size={16} />} label="Vencimento" value={selectedFatura.vencimento ? format(new Date(selectedFatura.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'} highlight />
+                <DetailItem icon={<Hash size={16} />} label="Identificador" value={selectedFatura.referencia} />
                 <DetailItem icon={<Clock size={16} />} label="Processado em" value={selectedFatura.created_at ? format(new Date(selectedFatura.created_at), "dd/MM/yyyy 'às' HH:mm") : '—'} />
                 <DetailItem icon={<FileText size={16} />} label="PDF Original" value={selectedFatura.pdf_nome_original || '—'} />
                 <DetailItem icon={<Zap size={16} />} label="Gmail Message ID" value={selectedFatura.gmail_message_id ? selectedFatura.gmail_message_id.substring(0, 16) + '...' : '—'} />

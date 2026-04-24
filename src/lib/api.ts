@@ -710,8 +710,20 @@ class ApiClient {
 
   // Reajustes Mercado
   async getReajustesMercado(categoria?: string) {
+    const baseUrl = '/reajustes';
     const param = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
-    return this.request<ReajusteMercado[]>(`/reajustes${param}`);
+    return this.request<ReajusteMercado[]>(`${baseUrl}/${param}`);
+  }
+
+  async getHistoricoFaturas(condominioId?: string, concessionariaId?: string) {
+    const params = new URLSearchParams();
+    if (condominioId) params.append('condominio_id', condominioId);
+    if (concessionariaId) params.append('concessionaria_id', concessionariaId);
+    return this.request<any[]>(`/historico/?${params.toString()}`);
+  }
+
+  async getFornecedores() {
+    return this.request<any[]>('/fornecedores');
   }
 
   async createReajusteMercado(formData: FormData) {
@@ -759,6 +771,28 @@ class ApiClient {
     for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
     const query = new URLSearchParams(safeParams).toString();
     return this.request<any[]>(`/historico?${query}`);
+  }
+
+  async downloadLoteFaturas(ids: string[]) {
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/faturas/download-lote`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(ids)
+    });
+    if (!response.ok) throw new Error('Falha ao baixar faturas em lote');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'faturas_datacron.zip';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   }
 }
 

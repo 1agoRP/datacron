@@ -341,7 +341,6 @@ export default function Dashboard() {
               <thead>
                 <tr>
                   <th style={{ paddingLeft: 24 }}>Unidade / ID</th>
-                  <th>Serviço</th>
                   <th>Vencimento</th>
                   <th>Volume</th>
                   <th style={{ paddingRight: 24 }}>Status</th>
@@ -355,17 +354,12 @@ export default function Dashboard() {
                       <div className="dc-cell-secondary"># {f.id.slice(0, 8)}</div>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div className={`dc-type-badge dc-type-${f.referencia?.charAt(0) || 'E'}`}>
-                          {f.referencia?.charAt(0) || 'F'}
-                        </div>
-                        <div className="dc-cell-primary" style={{ fontSize: '0.8rem' }}>{f.referencia}</div>
+                      <div className="dc-cell-primary" style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                        {f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
                       </div>
                     </td>
                     <td>
-                      <div className="dc-cell-primary" style={{ fontSize: '0.82rem' }}>
-                        {f.vencimento ? format(new Date(f.vencimento), "dd/MM/yyyy") : '—'}
-                      </div>
+                      <div className="dc-cell-primary" style={{ fontSize: '0.8rem', color: '#64748b' }}>{f.concessionaria?.tipo || 'Outros'}</div>
                     </td>
                     <td>
                       <div className="dc-cell-primary">{formatCurrency(f.valor)}</div>

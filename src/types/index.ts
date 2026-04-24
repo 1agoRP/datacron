@@ -30,6 +30,7 @@ export interface Concessionaria {
   dia_vencimento: number;
   valor_medio: number | null;
   nome_personalizado?: string | null;
+  email_emissao?: string | null;
   leitura_individualizada?: boolean;
   created_by_id?: string;
   created_at: string;

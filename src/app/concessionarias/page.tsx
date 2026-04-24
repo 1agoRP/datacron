@@ -259,7 +259,8 @@ export default function ConcessionariasPage() {
       nome_personalizado: conc.nome_personalizado || '',
       leitura_individualizada: conc.leitura_individualizada || false,
       debito_automatico: conc.debito_automatico || false,
-      senha_portal: conc.senha_portal || ''
+      senha_portal: conc.senha_portal || '',
+      email_emissao: conc.email_emissao || ''
     });
     setEditingId(conc.id);
     setShowPassword(false);
@@ -716,6 +717,24 @@ export default function ConcessionariasPage() {
                     </div>
                   </div>
                 </div>
+                {formConc.leitura_individualizada && (
+                  <div className="dc-form-group">
+                    <label>E-mail para Emissão (Leitura Individualizada)</label>
+                    <div style={{ position: 'relative' }}>
+                      <input 
+                        className="dc-form-input" 
+                        required={formConc.leitura_individualizada}
+                        disabled={readOnly} 
+                        value={formConc.email_emissao || ''} 
+                        onChange={e => setFormConc({...formConc, email_emissao: e.target.value})} 
+                        placeholder="Ex: emissao@administradora.com.br" 
+                        style={{ paddingLeft: 40 }}
+                      />
+                      <Mail size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    </div>
+                    <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 4 }}>As faturas serão enviadas automaticamente para este e-mail assim que desbloqueadas.</p>
+                  </div>
+                )}
               </div>
               
               <div className="dc-modal-footer" style={{ justifyContent: 'space-between' }}>

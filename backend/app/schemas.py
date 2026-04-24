@@ -155,6 +155,7 @@ class ConcessionariaCreate(BaseModel):
     leitura_individualizada: bool = False
     debito_automatico: bool = True
     senha_portal: Optional[str] = None
+    email_emissao: Optional[str] = None
 
 
 class ConcessionariaUpdate(BaseModel):
@@ -168,6 +169,7 @@ class ConcessionariaUpdate(BaseModel):
     leitura_individualizada: Optional[bool] = None
     debito_automatico: Optional[bool] = None
     senha_portal: Optional[str] = None
+    email_emissao: Optional[Optional[str]] = None
     ativo: Optional[bool] = None
 
 
@@ -204,6 +206,7 @@ class ConcessionariaResponse(BaseModel):
     leitura_individualizada: bool = False
     debito_automatico: bool = True
     senha_portal: Optional[str] = None
+    email_emissao: Optional[str] = None
     created_by_id: Optional[uuid.UUID] = None
     ativo: bool
     created_at: datetime

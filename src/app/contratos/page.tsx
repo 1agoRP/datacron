@@ -158,7 +158,7 @@ export default function ContratosPage() {
   };
   const [fornecedorForm, setFornecedorForm] = useState<any>({ ...defaultFornecedorForm });
 
-  const canManageFornecedores = user && ['admin', 'gerencia', 'assistente'].includes(user.role);
+  const canManageFornecedores = user && ['admin', 'gerencia', 'assistente', 'supervisor'].includes(user.role);
 
   // Fetch categories when popup opens
   useEffect(() => {

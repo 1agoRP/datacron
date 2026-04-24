@@ -34,6 +34,7 @@ class Concessionaria(Base):
     leitura_individualizada: Mapped[bool] = mapped_column(Boolean, default=False)
     debito_automatico: Mapped[bool] = mapped_column(Boolean, default=True)
     senha_portal: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    email_emissao: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
