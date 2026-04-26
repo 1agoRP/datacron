@@ -98,9 +98,6 @@ class ApiClient {
   }
 
   private async requestMultipart<T>(endpoint: string, formData: FormData, options: RequestInit = {}): Promise<T> {
-    const token = this.getToken();
-    const headers = {
-      ...options.headers,
     const finalUrl = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`.replace(/([^:])\/\//g, '$1/');
     const token = typeof window !== 'undefined' ? localStorage.getItem('datacron_token') : null;
 
