@@ -441,8 +441,6 @@ async def get_ata_eleicao_url(
     except Exception as e:
         logger.error(f"Error creating signed download URL: {e}")
         raise HTTPException(status_code=500, detail="Erro ao gerar link de download")
- filename="{condo.ata_eleicao_nome}"'},
-    )
 
 
 @router.post("/{id}/avcb")
