@@ -43,7 +43,9 @@ async def list_condominios(
     # Query 1: Fetch condominios (no eager loading, exclude heavy base64 column)
     stmt = (
         select(Condominio)
-        .options(defer(Condominio.ata_eleicao_base64))
+        .options(
+            defer(Condominio.ata_eleicao_base64)
+        )
         .where(Condominio.ativo == ativo)
     )
     if allowed_condo_ids is not None:
@@ -232,9 +234,13 @@ async def get_condominio(
     """Returns a single condominio by ID."""
     if allowed_condo_ids is not None and id not in allowed_condo_ids:
         raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
+
     result = await db.execute(
         select(Condominio)
-        .options(selectinload(Condominio.concessionarias))
+        .options(
+            selectinload(Condominio.concessionarias),
+            defer(Condominio.ata_eleicao_base64)
+        )
         .where(Condominio.id == id)
     )
     c = result.scalar_one_or_none()
@@ -374,30 +380,25 @@ async def upload_ata_eleicao(
     if pdf_file.content_type not in valid_pdf_mimes and not is_pdf_extension:
         raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
 
-    import base64
-    pdf_bytes = await pdf_file.read()
-    b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
-
-    with open("upload_debug.log", "a") as f:
-        f.write(f"[{datetime.now()}] Uploading for condo {id}: Bytes read={len(pdf_bytes)}, B64 len={len(b64_data)}\n")
-
-    condo.ata_eleicao_base64 = b64_data
-    condo.ata_eleicao_nome = pdf_file.filename or 'ata_eleicao.pdf'
-    condo.ata_eleicao_inicio = data_inicio
-    condo.ata_eleicao_fim = data_fim
-    
     try:
+        import base64
+        pdf_bytes = await pdf_file.read()
+        b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
+
+        condo.ata_eleicao_base64 = b64_data
+        condo.ata_eleicao_nome = pdf_file.filename or 'ata_eleicao.pdf'
+        condo.ata_eleicao_inicio = data_inicio
+        condo.ata_eleicao_fim = data_fim
+        
         await db.commit()
-        with open("upload_debug.log", "a") as f:
-            f.write(f"[{datetime.now()}] Commit successful for condo {id}\n")
+        await db.refresh(condo)
+
+        return {"mensagem": "ATA de Eleição salva com sucesso", "ata_eleicao_nome": condo.ata_eleicao_nome}
     except Exception as e:
-        with open("upload_debug.log", "a") as f:
-            f.write(f"[{datetime.now()}] Commit FAILED for condo {id}: {str(e)}\n")
-        raise e
-
-    await db.refresh(condo)
-
-    return {"mensagem": "ATA de Eleição salva com sucesso", "ata_eleicao_nome": condo.ata_eleicao_nome}
+        await db.rollback()
+        import logging
+        logging.error(f"Erro no upload da ATA: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro ao processar o arquivo: {str(e)}")
 
 
 @router.get("/{id}/ata-eleicao")
