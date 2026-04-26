@@ -361,8 +361,8 @@ async def get_condominio_gmail_history(
 @router.post("/{id}/ata-eleicao")
 async def upload_ata_eleicao(
     id: uuid.UUID,
-    data_inicio: Optional[datetime] = Form(None),
-    data_fim: Optional[datetime] = Form(None),
+    data_inicio: Optional[str] = Form(None),
+    data_fim: Optional[str] = Form(None),
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
@@ -380,6 +380,16 @@ async def upload_ata_eleicao(
     if pdf_file.content_type not in valid_pdf_mimes and not is_pdf_extension:
         raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
 
+    # Manual date parsing to be safer with empty strings from frontend
+    def parse_date(d_str):
+        if not d_str or d_str.strip() == "":
+            return None
+        try:
+            # Try common ISO format
+            return datetime.fromisoformat(d_str.replace('Z', '+00:00'))
+        except:
+            return None
+
     try:
         import base64
         pdf_bytes = await pdf_file.read()
@@ -387,18 +397,18 @@ async def upload_ata_eleicao(
 
         condo.ata_eleicao_base64 = b64_data
         condo.ata_eleicao_nome = pdf_file.filename or 'ata_eleicao.pdf'
-        condo.ata_eleicao_inicio = data_inicio
-        condo.ata_eleicao_fim = data_fim
+        condo.ata_eleicao_inicio = parse_date(data_inicio)
+        condo.ata_eleicao_fim = parse_date(data_fim)
         
         await db.commit()
-        await db.refresh(condo)
-
+        # No db.refresh(condo) here to avoid loading the massive base64 back into memory unnecessarily
+        
         return {"mensagem": "ATA de Eleição salva com sucesso", "ata_eleicao_nome": condo.ata_eleicao_nome}
     except Exception as e:
         await db.rollback()
         import logging
         logging.error(f"Erro no upload da ATA: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Erro ao processar o arquivo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro interno ao salvar arquivo: {str(e)}")
 
 
 @router.get("/{id}/ata-eleicao")
@@ -431,8 +441,8 @@ async def download_ata_eleicao(
 @router.post("/{id}/avcb")
 async def upload_avcb(
     id: uuid.UUID,
-    data_inicio: Optional[datetime] = Form(None),
-    data_fim: Optional[datetime] = Form(None),
+    data_inicio: Optional[str] = Form(None),
+    data_fim: Optional[str] = Form(None),
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
@@ -448,16 +458,28 @@ async def upload_avcb(
     if pdf_file.content_type not in valid_pdf_mimes and not is_pdf_extension:
         raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
 
-    import base64
-    pdf_bytes = await pdf_file.read()
-    b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
-    condo.avcb_url = b64_data
-    condo.avcb_inicio = data_inicio
-    condo.avcb_fim = data_fim
-    
-    await db.commit()
-    await db.refresh(condo)
-    return {"mensagem": "AVCB salvo com sucesso", "avcb_nome": pdf_file.filename}
+    # Manual date parsing
+    def parse_date(d_str):
+        if not d_str or d_str.strip() == "":
+            return None
+        try:
+            return datetime.fromisoformat(d_str.replace('Z', '+00:00'))
+        except:
+            return None
+
+    try:
+        import base64
+        pdf_bytes = await pdf_file.read()
+        b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
+        condo.avcb_url = b64_data
+        condo.avcb_inicio = parse_date(data_inicio)
+        condo.avcb_fim = parse_date(data_fim)
+        
+        await db.commit()
+        return {"mensagem": "AVCB salvo com sucesso", "avcb_nome": pdf_file.filename}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar AVCB: {str(e)}")
 
 
 @router.get("/{id}/avcb")
@@ -486,8 +508,8 @@ async def download_avcb(
 @router.post("/{id}/apolice")
 async def upload_apolice(
     id: uuid.UUID,
-    data_inicio: Optional[datetime] = Form(None),
-    data_fim: Optional[datetime] = Form(None),
+    data_inicio: Optional[str] = Form(None),
+    data_fim: Optional[str] = Form(None),
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
@@ -503,16 +525,28 @@ async def upload_apolice(
     if pdf_file.content_type not in valid_pdf_mimes and not is_pdf_extension:
         raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
 
-    import base64
-    pdf_bytes = await pdf_file.read()
-    b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
-    condo.apolice_seguro_url = b64_data
-    condo.apolice_seguro_inicio = data_inicio
-    condo.apolice_seguro_fim = data_fim
-    
-    await db.commit()
-    await db.refresh(condo)
-    return {"mensagem": "Apólice salva com sucesso", "apolice_nome": pdf_file.filename}
+    # Manual date parsing
+    def parse_date(d_str):
+        if not d_str or d_str.strip() == "":
+            return None
+        try:
+            return datetime.fromisoformat(d_str.replace('Z', '+00:00'))
+        except:
+            return None
+
+    try:
+        import base64
+        pdf_bytes = await pdf_file.read()
+        b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
+        condo.apolice_seguro_url = b64_data
+        condo.apolice_seguro_inicio = parse_date(data_inicio)
+        condo.apolice_seguro_fim = parse_date(data_fim)
+        
+        await db.commit()
+        return {"mensagem": "Apólice salva com sucesso", "apolice_nome": pdf_file.filename}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar Apólice: {str(e)}")
 
 
 @router.get("/{id}/apolice")

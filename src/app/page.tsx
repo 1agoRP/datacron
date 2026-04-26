@@ -1,13 +1,10 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight,
-  Lock,
   X,
-  Zap,
-  CheckCircle2,
   AlertTriangle,
   ChevronDown,
 } from 'lucide-react';
@@ -197,27 +194,27 @@ export default function LandingPage() {
       <section className="lp-section" id="funcionalidades">
         <div className="section-label">O Problema que Resolvemos</div>
         <h2 className="section-title">Do caos da caixa de entrada<br />ao <em>controle absoluto</em></h2>
-        <p className="section-sub">Administradoras perdem horas preciosas todo mês fazendo manualmente o que o Datacron faz em segundos.</p>
+        <p className="section-sub">Administradoras perdem horas preciosas todo mês fazendo manualmente o que o Datacron faz em segundos — com mais precisão e total rastreabilidade.</p>
 
         <div className="compare-grid">
           <div className="compare-card bad">
             <div className="compare-head bad-head">✕ Sem o Datacron</div>
             <ul className="compare-list">
-              <li><div className="ico ico-bad">✕</div>Varredura manual de dezenas de e-mails</li>
-              <li><div className="ico ico-bad">✕</div>Digitação linha a linha no Excel</li>
-              <li><div className="ico ico-bad">✕</div>Dias gastos fechando caixas</li>
-              <li><div className="ico ico-bad">✕</div>Risco alto de erros e multas</li>
-              <li><div className="ico ico-bad">✕</div>Zero visibilidade sobre variações</li>
+              <li><div className="ico ico-bad">✕</div>Varredura manual de dezenas de e-mails por dia</li>
+              <li><div className="ico ico-bad">✕</div>Digitação linha a linha no Excel — horas perdidas</li>
+              <li><div className="ico ico-bad">✕</div>Dias gastos fechando caixas de condomínio</li>
+              <li><div className="ico ico-bad">✕</div>Risco alto de erros, multas por atraso e retrabalho</li>
+              <li><div className="ico ico-bad">✕</div>Zero visibilidade sobre variações abusivas de consumo</li>
             </ul>
           </div>
           <div className="compare-card good">
             <div className="compare-head good-head">✓ Com o Datacron</div>
             <ul className="compare-list">
-              <li><div className="ico ico-good">✓</div>Robôs varrem centenas de inboxes</li>
-              <li><div className="ico ico-good">✓</div>Extração OCR com 99.9% de precisão</li>
-              <li><div className="ico ico-good">✓</div>Exportação instantânea para ERP</li>
-              <li><div className="ico ico-good">✓</div>Auditoria inteligente e automática</li>
-              <li><div className="ico ico-good">✓</div>Dashboard com alertas configuráveis</li>
+              <li><div className="ico ico-good">✓</div>Robôs varrem centenas de inboxes automaticamente</li>
+              <li><div className="ico ico-good">✓</div>Extração OCR com 99.9% de precisão comprovada</li>
+              <li><div className="ico ico-good">✓</div>Exportação instantânea pronta para o seu ERP</li>
+              <li><div className="ico ico-good">✓</div>Auditoria inteligente: bloqueia faturas com variação anormal</li>
+              <li><div className="ico ico-good">✓</div>Dashboard em tempo real com alertas configuráveis</li>
             </ul>
           </div>
         </div>
@@ -231,38 +228,38 @@ export default function LandingPage() {
           <div className="module-card">
             <div className="module-icon">📥</div>
             <div className="module-title">Varredura de Inbox</div>
-            <p className="module-desc">Monitoramento IMAP/POP3 a cada 5 minutos. Identifica faturas automaticamente.</p>
-            <div className="module-tags"><span className="tag">IMAP/POP3</span><span className="tag">Auto-Scan</span></div>
+            <p className="module-desc">Um agente monitora sua caixa IMAP/POP3 a cada 5 minutos. Identifica faturas de ENEL, SABESP, COMGÁS, CPFL e outras automaticamente.</p>
+            <div className="module-tags"><span className="tag">IMAP/POP3</span><span className="tag">Multi-inbox</span></div>
           </div>
           <div className="module-card">
             <div className="module-icon">🔓</div>
             <div className="module-title">Desbloqueio Automático</div>
-            <p className="module-desc">Quebra automática de senhas baseada no CNPJ do condomínio.</p>
-            <div className="module-tags"><span className="tag">PDF Unlock</span><span className="tag">Secure</span></div>
+            <p className="module-desc">Faturas protegidas por senha? O Datacron realiza a quebra automática baseada no CNPJ do condomínio.</p>
+            <div className="module-tags"><span className="tag">PDF Unlock</span><span className="tag">Seguro</span></div>
           </div>
           <div className="module-card">
             <div className="module-icon">🔍</div>
             <div className="module-title">OCR de Precisão</div>
-            <p className="module-desc">Extração de valores, vencimentos e código de barras com 99.9% de acurácia.</p>
-            <div className="module-tags"><span className="tag">99.9% OCR</span><span className="tag">Data Intelligence</span></div>
+            <p className="module-desc">Modelos treinados para extrair valores, vencimentos e código de barras com 99.9% de acurácia.</p>
+            <div className="module-tags"><span className="tag">99.9% OCR</span><span className="tag">Inteligência</span></div>
           </div>
           <div className="module-card">
             <div className="module-icon">🚨</div>
             <div className="module-title">Alertas Inteligentes</div>
-            <p className="module-desc">Variações críticas disparam alertas imediatos via dashboard e e-mail.</p>
-            <div className="module-tags"><span className="tag">Anti-Fraud</span><span className="tag">Thresholds</span></div>
+            <p className="module-desc">Variações acima do limiar configurado disparam alertas imediatos. Também avisa faturas em falta.</p>
+            <div className="module-tags"><span className="tag">Anti-fraude</span><span className="tag">Configurável</span></div>
           </div>
           <div className="module-card">
             <div className="module-icon">🗄️</div>
-            <div className="module-title">Exportação ERP</div>
-            <p className="module-desc">Dados estruturados em XLSX/CSV prontos para seu sistema de gestão.</p>
+            <div className="module-title">Banco de Dados Unificado</div>
+            <p className="module-desc">PostgreSQL arquitetado para milhões de faturas. Exportações em XLSX e API REST pronta para seu ERP.</p>
             <div className="module-tags"><span className="tag">PostgreSQL</span><span className="tag">API REST</span></div>
           </div>
           <div className="module-card">
             <div className="module-icon">📊</div>
-            <div className="module-title">Dashboard Real-time</div>
-            <p className="module-desc">Visibilidade total do consumo histórico e comparativos por período.</p>
-            <div className="module-tags"><span className="tag">Analytics</span><span className="tag">Live Data</span></div>
+            <div className="module-title">Dashboard & Relatórios</div>
+            <p className="module-desc">Visibilidade total em tempo real: consumo histórico, comparativos por período e ranking de concessionárias.</p>
+            <div className="module-tags"><span className="tag">Real-time</span><span className="tag">Analytics</span></div>
           </div>
         </div>
       </section>
@@ -274,23 +271,107 @@ export default function LandingPage() {
         <div className="flow">
           <div className="flow-step">
             <div className="flow-num">01</div>
-            <div className="flow-title">Monitoramento</div>
-            <p className="flow-desc">Agente monitora inboxes a cada 5 minutos e baixa PDFs.</p>
+            <div className="flow-title">Monitoramento contínuo</div>
+            <p className="flow-desc">O agente monitora inboxes a cada 5 minutos, identificando e baixando faturas automaticamente.</p>
           </div>
           <div className="flow-step">
             <div className="flow-num">02</div>
-            <div className="flow-title">Extração</div>
-            <p className="flow-desc">Senhas são quebradas e o OCR processa os dados.</p>
+            <div className="flow-title">Extração e desbloqueio</div>
+            <p className="flow-desc">Senhas são quebradas automaticamente. O OCR extrai dados com precisão de 99.9%.</p>
           </div>
           <div className="flow-step">
             <div className="flow-num">03</div>
-            <div className="flow-title">Auditoria</div>
-            <p className="flow-desc">Motor de regras compara consumos e gera alertas.</p>
+            <div className="flow-title">Auditoria e alertas</div>
+            <p className="flow-desc">O motor de regras compara o consumo com o histórico. Variações disparam alertas imediatos.</p>
           </div>
           <div className="flow-step">
             <div className="flow-num">04</div>
-            <div className="flow-title">Integração</div>
-            <p className="flow-desc">Dados são disponibilizados via API ou XLSX.</p>
+            <div className="flow-title">Exportação e integração</div>
+            <p className="flow-desc">Dados validados são gravados e disponibilizados via API ou XLSX para seu ERP.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── ALERTS SECTION ── */}
+      <section className="lp-section" style={{ background: 'var(--bg2)' }}>
+        <div className="section-label">Sistema de Alertas</div>
+        <h2 className="section-title">Nunca mais seja surpreendido<br />por uma fatura <em>fora do padrão</em></h2>
+        <div className="alerts-layout">
+          <div>
+            <p className="section-sub" style={{ marginBottom: '2rem' }}>O Datacron monitora ativamente variações absurdas de consumo e o não recebimento de faturas nas datas previstas.</p>
+            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '0.9rem', color: 'var(--text2)' }}>
+                <span style={{ color: 'var(--accent3)', fontWeight: 700, flexShrink: 0, marginTop: '2px' }}>✓</span>
+                Limiar de variação configurável por condomínio
+              </li>
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '0.9rem', color: 'var(--text2)' }}>
+                <span style={{ color: 'var(--accent3)', fontWeight: 700, flexShrink: 0, marginTop: '2px' }}>✓</span>
+                Alertas por e-mail e notificação no dashboard
+              </li>
+              <li style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', fontSize: '0.9rem', color: 'var(--text2)' }}>
+                <span style={{ color: 'var(--accent3)', fontWeight: 700, flexShrink: 0, marginTop: '2px' }}>✓</span>
+                Aviso antecipado de faturas não recebidas
+              </li>
+            </ul>
+          </div>
+          <div>
+            <div className="alert-card">
+              <div className="alert-card-icon icon-danger">🚨</div>
+              <div className="alert-card-body">
+                <div className="alert-card-title" style={{ color: 'var(--danger)' }}>Variação crítica detectada</div>
+                <div className="alert-card-desc">COMGÁS · Torre Business · Consumo <strong style={{ color: 'var(--danger)' }}>47% acima</strong> da média dos últimos 3 meses.</div>
+                <div className="alert-time">Detectado agora · Agente RPA</div>
+              </div>
+            </div>
+            <div className="alert-card">
+              <div className="alert-card-icon icon-warn">⏰</div>
+              <div className="alert-card-body">
+                <div className="alert-card-title" style={{ color: 'var(--warn)' }}>Fatura não recebida</div>
+                <div className="alert-card-desc">ENEL-SP · Residencial Laranjeiras · Previsão dia 15 <strong style={{ color: 'var(--warn)' }}>ainda não chegou</strong>.</div>
+                <div className="alert-time">Alerta automático · 08:14</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── TESTIMONIALS ── */}
+      <section className="lp-section">
+        <div className="section-label">Quem usa o Datacron</div>
+        <h2 className="section-title">Administradoras que <em>recuperaram</em><br />horas de trabalho todo mês</h2>
+        <div className="testimonials-grid">
+          <div className="testimonial-card">
+            <div className="stars">★★★★★</div>
+            <p className="testimonial-text">"Antes gastávamos 2 dias inteiros fechando as caixas dos condomínios. Com o Datacron isso é feito automaticamente."</p>
+            <div className="testimonial-author">
+              <div className="author-avatar">RS</div>
+              <div>
+                <div className="author-name">Ricardo S.</div>
+                <div className="author-role">Diretor · Adm. Síntese</div>
+              </div>
+            </div>
+          </div>
+          <div className="testimonial-card">
+            <div className="stars">★★★★★</div>
+            <p className="testimonial-text">"O alerta de variação nos salvou de um pagamento indevido de quase R$ 4 mil. O sistema sinalizou na hora."</p>
+            <div className="testimonial-author">
+              <div className="author-avatar">MC</div>
+              <div>
+                <div className="author-name">Mariana C.</div>
+                <div className="author-role">Gestora · CondoMais</div>
+              </div>
+            </div>
+          </div>
+          <div className="testimonial-card">
+            <div className="stars">★★★★★</div>
+            <p className="testimonial-text">"A integração com nosso ERP foi surpreendentemente simples. Em uma semana já tínhamos tudo funcionando."</p>
+            <div className="testimonial-author">
+              <div className="author-avatar">FP</div>
+              <div>
+                <div className="author-name">Felipe P.</div>
+                <div className="author-role">TI · Grupo Patrimonial</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -303,6 +384,7 @@ export default function LandingPage() {
           <div className="pricing-card">
             <div className="plan-name">Starter</div>
             <div className="plan-price">Sob consulta</div>
+            <p className="plan-desc">Ideal para administradoras iniciando a automação.</p>
             <ul className="plan-features">
               <li>Até 5 condomínios</li>
               <li>1 caixa de e-mail</li>
@@ -315,10 +397,12 @@ export default function LandingPage() {
             <div className="featured-badge">Mais Popular</div>
             <div className="plan-name">Professional</div>
             <div className="plan-price">Sob consulta</div>
+            <p className="plan-desc">Para administradoras com operação média a grande.</p>
             <ul className="plan-features">
               <li>Até 50 condomínios</li>
               <li>Múltiplas caixas</li>
               <li>Alertas configuráveis</li>
+              <li>Dashboard em tempo real</li>
               <li>API REST Ready</li>
             </ul>
             <a href="#contato" className="plan-cta cta-primary">Solicitar Proposta</a>
@@ -326,11 +410,12 @@ export default function LandingPage() {
           <div className="pricing-card">
             <div className="plan-name">Enterprise</div>
             <div className="plan-price">Personalizado</div>
+            <p className="plan-desc">Para grandes grupos com necessidades específicas.</p>
             <ul className="plan-features">
-              <li>Ilimitados</li>
+              <li>Condomínios ilimitados</li>
               <li>Suporte dedicado</li>
               <li>Integração dedicada</li>
-              <li>SLA Garantido</li>
+              <li>Customizações sob demanda</li>
             </ul>
             <a href="#contato" className="plan-cta cta-secondary">Falar com Especialista</a>
           </div>
@@ -345,15 +430,16 @@ export default function LandingPage() {
         </div>
         <div className="faq-list">
           {[
-            { q: 'O Datacron funciona com qualquer e-mail?', a: 'Sim, utiliza protocolo IMAP/POP3, compatível com Gmail, Outlook e servidores corporativos.' },
-            { q: 'Quais concessionárias são suportadas?', a: 'Suportamos ENEL, SABESP, COMGÁS, CPFL, Light e as principais do país.' },
-            { q: 'Como funciona o desbloqueio com senha?', a: 'O sistema utiliza o CNPJ cadastrado do condomínio para realizar o desbloqueio automático do PDF.' },
-            { q: 'Os dados ficam seguros?', a: 'Sim, todos os dados são criptografados e seguimos as diretrizes da LGPD.' },
+            { q: 'O Datacron funciona com qualquer provedor de e-mail?', a: 'Sim. O Datacron utiliza protocolo IMAP/POP3, compatível com Gmail, Outlook, Yahoo e qualquer servidor corporativo.' },
+            { q: 'Quais concessionárias são suportadas?', a: 'Suportamos ENEL, SABESP, COMGÁS, CPFL, Light, Copel e as principais do país.' },
+            { q: 'Como funciona o desbloqueio de faturas com senha?', a: 'O sistema utiliza o CNPJ cadastrado do condomínio para realizar o desbloqueio automático do PDF.' },
+            { q: 'Como o sistema me avisa quando uma fatura não chega?', a: 'Você cadastra o calendário esperado e o Datacron envia alertas automáticos se a fatura atrasar.' },
+            { q: 'Os dados ficam seguros?', a: 'Sim, utilizamos criptografia em repouso e em trânsito, em total conformidade com a LGPD.' },
           ].map((item, i) => (
             <div key={i} className={`faq-item ${openFaq === i ? 'open' : ''}`}>
               <div className="faq-q" onClick={() => toggleFaq(i)}>
                 {item.q}
-                <div className="faq-toggle">{openFaq === i ? '−' : '+'}</div>
+                <div className="faq-toggle"><ChevronDown size={20} style={{ transform: openFaq === i ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} /></div>
               </div>
               <div className="faq-a">{item.a}</div>
             </div>
@@ -367,7 +453,7 @@ export default function LandingPage() {
         <h2 className="section-title">Pronto para <em>automatizar</em><br />sua operação?</h2>
         <div className="contact-layout">
           <div>
-            <p style={{ color: 'var(--text2)', marginBottom: '2rem' }}>Respondemos seu contato em até 2 horas úteis.</p>
+            <p style={{ color: 'var(--text2)', marginBottom: '2rem' }}>Fale com nosso time e descubra como eliminar o trabalho manual. Respondemos em até 2 horas úteis.</p>
             <ul className="contact-info-list">
               <li>
                 <div className="contact-ico">✉️</div>
@@ -380,12 +466,13 @@ export default function LandingPage() {
                 <div className="contact-ico">⏱️</div>
                 <div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text3)' }}>Atendimento</div>
-                  <span style={{ color: 'var(--text2)', fontSize: '0.9rem' }}>Seg a Sex · 9h às 18h</span>
+                  <span style={{ color: 'var(--text2)', fontSize: '0.9rem' }}>Segunda a sexta · 9h às 18h</span>
                 </div>
               </li>
             </ul>
           </div>
           <div className="contact-form">
+            <h3 style={{ fontFamily: 'var(--font-head)', fontSize: '1.2rem', fontWeight: 700, marginBottom: '1.5rem' }}>Solicite uma Demonstração</h3>
             <div className="form-group">
               <label className="form-label">Nome completo</label>
               <input type="text" className="form-input" placeholder="Seu nome" />
@@ -394,7 +481,7 @@ export default function LandingPage() {
               <label className="form-label">E-mail corporativo</label>
               <input type="email" className="form-input" placeholder="seu@email.com" />
             </div>
-            <button className="form-submit" onClick={() => alert('Obrigado! Entraremos em contato.')}>Enviar Mensagem</button>
+            <button className="form-submit" onClick={() => alert('Obrigado! Entraremos em contato em breve.')}>Solicitar Demonstração Gratuita →</button>
           </div>
         </div>
       </section>

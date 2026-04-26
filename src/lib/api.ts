@@ -101,28 +101,40 @@ class ApiClient {
     const token = this.getToken();
     const headers = {
       ...options.headers,
-    } as any;
+    const finalUrl = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`.replace(/([^:])\/\//g, '$1/');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('datacron_token') : null;
 
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
+    };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const finalUrl = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`.replace(/([^:])\/\//g, '$1/');
-
-    const response = await fetchWithRetry(finalUrl, {
+    const response = await fetch(finalUrl, {
       ...options,
+      method: options.method || 'POST',
       headers,
       body: formData,
     });
 
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('datacron_token');
+        document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+        window.location.href = '/';
+      }
+      throw new Error('Sessão expirada. Por favor, faça login novamente.');
+    }
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      let msg = 'Erro no processamento do arquivo';
+      let msg = `Erro no processamento (Status: ${response.status})`;
       
       if (typeof errorData.detail === 'string') {
         msg = errorData.detail;
-      } else if (Array.isArray(errorData.detail)) {
-        msg = errorData.detail.map((e: any) => e.msg).join(', ');
+      } else if (response.status === 413) {
+        msg = 'O arquivo é muito grande para ser processado.';
       }
       
       throw new Error(msg);
@@ -140,9 +152,12 @@ class ApiClient {
         senha: credentials.senha
       }),
     });
-    localStorage.setItem('datacron_token', data.access_token);
-    // Also set cookie so Next.js middleware can protect routes server-side
-    document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Strict; max-age=${60 * 60 * 24 * 30}`; // 30 days
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('datacron_token', data.access_token);
+      // Extend cookie to 30 days and use Lax for better redirect handling
+      document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Lax; max-age=${60 * 60 * 24 * 30}`;
+    }
     return data;
   }
 
