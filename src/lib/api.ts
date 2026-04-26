@@ -234,119 +234,76 @@ class ApiClient {
     return this.request<any[]>(`/condominios/${condominioId}/status-contas`);
   }
 
-  async uploadAtaEleicao(id: string, formData: FormData) {
+  async getUploadUrl(id: string, filename: string, type: 'ata' | 'avcb' | 'apolice') {
+    return this.request<{ upload_url: string; storage_path: string; token: string }>(
+      `/condominios/${id}/upload-url?filename=${encodeURIComponent(filename)}&file_type=${type}`
+    );
+  }
+
+  async uploadToStorage(url: string, file: File) {
+    const response = await fetch(url, {
+      method: 'PUT',
+      body: file,
+      headers: {
+        'Content-Type': file.type || 'application/pdf',
+      }
+    });
+    if (!response.ok) {
+      throw new Error('Falha ao enviar arquivo para o Storage');
+    }
+    return response.json();
+  }
+
+  // Document Management Methods
+  async saveAtaEleicao(id: string, data: { storage_path: string; filename: string; data_inicio?: string; data_fim?: string }) {
+    const formData = new FormData();
+    formData.append('storage_path', data.storage_path);
+    formData.append('filename', data.filename);
+    if (data.data_inicio) formData.append('data_inicio', data.data_inicio);
+    if (data.data_fim) formData.append('data_fim', data.data_fim);
     return this.requestMultipart(`/condominios/${id}/ata-eleicao`, formData, { method: 'POST' });
   }
 
   async downloadAtaEleicao(id: string) {
-    const token = this.getToken();
-    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/ata-eleicao`, {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || 'Falha ao baixar ATA de Eleição');
-    }
-    const blob = await response.blob();
-    
-    const disposition = response.headers.get('Content-Disposition');
-    let filename = `ata_eleicao_${id}.pdf`;
-    if (disposition && disposition.includes('filename=')) {
-        const matches = disposition.match(/filename="(.+)"/);
-        if (matches && matches.length > 1) {
-            filename = matches[1];
-        }
-    }
-    
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    const data = await this.request<{ url: string }>(`/condominios/${id}/ata-eleicao`);
+    if (data?.url) window.open(data.url, '_blank');
   }
 
   async deleteAtaEleicao(id: string) {
     return this.request(`/condominios/${id}/ata-eleicao`, { method: 'DELETE' });
   }
 
-  async uploadAvcb(id: string, formData: FormData) {
+  async saveAvcb(id: string, data: { storage_path: string; data_inicio?: string; data_fim?: string }) {
+    const formData = new FormData();
+    formData.append('storage_path', data.storage_path);
+    if (data.data_inicio) formData.append('data_inicio', data.data_inicio);
+    if (data.data_fim) formData.append('data_fim', data.data_fim);
     return this.requestMultipart(`/condominios/${id}/avcb`, formData, { method: 'POST' });
   }
 
   async downloadAvcb(id: string) {
-    const token = this.getToken();
-    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/avcb`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || 'Falha ao baixar AVCB');
-    }
-    const blob = await response.blob();
-    
-    const disposition = response.headers.get('Content-Disposition');
-    let filename = `avcb_${id}.pdf`;
-    if (disposition && disposition.includes('filename=')) {
-        const matches = disposition.match(/filename="(.+)"/);
-        if (matches && matches.length > 1) {
-            filename = matches[1];
-        }
-    }
-    
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    const data = await this.request<{ url: string }>(`/condominios/${id}/avcb`);
+    if (data?.url) window.open(data.url, '_blank');
   }
 
   async deleteAvcb(id: string) {
     return this.request(`/condominios/${id}/avcb`, { method: 'DELETE' });
   }
 
-  async uploadApoliceSeguro(id: string, formData: FormData) {
+  async saveApolice(id: string, data: { storage_path: string; data_inicio?: string; data_fim?: string }) {
+    const formData = new FormData();
+    formData.append('storage_path', data.storage_path);
+    if (data.data_inicio) formData.append('data_inicio', data.data_inicio);
+    if (data.data_fim) formData.append('data_fim', data.data_fim);
     return this.requestMultipart(`/condominios/${id}/apolice`, formData, { method: 'POST' });
   }
 
-  async downloadApoliceSeguro(id: string) {
-    const token = this.getToken();
-    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/apolice`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
-    });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || 'Falha ao baixar Apólice de Seguro');
-    }
-    const blob = await response.blob();
-    
-    const disposition = response.headers.get('Content-Disposition');
-    let filename = `apolice_seguro_${id}.pdf`;
-    if (disposition && disposition.includes('filename=')) {
-        const matches = disposition.match(/filename="(.+)"/);
-        if (matches && matches.length > 1) {
-            filename = matches[1];
-        }
-    }
-    
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+  async downloadApolice(id: string) {
+    const data = await this.request<{ url: string }>(`/condominios/${id}/apolice`);
+    if (data?.url) window.open(data.url, '_blank');
   }
 
-  async deleteApoliceSeguro(id: string) {
+  async deleteApolice(id: string) {
     return this.request(`/condominios/${id}/apolice`, { method: 'DELETE' });
   }
 

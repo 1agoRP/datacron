@@ -26,7 +26,7 @@ class Condominio(Base):
     cnpj: Mapped[str] = mapped_column(String(18), unique=True, nullable=False, index=True)
     sindico: Mapped[str] = mapped_column(String(200), nullable=False)
     cpf_sindico: Mapped[Optional[str]] = mapped_column(String(14), nullable=True)
-    ata_eleicao_base64: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ata_eleicao_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ata_eleicao_nome: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     ata_eleicao_inicio: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     ata_eleicao_fim: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

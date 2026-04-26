@@ -16,10 +16,15 @@ from app.models.user import User
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
 from app.schemas import CondominioCreate, CondominioUpdate, CondominioResponse, FaturaResponse
+from app.config import settings
+from supabase import create_client, Client
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/condominios", tags=["Condomínios"])
+
+# Initialize Supabase client
+supabase_client: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
 
 
 def _escape_like(value: str) -> str:
@@ -40,12 +45,9 @@ async def list_condominios(
     """Lists all condominios with optional search and pagination."""
     from app.models.concessionaria import Concessionaria
 
-    # Query 1: Fetch condominios (no eager loading, exclude heavy base64 column)
+    # Query 1: Fetch condominios
     stmt = (
         select(Condominio)
-        .options(
-            defer(Condominio.ata_eleicao_base64)
-        )
         .where(Condominio.ativo == ativo)
     )
     if allowed_condo_ids is not None:
@@ -354,222 +356,191 @@ async def get_condominio_gmail_history(
     # 3. Chamar função de busca IMAP
     from app.services.email_monitor import get_gmail_history
     history = get_gmail_history(label_name, conc.instalacao)
-    
     return history
 
 
-@router.post("/{id}/ata-eleicao")
-async def upload_ata_eleicao(
+@router.get("/{id}/upload-url")
+async def get_upload_url(
     id: uuid.UUID,
-    data_inicio: Optional[str] = Form(None),
-    data_fim: Optional[str] = Form(None),
-    pdf_file: UploadFile = File(...),
+    filename: str,
+    file_type: str = Query(..., regex="^(ata|avcb|apolice)$"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
 ):
-    """Uploads and saves the ATA de Eleição PDF in base64."""
+    """Generates a signed URL for direct upload to Supabase Storage."""
+    # Generate a unique path for the file
+    file_uuid = uuid.uuid4()
+    extension = filename.split('.')[-1] if '.' in filename else 'pdf'
+    storage_path = f"{id}/{file_type}_{file_uuid}.{extension}"
+    
+    try:
+        # Create signed upload URL (expires in 15 minutes)
+        res = supabase_client.storage.from_(settings.SUPABASE_BUCKET).create_signed_upload_url(storage_path)
+        
+        return {
+            "upload_url": res['url'],
+            "storage_path": storage_path,
+            "token": res['token']
+        }
+    except Exception as e:
+        logger.error(f"Error creating signed upload URL: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao gerar URL de upload")
+
+
+@router.post("/{id}/ata-eleicao")
+async def save_ata_eleicao(
+    id: uuid.UUID,
+    storage_path: str = Form(...),
+    filename: str = Form(...),
+    data_inicio: Optional[str] = Form(None),
+    data_fim: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_write()),
+):
+    """Saves the ATA de Eleição reference after successful storage upload."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
     if not condo:
         raise HTTPException(status_code=404, detail="Condomínio não encontrado")
 
-    # Relax validation to allow common PDF variants
-    valid_pdf_mimes = ["application/pdf", "application/x-pdf", "binary/octet-stream"]
-    is_pdf_extension = (pdf_file.filename or "").lower().endswith(".pdf")
-    
-    if pdf_file.content_type not in valid_pdf_mimes and not is_pdf_extension:
-        raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
-
-    # Manual date parsing to be safer with empty strings from frontend
     def parse_date(d_str):
-        if not d_str or d_str.strip() == "":
-            return None
-        try:
-            # Try common ISO format
-            return datetime.fromisoformat(d_str.replace('Z', '+00:00'))
-        except:
-            return None
+        if not d_str or d_str.strip() == "": return None
+        try: return datetime.fromisoformat(d_str.replace('Z', '+00:00'))
+        except: return None
 
     try:
-        import base64
-        pdf_bytes = await pdf_file.read()
-        b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
-
-        condo.ata_eleicao_base64 = b64_data
-        condo.ata_eleicao_nome = pdf_file.filename or 'ata_eleicao.pdf'
+        condo.ata_eleicao_url = storage_path
+        condo.ata_eleicao_nome = filename
         condo.ata_eleicao_inicio = parse_date(data_inicio)
         condo.ata_eleicao_fim = parse_date(data_fim)
         
         await db.commit()
-        # No db.refresh(condo) here to avoid loading the massive base64 back into memory unnecessarily
-        
-        return {"mensagem": "ATA de Eleição salva com sucesso", "ata_eleicao_nome": condo.ata_eleicao_nome}
+        return {"mensagem": "ATA de Eleição salva com sucesso", "ata_eleicao_nome": filename}
     except Exception as e:
         await db.rollback()
-        import logging
-        logging.error(f"Erro no upload da ATA: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Erro interno ao salvar arquivo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar referência da ATA: {str(e)}")
 
 
 @router.get("/{id}/ata-eleicao")
-async def download_ata_eleicao(
+async def get_ata_eleicao_url(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Downloads the ATA de Eleição PDF."""
-    import io
-    import base64
-    
+    """Returns a signed download URL for the ATA de Eleição."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
     
-    if not condo:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
-        
-    if not condo.ata_eleicao_base64:
-        raise HTTPException(status_code=404, detail="Este condomínio não possui ATA de eleição cadastrada")
+    if not condo or not condo.ata_eleicao_url:
+        raise HTTPException(status_code=404, detail="ATA não encontrada")
 
-    pdf_bytes = base64.b64decode(condo.ata_eleicao_base64)
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{condo.ata_eleicao_nome}"'},
+    try:
+        # Create a signed URL for downloading (60 seconds)
+        res = supabase_client.storage.from_(settings.SUPABASE_BUCKET).create_signed_url(condo.ata_eleicao_url, 60)
+        return {"url": res['signedURL']}
+    except Exception as e:
+        logger.error(f"Error creating signed download URL: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao gerar link de download")
+ filename="{condo.ata_eleicao_nome}"'},
     )
 
 
 @router.post("/{id}/avcb")
-async def upload_avcb(
+async def save_avcb(
     id: uuid.UUID,
+    storage_path: str = Form(...),
     data_inicio: Optional[str] = Form(None),
     data_fim: Optional[str] = Form(None),
-    pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
 ):
-    """Uploads and saves the AVCB PDF in base64."""
+    """Saves the AVCB reference after successful storage upload."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
-    if not condo:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    if not condo: raise HTTPException(status_code=404, detail="Condomínio não encontrado")
 
-    valid_pdf_mimes = ["application/pdf", "application/x-pdf", "binary/octet-stream"]
-    is_pdf_extension = (pdf_file.filename or "").lower().endswith(".pdf")
-    if pdf_file.content_type not in valid_pdf_mimes and not is_pdf_extension:
-        raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
-
-    # Manual date parsing
     def parse_date(d_str):
-        if not d_str or d_str.strip() == "":
-            return None
-        try:
-            return datetime.fromisoformat(d_str.replace('Z', '+00:00'))
-        except:
-            return None
+        if not d_str or d_str.strip() == "": return None
+        try: return datetime.fromisoformat(d_str.replace('Z', '+00:00'))
+        except: return None
 
     try:
-        import base64
-        pdf_bytes = await pdf_file.read()
-        b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
-        condo.avcb_url = b64_data
+        condo.avcb_url = storage_path
         condo.avcb_inicio = parse_date(data_inicio)
         condo.avcb_fim = parse_date(data_fim)
-        
         await db.commit()
-        return {"mensagem": "AVCB salvo com sucesso", "avcb_nome": pdf_file.filename}
+        return {"mensagem": "AVCB salvo com sucesso"}
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Erro ao salvar AVCB: {str(e)}")
 
 
 @router.get("/{id}/avcb")
-async def download_avcb(
+async def get_avcb_url(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Downloads the AVCB PDF."""
-    import io
-    import base64
+    """Returns a signed download URL for the AVCB."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
-    
     if not condo or not condo.avcb_url:
         raise HTTPException(status_code=404, detail="AVCB não encontrado")
 
-    pdf_bytes = base64.b64decode(condo.avcb_url)
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="AVCB_{condo.nome}.pdf"'},
-    )
+    try:
+        res = supabase_client.storage.from_(settings.SUPABASE_BUCKET).create_signed_url(condo.avcb_url, 60)
+        return {"url": res['signedURL']}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Erro ao gerar link do AVCB")
 
 
 @router.post("/{id}/apolice")
-async def upload_apolice(
+async def save_apolice(
     id: uuid.UUID,
+    storage_path: str = Form(...),
     data_inicio: Optional[str] = Form(None),
     data_fim: Optional[str] = Form(None),
-    pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
 ):
-    """Uploads and saves the Apolice PDF in base64."""
+    """Saves the Apolice reference after successful storage upload."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
-    if not condo:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    if not condo: raise HTTPException(status_code=404, detail="Condomínio não encontrado")
 
-    valid_pdf_mimes = ["application/pdf", "application/x-pdf", "binary/octet-stream"]
-    is_pdf_extension = (pdf_file.filename or "").lower().endswith(".pdf")
-    if pdf_file.content_type not in valid_pdf_mimes and not is_pdf_extension:
-        raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
-
-    # Manual date parsing
     def parse_date(d_str):
-        if not d_str or d_str.strip() == "":
-            return None
-        try:
-            return datetime.fromisoformat(d_str.replace('Z', '+00:00'))
-        except:
-            return None
+        if not d_str or d_str.strip() == "": return None
+        try: return datetime.fromisoformat(d_str.replace('Z', '+00:00'))
+        except: return None
 
     try:
-        import base64
-        pdf_bytes = await pdf_file.read()
-        b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
-        condo.apolice_seguro_url = b64_data
+        condo.apolice_seguro_url = storage_path
         condo.apolice_seguro_inicio = parse_date(data_inicio)
         condo.apolice_seguro_fim = parse_date(data_fim)
-        
         await db.commit()
-        return {"mensagem": "Apólice salva com sucesso", "apolice_nome": pdf_file.filename}
+        return {"mensagem": "Apólice salva com sucesso"}
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Erro ao salvar Apólice: {str(e)}")
 
 
 @router.get("/{id}/apolice")
-async def download_apolice(
+async def get_apolice_url(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Downloads the Apolice PDF."""
-    import io
-    import base64
+    """Returns a signed download URL for the Apolice."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
-    
     if not condo or not condo.apolice_seguro_url:
         raise HTTPException(status_code=404, detail="Apólice não encontrada")
 
-    pdf_bytes = base64.b64decode(condo.apolice_seguro_url)
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="Apolice_{condo.nome}.pdf"'},
-    )
+    try:
+        res = supabase_client.storage.from_(settings.SUPABASE_BUCKET).create_signed_url(condo.apolice_seguro_url, 60)
+        return {"url": res['signedURL']}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Erro ao gerar link da Apólice")
 
 @router.delete("/{id}/ata-eleicao", status_code=204)
 async def delete_ata_eleicao(
@@ -583,7 +554,7 @@ async def delete_ata_eleicao(
     if not condo:
         raise HTTPException(status_code=404, detail="Condomínio não encontrado")
     
-    condo.ata_eleicao_base64 = None
+    condo.ata_eleicao_url = None
     condo.ata_eleicao_nome = None
     condo.ata_eleicao_inicio = None
     condo.ata_eleicao_fim = None

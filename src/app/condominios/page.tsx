@@ -177,27 +177,43 @@ export default function CondominiosPage() {
     const { type, condoId } = docUploadModal;
     try {
       setUploadingDoc(true);
-      const formData = new FormData();
-      formData.append('pdf_file', docUploadFile);
-      formData.append('data_inicio', docDates.inicio);
-      formData.append('data_fim', docDates.fim);
+      
+      // 1. Get Signed URL from Backend
+      const { upload_url, storage_path } = await api.getUploadUrl(condoId, docUploadFile.name, type);
+      
+      // 2. Upload DIRECTLY to Storage (Bypasses Vercel 4.5MB limit)
+      await api.uploadToStorage(upload_url, docUploadFile);
 
+      // 3. Save Reference in Database
       if (type === 'ata') {
-        await api.uploadAtaEleicao(condoId, formData);
+        await api.saveAtaEleicao(condoId, { 
+          storage_path, 
+          filename: docUploadFile.name, 
+          data_inicio: docDates.inicio, 
+          data_fim: docDates.fim 
+        });
         if (detailsCondo && detailsCondo.id === condoId) {
           setDetailsCondo({ ...detailsCondo, ata_eleicao_nome: docUploadFile.name, ata_eleicao_inicio: docDates.inicio, ata_eleicao_fim: docDates.fim });
         }
         alert('ATA enviada com sucesso!');
       } else if (type === 'avcb') {
-        await api.uploadAvcb(condoId, formData);
+        await api.saveAvcb(condoId, { 
+          storage_path, 
+          data_inicio: docDates.inicio, 
+          data_fim: docDates.fim 
+        });
         if (detailsCondo && detailsCondo.id === condoId) {
-          setDetailsCondo({ ...detailsCondo, avcb_url: 'uploaded', avcb_inicio: docDates.inicio, avcb_fim: docDates.fim });
+          setDetailsCondo({ ...detailsCondo, avcb_url: storage_path, avcb_inicio: docDates.inicio, avcb_fim: docDates.fim });
         }
         alert('AVCB enviado com sucesso!');
       } else if (type === 'apolice') {
-        await api.uploadApoliceSeguro(condoId, formData);
+        await api.saveApolice(condoId, { 
+          storage_path, 
+          data_inicio: docDates.inicio, 
+          data_fim: docDates.fim 
+        });
         if (detailsCondo && detailsCondo.id === condoId) {
-          setDetailsCondo({ ...detailsCondo, apolice_seguro_url: 'uploaded', apolice_seguro_inicio: docDates.inicio, apolice_seguro_fim: docDates.fim });
+          setDetailsCondo({ ...detailsCondo, apolice_seguro_url: storage_path, apolice_seguro_inicio: docDates.inicio, apolice_seguro_fim: docDates.fim });
         }
         alert('Apólice enviada com sucesso!');
       }
@@ -221,7 +237,7 @@ export default function CondominiosPage() {
         await api.deleteAvcb(condoId);
         if (detailsCondo) setDetailsCondo({ ...detailsCondo, avcb_url: null, avcb_inicio: null, avcb_fim: null });
       } else if (type === 'apolice') {
-        await api.deleteApoliceSeguro(condoId);
+        await api.deleteApolice(condoId);
         if (detailsCondo) setDetailsCondo({ ...detailsCondo, apolice_seguro_url: null, apolice_seguro_inicio: null, apolice_seguro_fim: null });
       }
       mutate();
@@ -249,7 +265,7 @@ export default function CondominiosPage() {
 
   const handleDownloadApolice = async (condoId: string) => {
     try {
-      await api.downloadApoliceSeguro(condoId);
+      await api.downloadApolice(condoId);
     } catch (err: any) {
       alert(err.message || 'Erro ao baixar Apólice de Seguro');
     }
