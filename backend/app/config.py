@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     # ─── Auth ──────────────────────────────────────────────────
     SECRET_KEY: str  # REQUIRED — no default, crashes on startup if missing
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200  # 30 days
 
     @field_validator("SECRET_KEY")
     @classmethod

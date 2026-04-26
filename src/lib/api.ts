@@ -142,7 +142,7 @@ class ApiClient {
     });
     localStorage.setItem('datacron_token', data.access_token);
     // Also set cookie so Next.js middleware can protect routes server-side
-    document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Strict; max-age=${60 * 60 * 24}`; // 24h
+    document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Strict; max-age=${60 * 60 * 24 * 30}`; // 30 days
     return data;
   }
 
