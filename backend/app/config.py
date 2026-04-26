@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     PDF_STORAGE_PATH: str = "./pdfs_storage"
     SUPABASE_URL: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
-    SUPABASE_BUCKET: str = "faturas"
+    SUPABASE_BUCKET: str = "condo-documents"
 
     # ─── CORS ─────────────────────────────────────────────────
     ALLOWED_ORIGINS: str = "http://localhost:3000"

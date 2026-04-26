@@ -24,7 +24,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/condominios", tags=["Condomínios"])
 
 # Initialize Supabase client
-supabase_client: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+supabase_client: Optional[Client] = None
+try:
+    if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
+        supabase_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+    else:
+        logger.warning("SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY ausente. Funcionalidades de Storage desativadas.")
+except Exception as e:
+    logger.error(f"Erro ao inicializar cliente Supabase: {e}")
 
 
 def _escape_like(value: str) -> str:
@@ -368,6 +375,9 @@ async def get_upload_url(
     _: User = Depends(require_write()),
 ):
     """Generates a signed URL for direct upload to Supabase Storage."""
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Serviço de Storage não configurado")
+    
     # Generate a unique path for the file
     file_uuid = uuid.uuid4()
     extension = filename.split('.')[-1] if '.' in filename else 'pdf'
@@ -434,6 +444,9 @@ async def get_ata_eleicao_url(
     if not condo or not condo.ata_eleicao_url:
         raise HTTPException(status_code=404, detail="ATA não encontrada")
 
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Serviço de Storage não configurado")
+
     try:
         # Create a signed URL for downloading (60 seconds)
         res = supabase_client.storage.from_(settings.SUPABASE_BUCKET).create_signed_url(condo.ata_eleicao_url, 60)
@@ -485,6 +498,9 @@ async def get_avcb_url(
     if not condo or not condo.avcb_url:
         raise HTTPException(status_code=404, detail="AVCB não encontrado")
 
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Serviço de Storage não configurado")
+
     try:
         res = supabase_client.storage.from_(settings.SUPABASE_BUCKET).create_signed_url(condo.avcb_url, 60)
         return {"url": res['signedURL']}
@@ -533,6 +549,9 @@ async def get_apolice_url(
     condo = result.scalar_one_or_none()
     if not condo or not condo.apolice_seguro_url:
         raise HTTPException(status_code=404, detail="Apólice não encontrada")
+
+    if not supabase_client:
+        raise HTTPException(status_code=538, detail="Serviço de Storage não configurado")
 
     try:
         res = supabase_client.storage.from_(settings.SUPABASE_BUCKET).create_signed_url(condo.apolice_seguro_url, 60)
