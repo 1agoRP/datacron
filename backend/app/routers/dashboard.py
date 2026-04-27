@@ -39,8 +39,8 @@ async def dashboard_stats(
 
     # Faturas received in Current Month (KPI is more useful than just 'today')
     fatura_stmt = select(func.count(Fatura.id)).where(
-        extract("month", Fatura.created_at) == today.month,
-        extract("year", Fatura.created_at) == today.year
+        extract("month", Fatura.vencimento) == today.month,
+        extract("year", Fatura.vencimento) == today.year
     )
     if allowed_condo_ids is not None:
         fatura_stmt = fatura_stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
@@ -99,8 +99,8 @@ async def contas_esperadas(
         y, m = datetime.now().year, datetime.now().month
 
     recebidas_stmt = select(func.count(Fatura.id)).where(
-        extract("year", Fatura.created_at) == y,
-        extract("month", Fatura.created_at) == m,
+        extract("year", Fatura.vencimento) == y,
+        extract("month", Fatura.vencimento) == m,
     )
     if allowed_condo_ids is not None:
         recebidas_stmt = recebidas_stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))

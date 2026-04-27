@@ -86,8 +86,8 @@ async def list_condominios(
             select(Fatura.condominio_id, func.count(Fatura.id))
             .where(
                 Fatura.condominio_id.in_(condo_ids),
-                extract("year", Fatura.created_at) == now.year,
-                extract("month", Fatura.created_at) == now.month,
+                extract("year", Fatura.vencimento) == now.year,
+                extract("month", Fatura.vencimento) == now.month,
             )
             .group_by(Fatura.condominio_id)
         )
