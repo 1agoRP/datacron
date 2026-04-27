@@ -659,14 +659,14 @@ class ApiClient {
   async getReajustesMercado(categoria?: string) {
     const baseUrl = '/reajustes';
     const param = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
-    return this.request<ReajusteMercado[]>(`${baseUrl}${param}`);
+    return this.request<ReajusteMercado[]>(`${baseUrl}/${param}`);
   }
 
   async getHistoricoFaturas(condominioId?: string, concessionariaId?: string) {
     const params = new URLSearchParams();
     if (condominioId) params.append('condominio_id', condominioId);
     if (concessionariaId) params.append('concessionaria_id', concessionariaId);
-    return this.request<any[]>(`/historico?${params.toString()}`);
+    return this.request<any[]>(`/historico/?${params.toString()}`);
   }
 
   async getFornecedores() {
