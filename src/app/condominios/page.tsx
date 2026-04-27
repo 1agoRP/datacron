@@ -178,17 +178,10 @@ export default function CondominiosPage() {
     try {
       setUploadingDoc(true);
       
-      // 1. Get Signed URL from Backend
-      const { upload_url, storage_path } = await api.getUploadUrl(condoId, docUploadFile.name, type);
-      
-      // 2. Upload DIRECTLY to Storage (Bypasses Vercel 4.5MB limit)
-      await api.uploadToStorage(upload_url, docUploadFile);
-
-      // 3. Save Reference in Database
+      // Direct Upload (Base64) to Backend
       if (type === 'ata') {
         await api.saveAtaEleicao(condoId, { 
-          storage_path, 
-          filename: docUploadFile.name, 
+          file: docUploadFile, 
           data_inicio: docDates.inicio, 
           data_fim: docDates.fim 
         });
@@ -198,22 +191,22 @@ export default function CondominiosPage() {
         alert('ATA enviada com sucesso!');
       } else if (type === 'avcb') {
         await api.saveAvcb(condoId, { 
-          storage_path, 
+          file: docUploadFile, 
           data_inicio: docDates.inicio, 
           data_fim: docDates.fim 
         });
         if (detailsCondo && detailsCondo.id === condoId) {
-          setDetailsCondo({ ...detailsCondo, avcb_url: storage_path, avcb_inicio: docDates.inicio, avcb_fim: docDates.fim });
+          setDetailsCondo({ ...detailsCondo, avcb_url: 'data:application/pdf;base64,...', avcb_inicio: docDates.inicio, avcb_fim: docDates.fim });
         }
         alert('AVCB enviado com sucesso!');
       } else if (type === 'apolice') {
         await api.saveApolice(condoId, { 
-          storage_path, 
+          file: docUploadFile, 
           data_inicio: docDates.inicio, 
           data_fim: docDates.fim 
         });
         if (detailsCondo && detailsCondo.id === condoId) {
-          setDetailsCondo({ ...detailsCondo, apolice_seguro_url: storage_path, apolice_seguro_inicio: docDates.inicio, apolice_seguro_fim: docDates.fim });
+          setDetailsCondo({ ...detailsCondo, apolice_seguro_url: 'data:application/pdf;base64,...', apolice_seguro_inicio: docDates.inicio, apolice_seguro_fim: docDates.fim });
         }
         alert('Apólice enviada com sucesso!');
       }

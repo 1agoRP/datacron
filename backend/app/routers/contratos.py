@@ -266,6 +266,8 @@ async def upload_contract_pdf(
     if pdf_file.content_type != "application/pdf":
         raise HTTPException(status_code=415, detail="Apenas arquivos PDF são permitidos")
     pdf_bytes = await pdf_file.read()
+    if len(pdf_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
     extracted = extract_contract_data(pdf_bytes)
     return {"campos": extracted}
 
@@ -290,6 +292,11 @@ async def upload_contrato_arquivo(
     from app.models.contract_file import ContractFile
 
     pdf_bytes = await pdf_file.read()
+    
+    # 10MB limit
+    if len(pdf_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
+        
     b64_data = base64.b64encode(pdf_bytes).decode('utf-8')
 
     cf = ContractFile(

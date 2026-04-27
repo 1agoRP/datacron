@@ -1,38 +1,29 @@
 """
-Supabase Storage Service
-========================
-Handles PDF file upload and download via Supabase Storage buckets.
-Falls back to local disk when Supabase credentials are not configured.
+Datacron Storage Service (Old Model - Local/Database)
+=====================================================
+Handles PDF file storage with a strict 10MB limit.
+Prioritizes local disk or Base64 (implemented in routers).
+Supabase Storage is disabled to avoid authentication issues on VPS.
 """
 
 import os
 import uuid
 import logging
 from typing import Optional
+from fastapi import HTTPException
 
 import aiofiles
 
 logger = logging.getLogger(__name__)
 
 # ─── Configuration ──────────────────────────────────────────
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
-SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "faturas")
-
-use_supabase_storage = bool(SUPABASE_URL and SUPABASE_KEY)
+# Supabase is disabled per user request (returning to old model)
+use_supabase_storage = False
 supabase_client = None
 
-if use_supabase_storage:
-    try:
-        from supabase import create_client, Client
-        supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        logger.info(f"Supabase Storage enabled – bucket: {SUPABASE_BUCKET}")
-    except Exception as e:
-        logger.error(f"Failed to initialize Supabase client: {e}")
-        use_supabase_storage = False
-
-# Fallback local storage
+# Local storage directory (Fallback for specific legacy flows)
 LOCAL_STORAGE_DIR = os.environ.get("PDF_STORAGE_PATH", "./pdfs_storage")
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 
 # ─── Upload ─────────────────────────────────────────────────
@@ -42,40 +33,26 @@ async def save_file(
     content_type: str = "application/pdf",
 ) -> str:
     """
-    Saves a file to Supabase Storage (preferred) or local disk (fallback).
-
-    Args:
-        file_content: Raw file bytes.
-        destination_path: The key/path inside the bucket (e.g. "condominios/0042/fatura_abc.pdf").
-        content_type: MIME type of the file.
-
-    Returns:
-        The storage key (Supabase) or local file path (fallback).
+    Saves a file to local disk (Base64 storage is handled directly in routers).
+    Enforces a strict 10MB limit.
     """
+    if len(file_content) > MAX_FILE_SIZE:
+        logger.error(f"File size exceeds 10MB limit: {len(file_content)} bytes")
+        raise HTTPException(status_code=413, detail="O arquivo excede o limite de 10MB")
+
     if not destination_path:
         destination_path = f"{uuid.uuid4()}.pdf"
 
-    if use_supabase_storage and supabase_client:
-        try:
-            supabase_client.storage.from_(SUPABASE_BUCKET).upload(
-                path=destination_path,
-                file=file_content,
-                file_options={
-                    "content-type": content_type,
-                    "upsert": "true",  # Overwrite if same path exists
-                },
-            )
-            logger.info(f"Uploaded to Supabase Storage: {destination_path}")
-            return destination_path
-        except Exception as e:
-            logger.error(f"Supabase upload failed, falling back to local: {e}")
-
-    # ── Local File System Fallback ──
+    # ── Local File System ──
     os.makedirs(LOCAL_STORAGE_DIR, exist_ok=True)
-    full_path = os.path.join(LOCAL_STORAGE_DIR, destination_path.replace("/", os.sep))
-    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+    
+    # Ensure safe path
+    safe_name = os.path.basename(destination_path.replace("/", os.sep))
+    full_path = os.path.join(LOCAL_STORAGE_DIR, safe_name)
+    
     async with aiofiles.open(full_path, "wb") as f:
         await f.write(file_content)
+    
     logger.info(f"Saved locally: {full_path}")
     return full_path
 
@@ -83,52 +60,23 @@ async def save_file(
 # ─── Download ───────────────────────────────────────────────
 async def get_file_content(file_path: str) -> Optional[bytes]:
     """
-    Downloads file content from Supabase Storage or local disk.
-
-    Args:
-        file_path: The storage key (Supabase) or local file path.
-
-    Returns:
-        File bytes or None if not found.
+    Reads file content from local disk.
     """
-    # Try Supabase first if enabled and path looks like a storage key (not a local path)
-    if use_supabase_storage and supabase_client and not os.path.isabs(file_path):
-        try:
-            res = supabase_client.storage.from_(SUPABASE_BUCKET).download(file_path)
-            logger.info(f"Downloaded from Supabase Storage: {file_path}")
-            return res
-        except Exception as e:
-            logger.warning(f"Supabase download failed for '{file_path}': {e}")
-
-    # Local File System
     if os.path.exists(file_path):
         async with aiofiles.open(file_path, "rb") as f:
+            return await f.read()
+
+    # Try relative to storage dir
+    alt_path = os.path.join(LOCAL_STORAGE_DIR, os.path.basename(file_path))
+    if os.path.exists(alt_path):
+        async with aiofiles.open(alt_path, "rb") as f:
             return await f.read()
 
     logger.warning(f"File not found: {file_path}")
     return None
 
 
-# ─── Signed URL (for direct browser downloads) ─────────────
+# ─── Signed URL (Disabled) ──────────────────────────────────
 def get_signed_url(file_path: str, expires_in: int = 3600) -> Optional[str]:
-    """
-    Generates a temporary signed URL for direct download from Supabase Storage.
-
-    Args:
-        file_path: The storage key inside the bucket.
-        expires_in: URL validity in seconds (default: 1 hour).
-
-    Returns:
-        Signed URL string or None.
-    """
-    if not use_supabase_storage or not supabase_client:
-        return None
-
-    try:
-        result = supabase_client.storage.from_(SUPABASE_BUCKET).create_signed_url(
-            file_path, expires_in
-        )
-        return result.get("signedURL") or result.get("signedUrl")
-    except Exception as e:
-        logger.error(f"Failed to create signed URL for '{file_path}': {e}")
-        return None
+    """Supabase Signed URLs are disabled in the old model."""
+    return None

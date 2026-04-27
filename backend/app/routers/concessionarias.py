@@ -172,6 +172,8 @@ async def test_password_rule(
 
     password = conc.gerar_senha_pdf(condo.cnpj_digits if condo else "")
     pdf_bytes = await pdf_file.read()
+    if len(pdf_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
 
     success = test_pdf_password(pdf_bytes, password)
     return {
@@ -190,6 +192,8 @@ async def extrair_dados_fatura(
 ):
     """Parses an uploaded PDF invoice to suggest fields for the concessionária."""
     pdf_bytes = await pdf_file.read()
+    if len(pdf_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
     extracted = extract_data(pdf_bytes)
 
     full_text = extracted.get("texto_completo", "").upper()
@@ -245,6 +249,11 @@ async def aplicar_reajuste(
     pdf_name = None
     if pdf_file:
         pdf_bytes = await pdf_file.read()
+        
+        # 10MB limit
+        if len(pdf_bytes) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
+            
         pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
         pdf_name = pdf_file.filename
         
@@ -263,6 +272,30 @@ async def aplicar_reajuste(
     await db.commit()
     await db.refresh(reajuste)
     return reajuste
+
+
+@router.get("/reajustes/{id}/documento")
+async def download_reajuste_documento(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Downloads the attached PDF document."""
+    result = await db.execute(select(ReajusteConcessionaria).where(ReajusteConcessionaria.id == id))
+    r = result.scalar_one_or_none()
+    
+    if not r:
+        raise HTTPException(status_code=404, detail="Reajuste não encontrado")
+        
+    if not r.documento_base64:
+        raise HTTPException(status_code=404, detail="Este reajuste não possui documento anexo")
+
+    pdf_bytes = base64.b64decode(r.documento_base64)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{r.documento_nome}"'},
+    )
 
 
 @router.get("/reajustes/historico", response_model=list[ReajusteConcessionariaResponse])

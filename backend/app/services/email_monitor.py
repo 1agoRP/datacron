@@ -36,7 +36,6 @@ from app.models.concessionaria import Concessionaria
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
 from app.services.pdf_processor import unlock_pdf, extract_data, save_pdf
-from app.storage import save_file as storage_save_file
 from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -482,15 +481,12 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         else:
             safe_filename = f"{msg_id.replace('<', '').replace('>', '')}_{filename}".replace("/", "_")
 
-        # ── Upload PDF to Supabase Storage ──
-        # Organize files by condominio number for easy browsing
-        if condo:
-            numero_pad = str(condo.numero).zfill(4)
-            storage_key = f"condominios/{numero_pad}/{safe_filename}"
-        else:
-            storage_key = f"nao_identificados/{safe_filename}"
+        # ── Handle PDF Storage (Base64) ──
+        if len(final_bytes) > 10 * 1024 * 1024:
+            logger.warning(f"Ignorando anexo '{filename}' pois excede 10MB.")
+            continue
 
-        storage_path = await storage_save_file(final_bytes, storage_key)
+        pdf_b64 = base64.b64encode(final_bytes).decode('utf-8')
 
         # Also save locally for email forwarding attachments
         local_path = save_pdf(final_bytes, safe_filename)
@@ -526,8 +522,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             pdf_path=local_path,
             pdf_desbloqueado=pdf_unlocked,
             pdf_nome_original=safe_filename,
-            storage_path=storage_path,  # Supabase Storage key
-            # pdf_base64 is NO LONGER stored in the DB to save space
+            pdf_base64=pdf_b64,
             dados_extraidos=extracted,
             debito_automatico=extracted.get("debito_automatico", False),
         )
@@ -545,7 +540,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
                 vencimento=fatura.vencimento,
                 valor=fatura.valor,
                 pdf_nome_original=fatura.pdf_nome_original,
-                storage_path=storage_path,  # Supabase Storage key
+                pdf_base64=fatura.pdf_base64,
                 debito_automatico=fatura.debito_automatico,
                 email_remetente=fatura.email_remetente,
                 email_assunto=fatura.email_assunto,

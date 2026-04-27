@@ -467,6 +467,7 @@ class ReajusteConcessionariaResponse(BaseModel):
     percentual: float
     mes_aplicacao: str
     documento_nome: Optional[str] = None
+    storage_path: Optional[str] = None
     aplicado_por: str
     registros_afetados: int
     created_at: datetime
@@ -492,6 +493,7 @@ class ReajusteMercadoResponse(BaseModel):
     vigencia: str
     descricao: Optional[str] = None
     documento_nome: Optional[str] = None
+    storage_path: Optional[str] = None
     created_at: datetime
     model_config = {"from_attributes": True}
 

@@ -158,6 +158,20 @@ export default function FaturasPage() {
       alert(err.message);
     }
   };
+  
+  const handleDownloadLote = async () => {
+    if (filteredAndSorted.length === 0) return;
+    
+    const confirmDownload = confirm(`Deseja baixar ${filteredAndSorted.length} faturas em um arquivo ZIP?`);
+    if (!confirmDownload) return;
+    
+    try {
+      const ids = filteredAndSorted.map((f: any) => f.id);
+      await api.downloadLoteFaturas(ids);
+    } catch (err: any) {
+      alert('❌ Erro ao baixar lote: ' + err.message);
+    }
+  };
 
   const handleDownloadPdf = (faturaId: string, filename: string) => {
     const token = localStorage.getItem('datacron_token');
@@ -214,6 +228,13 @@ export default function FaturasPage() {
         <div className="dc-page-header-actions">
           <button className="dc-btn dc-btn-secondary" onClick={() => window.print()}>
             <Printer size={16} /> Imprimir
+          </button>
+          <button 
+            className="dc-btn dc-btn-secondary" 
+            onClick={handleDownloadLote}
+            disabled={filteredAndSorted.length === 0}
+          >
+            <Download size={16} /> Baixar todas as contas
           </button>
           <button className="dc-btn dc-btn-primary" onClick={handleExportExcel}>
             <Download size={16} /> Exportar Excel

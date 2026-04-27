@@ -23,6 +23,7 @@ class ReajusteConcessionaria(Base):
     )  # YYYY-MM
     documento_base64: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     documento_nome: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    storage_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     aplicado_por: Mapped[str] = mapped_column(String(200), nullable=False, default="Operador")
     registros_afetados: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(

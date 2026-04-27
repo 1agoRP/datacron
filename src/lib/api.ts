@@ -234,73 +234,51 @@ class ApiClient {
     return this.request<any[]>(`/condominios/${condominioId}/status-contas`);
   }
 
-  async getUploadUrl(id: string, filename: string, type: 'ata' | 'avcb' | 'apolice') {
-    return this.request<{ upload_url: string; storage_path: string; token: string }>(
-      `/condominios/${id}/upload-url?filename=${encodeURIComponent(filename)}&file_type=${type}`
-    );
-  }
-
-  async uploadToStorage(url: string, file: File) {
-    const response = await fetch(url, {
-      method: 'PUT',
-      body: file,
-      headers: {
-        'Content-Type': file.type || 'application/pdf',
-      }
-    });
-    if (!response.ok) {
-      throw new Error('Falha ao enviar arquivo para o Storage');
-    }
-    return response.json();
-  }
+  // Document Management Methods (Base64)
 
   // Document Management Methods
-  async saveAtaEleicao(id: string, data: { storage_path: string; filename: string; data_inicio?: string; data_fim?: string }) {
+  async saveAtaEleicao(id: string, data: { file: File; data_inicio?: string; data_fim?: string }) {
     const formData = new FormData();
-    formData.append('storage_path', data.storage_path);
-    formData.append('filename', data.filename);
+    formData.append('pdf_file', data.file);
     if (data.data_inicio) formData.append('data_inicio', data.data_inicio);
     if (data.data_fim) formData.append('data_fim', data.data_fim);
     return this.requestMultipart(`/condominios/${id}/ata-eleicao`, formData, { method: 'POST' });
   }
 
   async downloadAtaEleicao(id: string) {
-    const data = await this.request<{ url: string }>(`/condominios/${id}/ata-eleicao`);
-    if (data?.url) window.open(data.url, '_blank');
+    window.open(`${this.baseUrl}/condominios/${id}/download/ata_eleicao`, '_blank');
   }
 
   async deleteAtaEleicao(id: string) {
     return this.request(`/condominios/${id}/ata-eleicao`, { method: 'DELETE' });
   }
 
-  async saveAvcb(id: string, data: { storage_path: string; data_inicio?: string; data_fim?: string }) {
+  async saveAvcb(id: string, data: { file: File; data_inicio?: string; data_fim?: string }) {
     const formData = new FormData();
-    formData.append('storage_path', data.storage_path);
+    formData.append('pdf_file', data.file);
     if (data.data_inicio) formData.append('data_inicio', data.data_inicio);
     if (data.data_fim) formData.append('data_fim', data.data_fim);
     return this.requestMultipart(`/condominios/${id}/avcb`, formData, { method: 'POST' });
   }
 
   async downloadAvcb(id: string) {
-    const data = await this.request<{ url: string }>(`/condominios/${id}/avcb`);
-    if (data?.url) window.open(data.url, '_blank');
+    window.open(`${this.baseUrl}/condominios/${id}/download/avcb`, '_blank');
   }
 
   async deleteAvcb(id: string) {
     return this.request(`/condominios/${id}/avcb`, { method: 'DELETE' });
   }
 
-  async saveApolice(id: string, data: { storage_path: string; data_inicio?: string; data_fim?: string }) {
+  async saveApolice(id: string, data: { file: File; data_inicio?: string; data_fim?: string }) {
     const formData = new FormData();
-    formData.append('storage_path', data.storage_path);
+    formData.append('pdf_file', data.file);
     if (data.data_inicio) formData.append('data_inicio', data.data_inicio);
     if (data.data_fim) formData.append('data_fim', data.data_fim);
     return this.requestMultipart(`/condominios/${id}/apolice`, formData, { method: 'POST' });
   }
 
   async downloadApolice(id: string) {
-    const data = await this.request<{ url: string }>(`/condominios/${id}/apolice`);
-    if (data?.url) window.open(data.url, '_blank');
+    window.open(`${this.baseUrl}/condominios/${id}/download/apolice`, '_blank');
   }
 
   async deleteApolice(id: string) {
@@ -695,9 +673,6 @@ class ApiClient {
     return this.request<any[]>('/fornecedores');
   }
 
-  async createReajusteMercado(formData: FormData) {
-    return this.requestMultipart<ReajusteMercado>('/reajustes/', formData, { method: 'POST' });
-  }
 
   async deleteReajusteMercado(id: string) {
     return this.request(`/reajustes/${id}`, {
@@ -732,6 +707,39 @@ class ApiClient {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  }
+
+  async downloadDocumentoReajusteConcessionaria(id: string) {
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/concessionarias/reajustes/${id}/documento`, {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    });
+    if (!response.ok) throw new Error('Falha ao baixar documento');
+    const blob = await response.blob();
+    
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = `reajuste_conc_${id}.pdf`;
+    if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="(.+)"/);
+        if (matches && matches.length > 1) {
+            filename = matches[1];
+        }
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  async createReajusteMercado(formData: FormData) {
+    return this.requestMultipart<ReajusteMercado>('/reajustes', formData, { method: 'POST' });
   }
 
   // Histórico

@@ -65,7 +65,13 @@ async def create_reajuste(
     if pdf_file:
         if pdf_file.content_type != "application/pdf":
             raise HTTPException(status_code=415, detail="O anexo deve ser um arquivo PDF")
+        
         pdf_bytes = await pdf_file.read()
+        
+        # 10MB limit
+        if len(pdf_bytes) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
+            
         pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
         pdf_name = pdf_file.filename
 
@@ -148,10 +154,10 @@ async def download_documento_reajuste(
     r = result.scalar_one_or_none()
     
     if not r:
-        raise HTTPException(status_code=404, detail="Reajuste nao encontrado")
+        raise HTTPException(status_code=404, detail="Reajuste não encontrado")
         
     if not r.documento_base64:
-        raise HTTPException(status_code=404, detail="Este reajuste nao possui documento anexo")
+        raise HTTPException(status_code=404, detail="Este reajuste não possui documento anexo")
 
     pdf_bytes = base64.b64decode(r.documento_base64)
     return StreamingResponse(

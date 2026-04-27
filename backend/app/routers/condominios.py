@@ -17,21 +17,10 @@ from app.models.condominio import Condominio
 from app.models.fatura import Fatura
 from app.schemas import CondominioCreate, CondominioUpdate, CondominioResponse, FaturaResponse
 from app.config import settings
-from supabase import create_client, Client
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/condominios", tags=["Condomínios"])
 
-# Initialize Supabase client
-supabase_client: Optional[Client] = None
-try:
-    if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
-        supabase_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
-    else:
-        logger.warning("SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY ausente. Funcionalidades de Storage desativadas.")
-except Exception as e:
-    logger.error(f"Erro ao inicializar cliente Supabase: {e}")
 
 
 def _escape_like(value: str) -> str:
@@ -366,52 +355,76 @@ async def get_condominio_gmail_history(
     return history
 
 
-@router.get("/{id}/upload-url")
-async def get_upload_url(
+@router.get("/{id}/download/{file_type}")
+async def download_condo_file(
     id: uuid.UUID,
-    filename: str,
-    file_type: str = Query(..., regex="^(ata|avcb|apolice)$"),
+    file_type: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    _: User = Depends(get_current_user),
 ):
-    """Generates a signed URL for direct upload to Supabase Storage."""
-    if not supabase_client:
-        raise HTTPException(status_code=503, detail="Serviço de Storage não configurado")
+    """Downloads a condo document (ATA, AVCB, or Seguro) from Base64."""
+    result = await db.execute(select(Condominio).where(Condominio.id == id))
+    condo = result.scalar_one_or_none()
+    if not condo:
+        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
     
-    # Generate a unique path for the file
-    file_uuid = uuid.uuid4()
-    extension = filename.split('.')[-1] if '.' in filename else 'pdf'
-    storage_path = f"{id}/{file_type}_{file_uuid}.{extension}"
+    b64_data = None
+    filename = f"{file_type}.pdf"
     
-    try:
-        # Create signed upload URL (expires in 15 minutes)
-        res = supabase_client.storage.from_(settings.SUPABASE_BUCKET).create_signed_upload_url(storage_path)
+    if file_type == "ata_eleicao":
+        b64_data = condo.ata_eleicao_url
+        filename = condo.ata_eleicao_nome or "ata_eleicao.pdf"
+    elif file_type == "avcb":
+        b64_data = condo.avcb_url
+        filename = "avcb.pdf"
+    elif file_type == "apolice":
+        b64_data = condo.apolice_seguro_url
+        filename = "apolice_seguro.pdf"
+    else:
+        raise HTTPException(status_code=400, detail="Tipo de arquivo inválido")
         
-        return {
-            "upload_url": res['url'],
-            "storage_path": storage_path,
-            "token": res['token']
-        }
+    if not b64_data:
+        raise HTTPException(status_code=404, detail="Documento não encontrado")
+
+    try:
+        # Check if it has the data: URI header
+        if "," in b64_data:
+            b64_data = b64_data.split(",")[1]
+            
+        pdf_bytes = base64.b64decode(b64_data)
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
     except Exception as e:
-        logger.error(f"Error creating signed upload URL: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao gerar URL de upload")
+        logger.error(f"Error decoding base64 condo file: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao processar arquivo")
 
 
 @router.post("/{id}/ata-eleicao")
 async def save_ata_eleicao(
     id: uuid.UUID,
-    storage_path: str = Form(...),
-    filename: str = Form(...),
+    pdf_file: UploadFile = File(...),
     data_inicio: Optional[str] = Form(None),
     data_fim: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
 ):
-    """Saves the ATA de Eleição reference after successful storage upload."""
+    """Uploads and saves the ATA de Eleição in Base64 (max 10MB)."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
     if not condo:
         raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+
+    if pdf_file.content_type != "application/pdf":
+        raise HTTPException(status_code=415, detail="Apenas arquivos PDF são permitidos")
+
+    pdf_bytes = await pdf_file.read()
+    if len(pdf_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
+
+    b64_data = f"data:application/pdf;base64,{base64.b64encode(pdf_bytes).decode('utf-8')}"
 
     def parse_date(d_str):
         if not d_str or d_str.strip() == "": return None
@@ -419,16 +432,16 @@ async def save_ata_eleicao(
         except: return None
 
     try:
-        condo.ata_eleicao_url = storage_path
-        condo.ata_eleicao_nome = filename
+        condo.ata_eleicao_url = b64_data
+        condo.ata_eleicao_nome = pdf_file.filename
         condo.ata_eleicao_inicio = parse_date(data_inicio)
         condo.ata_eleicao_fim = parse_date(data_fim)
         
         await db.commit()
-        return {"mensagem": "ATA de Eleição salva com sucesso", "ata_eleicao_nome": filename}
+        return {"mensagem": "ATA de Eleição salva com sucesso", "ata_eleicao_nome": pdf_file.filename}
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Erro ao salvar referência da ATA: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar ATA: {str(e)}")
 
 
 @router.get("/{id}/ata-eleicao")
@@ -437,38 +450,38 @@ async def get_ata_eleicao_url(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Returns a signed download URL for the ATA de Eleição."""
+    """Returns the ATA de Eleição Base64 data (or proxy URL)."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
     
     if not condo or not condo.ata_eleicao_url:
         raise HTTPException(status_code=404, detail="ATA não encontrada")
-
-    if not supabase_client:
-        raise HTTPException(status_code=503, detail="Serviço de Storage não configurado")
-
-    try:
-        # Create a signed URL for downloading (60 seconds)
-        res = supabase_client.storage.from_(settings.SUPABASE_BUCKET).create_signed_url(condo.ata_eleicao_url, 60)
-        return {"url": res['signedURL']}
-    except Exception as e:
-        logger.error(f"Error creating signed download URL: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao gerar link de download")
+        
+    return {"url": condo.ata_eleicao_url, "filename": condo.ata_eleicao_nome}
 
 
 @router.post("/{id}/avcb")
 async def save_avcb(
     id: uuid.UUID,
-    storage_path: str = Form(...),
+    pdf_file: UploadFile = File(...),
     data_inicio: Optional[str] = Form(None),
     data_fim: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
 ):
-    """Saves the AVCB reference after successful storage upload."""
+    """Uploads and saves the AVCB in Base64 (max 10MB)."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
     if not condo: raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+
+    if pdf_file.content_type != "application/pdf":
+        raise HTTPException(status_code=415, detail="Apenas arquivos PDF são permitidos")
+
+    pdf_bytes = await pdf_file.read()
+    if len(pdf_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
+
+    b64_data = f"data:application/pdf;base64,{base64.b64encode(pdf_bytes).decode('utf-8')}"
 
     def parse_date(d_str):
         if not d_str or d_str.strip() == "": return None
@@ -476,7 +489,7 @@ async def save_avcb(
         except: return None
 
     try:
-        condo.avcb_url = storage_path
+        condo.avcb_url = b64_data
         condo.avcb_inicio = parse_date(data_inicio)
         condo.avcb_fim = parse_date(data_fim)
         await db.commit()
@@ -492,35 +505,36 @@ async def get_avcb_url(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Returns a signed download URL for the AVCB."""
+    """Returns the AVCB Base64 data."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
     if not condo or not condo.avcb_url:
         raise HTTPException(status_code=404, detail="AVCB não encontrado")
-
-    if not supabase_client:
-        raise HTTPException(status_code=503, detail="Serviço de Storage não configurado")
-
-    try:
-        res = supabase_client.storage.from_(settings.SUPABASE_BUCKET).create_signed_url(condo.avcb_url, 60)
-        return {"url": res['signedURL']}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Erro ao gerar link do AVCB")
+    return {"url": condo.avcb_url}
 
 
 @router.post("/{id}/apolice")
 async def save_apolice(
     id: uuid.UUID,
-    storage_path: str = Form(...),
+    pdf_file: UploadFile = File(...),
     data_inicio: Optional[str] = Form(None),
     data_fim: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_write()),
 ):
-    """Saves the Apolice reference after successful storage upload."""
+    """Uploads and saves the Apólice de Seguro in Base64 (max 10MB)."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
     if not condo: raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+
+    if pdf_file.content_type != "application/pdf":
+        raise HTTPException(status_code=415, detail="Apenas arquivos PDF são permitidos")
+
+    pdf_bytes = await pdf_file.read()
+    if len(pdf_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
+
+    b64_data = f"data:application/pdf;base64,{base64.b64encode(pdf_bytes).decode('utf-8')}"
 
     def parse_date(d_str):
         if not d_str or d_str.strip() == "": return None
@@ -528,7 +542,7 @@ async def save_apolice(
         except: return None
 
     try:
-        condo.apolice_seguro_url = storage_path
+        condo.apolice_seguro_url = b64_data
         condo.apolice_seguro_inicio = parse_date(data_inicio)
         condo.apolice_seguro_fim = parse_date(data_fim)
         await db.commit()
@@ -544,20 +558,12 @@ async def get_apolice_url(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Returns a signed download URL for the Apolice."""
+    """Returns the Apólice de Seguro Base64 data."""
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     condo = result.scalar_one_or_none()
     if not condo or not condo.apolice_seguro_url:
         raise HTTPException(status_code=404, detail="Apólice não encontrada")
-
-    if not supabase_client:
-        raise HTTPException(status_code=538, detail="Serviço de Storage não configurado")
-
-    try:
-        res = supabase_client.storage.from_(settings.SUPABASE_BUCKET).create_signed_url(condo.apolice_seguro_url, 60)
-        return {"url": res['signedURL']}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Erro ao gerar link da Apólice")
+    return {"url": condo.apolice_seguro_url}
 
 @router.delete("/{id}/ata-eleicao", status_code=204)
 async def delete_ata_eleicao(
