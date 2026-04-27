@@ -666,7 +666,7 @@ class ApiClient {
     const params = new URLSearchParams();
     if (condominioId) params.append('condominio_id', condominioId);
     if (concessionariaId) params.append('concessionaria_id', concessionariaId);
-    return this.request<any[]>(`/historico/?${params.toString()}`);
+    return this.request<any[]>(`/historico?${params.toString()}`);
   }
 
   async getFornecedores() {

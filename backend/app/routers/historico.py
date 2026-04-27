@@ -18,7 +18,7 @@ from app.models.fatura import Fatura
 
 router = APIRouter(prefix="/historico", tags=["Historico"])
 
-@router.get("/", response_model=list[HistoricoFaturaResponse])
+@router.get("", response_model=list[HistoricoFaturaResponse])
 async def list_historico(
     condominio_id: Optional[uuid.UUID] = None,
     concessionaria_id: Optional[uuid.UUID] = None,
