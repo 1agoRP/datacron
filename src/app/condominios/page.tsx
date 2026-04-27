@@ -907,7 +907,7 @@ export default function CondominiosPage() {
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                               <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>{formatCurrencyCeil(f.valor || 0)}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>R$ {formatCurrencyCeil(f.valor || 0)}</div>
                                 <div style={{ fontSize: '0.72rem', color: statusColor, fontWeight: 700 }}>{statusLabel}</div>
                               </div>
                               <button
