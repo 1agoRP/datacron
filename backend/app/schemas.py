@@ -97,7 +97,6 @@ class CondominioUpdate(BaseModel):
     mandato_inicio: Optional[datetime] = None
     mandato_fim: Optional[datetime] = None
     leitura_individualizada_ativa: Optional[bool] = None
-    ata_eleicao_base64: Optional[str] = None
     ata_eleicao_nome: Optional[str] = None
     ata_eleicao_inicio: Optional[datetime] = None
     ata_eleicao_fim: Optional[datetime] = None
@@ -247,7 +246,6 @@ class FaturaResponse(BaseModel):
     storage_path: Optional[str] = None
     variacao_percentual: Optional[float] = None
     debito_automatico: bool = False
-    pdf_base64: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -515,10 +513,6 @@ class HistoricoFaturaResponse(BaseModel):
     storage_path: Optional[str] = None
     debito_automatico: bool = False
     status: Optional[str] = None
-    base_64: Optional[str] = None
-    pdf_base64: Optional[str] = None
-    email_remetente: Optional[str] = None
-    email_assunto: Optional[str] = None
     gmail_message_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime

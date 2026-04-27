@@ -17,7 +17,11 @@ from app.schemas import (
     ReajusteConcessionariaCreate, ReajusteConcessionariaResponse
 )
 from app.services.pdf_processor import test_pdf_password, extract_data
+from app.storage import save_file, get_file_content
 import base64
+import io
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/concessionarias", tags=["Concessionárias"])
 
@@ -245,7 +249,7 @@ async def aplicar_reajuste(
             c.valor_medio = c.valor_medio * (1 + (percentual / 100.0))
             
     # 3. Handle PDF upload
-    pdf_base64 = None
+    pdf_path = None
     pdf_name = None
     if pdf_file:
         pdf_bytes = await pdf_file.read()
@@ -254,7 +258,8 @@ async def aplicar_reajuste(
         if len(pdf_bytes) > 10 * 1024 * 1024:
             raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
             
-        pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+        filename = f"reajuste_{tipo_concessionaria}_{mes_aplicacao}_{uuid.uuid4().hex[:8]}.pdf"
+        pdf_path = await save_file(pdf_bytes, filename)
         pdf_name = pdf_file.filename
         
     # 4. Create Reajuste record
@@ -262,7 +267,7 @@ async def aplicar_reajuste(
         tipo_concessionaria=tipo_concessionaria,
         percentual=percentual,
         mes_aplicacao=mes_aplicacao,
-        documento_base64=pdf_base64,
+        storage_path=pdf_path,
         documento_nome=pdf_name,
         aplicado_por=user.nome,
         registros_afetados=len(concs)
@@ -287,15 +292,50 @@ async def download_reajuste_documento(
     if not r:
         raise HTTPException(status_code=404, detail="Reajuste não encontrado")
         
-    if not r.documento_base64:
-        raise HTTPException(status_code=404, detail="Este reajuste não possui documento anexo")
+    filename = r.documento_nome or f"reajuste_{id}.pdf"
 
-    pdf_bytes = base64.b64decode(r.documento_base64)
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{r.documento_nome}"'},
-    )
+    # 1. Try storage path
+    if r.storage_path:
+        import os
+        from app.storage import LOCAL_STORAGE_DIR
+        
+        path = r.storage_path
+        if os.path.exists(path):
+            def file_iterator(p: str):
+                with open(p, "rb") as f:
+                    while chunk := f.read(8192):
+                        yield chunk
+            return StreamingResponse(
+                file_iterator(path),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        # Try relative
+        rel_path = os.path.join(LOCAL_STORAGE_DIR, os.path.basename(path))
+        if os.path.exists(rel_path):
+            def file_iterator(p: str):
+                with open(p, "rb") as f:
+                    while chunk := f.read(8192):
+                        yield chunk
+            return StreamingResponse(
+                file_iterator(rel_path),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+
+    # 2. Fallback to legacy base64
+    if r.documento_base64:
+        try:
+            pdf_bytes = base64.b64decode(r.documento_base64)
+            return StreamingResponse(
+                io.BytesIO(pdf_bytes),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+        except Exception as e:
+            logger.error(f"Base64 decode failed for reajuste {id}: {e}")
+
+    raise HTTPException(status_code=404, detail="Documento não encontrado")
 
 
 @router.get("/reajustes/historico", response_model=list[ReajusteConcessionariaResponse])

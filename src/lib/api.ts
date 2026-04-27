@@ -249,6 +249,10 @@ class ApiClient {
     window.open(`${API_BASE_URL}/condominios/${id}/download/ata_eleicao`, '_blank');
   }
 
+  async downloadFatura(id: string) {
+    window.open(`${API_BASE_URL}/faturas/${id}/download`, '_blank');
+  }
+
   async deleteAtaEleicao(id: string) {
     return this.request(`/condominios/${id}/ata-eleicao`, { method: 'DELETE' });
   }

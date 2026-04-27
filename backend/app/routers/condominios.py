@@ -17,6 +17,9 @@ from app.models.condominio import Condominio
 from app.models.fatura import Fatura
 from app.schemas import CondominioCreate, CondominioUpdate, CondominioResponse, FaturaResponse
 from app.config import settings
+from app.storage import save_file, get_file_content
+import io
+import base64
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/condominios", tags=["Condomínios"])
@@ -387,8 +390,37 @@ async def download_condo_file(
     if not b64_data:
         raise HTTPException(status_code=404, detail="Documento não encontrado")
 
+    import os
+    from app.storage import LOCAL_STORAGE_DIR
+
     try:
-        # Check if it has the data: URI header
+        # Check if it's a file path
+        if b64_data.startswith(LOCAL_STORAGE_DIR) or b64_data.endswith(".pdf"):
+             # It's a path on disk
+            if os.path.exists(b64_data):
+                def file_iterator(path: str):
+                    with open(path, "rb") as f:
+                        while chunk := f.read(8192):
+                            yield chunk
+                return StreamingResponse(
+                    file_iterator(b64_data),
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+                )
+            # Try relative
+            rel_path = os.path.join(LOCAL_STORAGE_DIR, os.path.basename(b64_data))
+            if os.path.exists(rel_path):
+                def file_iterator(path: str):
+                    with open(path, "rb") as f:
+                        while chunk := f.read(8192):
+                            yield chunk
+                return StreamingResponse(
+                    file_iterator(rel_path),
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+                )
+
+        # Fallback to legacy Base64
         if "," in b64_data:
             b64_data = b64_data.split(",")[1]
             
@@ -399,7 +431,7 @@ async def download_condo_file(
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
     except Exception as e:
-        logger.error(f"Error decoding base64 condo file: {e}")
+        logger.error(f"Error serving condo file: {e}")
         raise HTTPException(status_code=500, detail="Erro ao processar arquivo")
 
 
@@ -425,7 +457,9 @@ async def save_ata_eleicao(
     if len(pdf_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
 
-    b64_data = f"data:application/pdf;base64,{base64.b64encode(pdf_bytes).decode('utf-8')}"
+    # Save file to disk
+    filename = f"ata_eleicao_{id}_{uuid.uuid4().hex[:8]}.pdf"
+    file_path = await save_file(pdf_bytes, filename)
 
     def parse_date(d_str):
         if not d_str or d_str.strip() == "": return None
@@ -433,7 +467,7 @@ async def save_ata_eleicao(
         except: return None
 
     try:
-        condo.ata_eleicao_url = b64_data
+        condo.ata_eleicao_url = file_path
         condo.ata_eleicao_nome = pdf_file.filename
         condo.ata_eleicao_inicio = parse_date(data_inicio)
         condo.ata_eleicao_fim = parse_date(data_fim)
@@ -482,7 +516,9 @@ async def save_avcb(
     if len(pdf_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
 
-    b64_data = f"data:application/pdf;base64,{base64.b64encode(pdf_bytes).decode('utf-8')}"
+    # Save file to disk
+    filename = f"avcb_{id}_{uuid.uuid4().hex[:8]}.pdf"
+    file_path = await save_file(pdf_bytes, filename)
 
     def parse_date(d_str):
         if not d_str or d_str.strip() == "": return None
@@ -490,7 +526,7 @@ async def save_avcb(
         except: return None
 
     try:
-        condo.avcb_url = b64_data
+        condo.avcb_url = file_path
         condo.avcb_inicio = parse_date(data_inicio)
         condo.avcb_fim = parse_date(data_fim)
         await db.commit()
@@ -535,7 +571,9 @@ async def save_apolice(
     if len(pdf_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
 
-    b64_data = f"data:application/pdf;base64,{base64.b64encode(pdf_bytes).decode('utf-8')}"
+    # Save file to disk
+    filename = f"apolice_{id}_{uuid.uuid4().hex[:8]}.pdf"
+    file_path = await save_file(pdf_bytes, filename)
 
     def parse_date(d_str):
         if not d_str or d_str.strip() == "": return None
@@ -543,7 +581,7 @@ async def save_apolice(
         except: return None
 
     try:
-        condo.apolice_seguro_url = b64_data
+        condo.apolice_seguro_url = file_path
         condo.apolice_seguro_inicio = parse_date(data_inicio)
         condo.apolice_seguro_fim = parse_date(data_fim)
         await db.commit()

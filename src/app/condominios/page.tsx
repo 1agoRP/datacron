@@ -358,6 +358,9 @@ export default function CondominiosPage() {
           return;
         }
 
+        // Fallback: Download from API via path
+        await api.downloadFatura(fatura.id);
+
         // Fallback to traditional download endpoint if base64 is missing
         const token = localStorage.getItem('datacron_token');
         const endpoint = `/faturas/${fatura.id}/pdf`;
