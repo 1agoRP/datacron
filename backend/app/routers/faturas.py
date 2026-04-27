@@ -25,7 +25,7 @@ router = APIRouter(prefix="/faturas", tags=["Faturas"])
 VALID_STATUSES = {"pendente", "processada", "erro", "revisao"}
 
 
-@router.get("/", response_model=list[FaturaResponse])
+@router.get("", response_model=list[FaturaResponse])
 async def list_faturas(
     condominio_id: Optional[uuid.UUID] = None,
     concessionaria_id: Optional[uuid.UUID] = None,

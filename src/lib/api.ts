@@ -659,7 +659,7 @@ class ApiClient {
   async getReajustesMercado(categoria?: string) {
     const baseUrl = '/reajustes';
     const param = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
-    return this.request<ReajusteMercado[]>(`${baseUrl}/${param}`);
+    return this.request<ReajusteMercado[]>(`${baseUrl}${param}`);
   }
 
   async getHistoricoFaturas(condominioId?: string, concessionariaId?: string) {

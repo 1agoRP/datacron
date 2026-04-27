@@ -17,7 +17,7 @@ from app.schemas import ReajusteMercadoCreate, ReajusteMercadoResponse
 router = APIRouter(prefix="/reajustes", tags=["Reajustes de Mercado"])
 
 
-@router.get("/", response_model=list[ReajusteMercadoResponse])
+@router.get("", response_model=list[ReajusteMercadoResponse])
 async def list_reajustes(
     categoria: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
