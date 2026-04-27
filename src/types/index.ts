@@ -138,6 +138,7 @@ export interface ReajusteConcessionaria {
   percentual: number;
   mes_aplicacao: string;
   documento_nome?: string | null;
+  documento_base64?: string | null;
   aplicado_por: string;
   registros_afetados: number;
   created_at: string;
@@ -151,5 +152,6 @@ export interface ReajusteMercado {
   vigencia: string;
   descricao?: string | null;
   documento_nome?: string | null;
+  documento_base64?: string | null;
   created_at: string;
 }
