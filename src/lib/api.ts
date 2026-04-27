@@ -246,7 +246,7 @@ class ApiClient {
   }
 
   async downloadAtaEleicao(id: string) {
-    window.open(`${this.baseUrl}/condominios/${id}/download/ata_eleicao`, '_blank');
+    window.open(`${API_BASE_URL}/condominios/${id}/download/ata_eleicao`, '_blank');
   }
 
   async deleteAtaEleicao(id: string) {
@@ -262,7 +262,7 @@ class ApiClient {
   }
 
   async downloadAvcb(id: string) {
-    window.open(`${this.baseUrl}/condominios/${id}/download/avcb`, '_blank');
+    window.open(`${API_BASE_URL}/condominios/${id}/download/avcb`, '_blank');
   }
 
   async deleteAvcb(id: string) {
@@ -278,7 +278,7 @@ class ApiClient {
   }
 
   async downloadApolice(id: string) {
-    window.open(`${this.baseUrl}/condominios/${id}/download/apolice`, '_blank');
+    window.open(`${API_BASE_URL}/condominios/${id}/download/apolice`, '_blank');
   }
 
   async deleteApolice(id: string) {
