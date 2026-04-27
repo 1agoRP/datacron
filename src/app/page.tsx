@@ -883,17 +883,6 @@ export default function LandingPage() {
 
       <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
 
-        {/* ── STICKY CTA BAR ── */}
-        <div className={`sticky-bar ${showSticky ? 'visible' : ''}`}>
-          <div className="sticky-bar-text">
-            <strong>Datacron RPA</strong> · Automatize 100% das suas faturas de condomínio
-          </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button className="btn-ghost" onClick={() => setIsLoginView(true)}>Entrar</button>
-            <a href="#contato" className="btn-accent">Solicitar Demo →</a>
-          </div>
-        </div>
-
         {/* ── NAV ── */}
         <nav className="lp-nav">
           <Link href="/" className="nav-logo">DATA<span>CRON</span></Link>
