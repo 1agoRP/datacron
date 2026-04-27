@@ -24,7 +24,7 @@ async def list_historico(
     concessionaria_id: Optional[uuid.UUID] = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
-    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
+    allowed_condo_ids: Optional[list] = Depends(get_user_condo_ids),
 ):
     """
     Retorna o histórico unificado de faturas.

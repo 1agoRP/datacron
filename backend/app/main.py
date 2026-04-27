@@ -17,7 +17,7 @@ from app.limiter import limiter
 
 from app.config import settings
 from app.database import engine, Base
-from app.routers import auth, condominios, concessionarias, faturas, alertas, emails, importacoes, relatorios, dashboard, contratos, reajustes, fornecedores, historico
+from app.routers import auth, condominios, concessionarias, faturas, alertas, emails, importacoes, relatorios, dashboard, contratos, reajustes, fornecedores #, historico
 from app.workers.scheduler import start_scheduler, stop_scheduler
 
 # ─── Logging ────────────────────────────────────────────────
@@ -94,7 +94,7 @@ app.include_router(dashboard.router,        prefix=API_PREFIX)
 app.include_router(contratos.router,        prefix=API_PREFIX)
 app.include_router(reajustes.router,        prefix=API_PREFIX)
 app.include_router(fornecedores.router,     prefix=API_PREFIX)
-app.include_router(historico.router,        prefix=API_PREFIX)
+# app.include_router(historico.router,        prefix=API_PREFIX)
 
 
 # ─── Health check ───────────────────────────────────────────
