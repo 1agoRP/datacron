@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/reajustes", tags=["Reajustes de Mercado"])
 
 
-@router.get("/", response_model=list[ReajusteMercadoResponse])
+@router.get("", response_model=list[ReajusteMercadoResponse])
 async def list_reajustes(
     categoria: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
@@ -51,7 +51,7 @@ async def get_reajuste(
     return r
 
 
-@router.post("/", response_model=ReajusteMercadoResponse, status_code=201)
+@router.post("", response_model=ReajusteMercadoResponse, status_code=201)
 async def create_reajuste(
     categoria: str = Form(...),
     percentual: float = Form(...),
