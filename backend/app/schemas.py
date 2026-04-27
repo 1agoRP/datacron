@@ -516,6 +516,7 @@ class HistoricoFaturaResponse(BaseModel):
     debito_automatico: bool = False
     status: Optional[str] = None
     base_64: Optional[str] = None
+    pdf_base64: Optional[str] = None
     email_remetente: Optional[str] = None
     email_assunto: Optional[str] = None
     gmail_message_id: Optional[str] = None

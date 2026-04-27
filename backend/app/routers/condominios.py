@@ -136,8 +136,8 @@ async def get_status_contas(
         select(Fatura)
         .where(
             Fatura.condominio_id == id,
-            extract("year", Fatura.created_at) == now.year,
-            extract("month", Fatura.created_at) == now.month,
+            extract("year", Fatura.vencimento) == now.year,
+            extract("month", Fatura.vencimento) == now.month,
         )
         .order_by(Fatura.created_at.desc())
     )
@@ -164,6 +164,7 @@ async def get_status_contas(
             "fatura": {
                 "id": str(fat.id),
                 "valor": fat.valor,
+                "vencimento": fat.vencimento.isoformat() if fat.vencimento else None,
                 "created_at": fat.created_at.isoformat() if fat.created_at else None,
                 "pdf_nome_original": fat.pdf_nome_original,
                 "storage_path": fat.storage_path,

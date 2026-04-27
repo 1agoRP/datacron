@@ -291,7 +291,9 @@ export default function CondominiosPage() {
     try {
       setLoadingHistory(true);
       // 1. Fetch from Historico Table (Combined current + legacy)
-      const dbFaturas = await api.getHistoricoFaturas(detailsCondo.id, conc.id);
+      const condId = String(detailsCondo.id);
+      const concId = String(conc.id);
+      const dbFaturas = await api.getHistoricoFaturas(condId, concId);
 
       const sorted = [...dbFaturas].sort((a: any, b: any) => {
         const dateA = new Date(a.vencimento || 0);
@@ -1319,6 +1321,11 @@ export default function CondominiosPage() {
                           </div>
                           <div style={{ fontSize: '0.85rem', color: item.fatura ? '#059669' : '#64748b', fontWeight: 500 }}>
                             {item.fatura ? `Recebida em ${format(new Date(item.fatura.created_at), 'dd/MM/yyyy')}` : `Vencimento planejado: Dia ${item.concessionaria.dia_vencimento}`}
+                            {item.fatura && item.fatura.vencimento && (
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>
+                                Vencimento: {format(new Date(item.fatura.vencimento + 'T12:00:00'), 'dd/MM/yyyy')}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1327,7 +1334,7 @@ export default function CondominiosPage() {
                         {item.fatura ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                             <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>{formatCurrencyCeil(item.fatura.valor || 0)}</div>
+                              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>R$ {formatCurrencyCeil(item.fatura.valor || 0)}</div>
                             </div>
                             <button
                               className="dc-btn"
