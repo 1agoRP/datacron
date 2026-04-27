@@ -247,6 +247,7 @@ class FaturaResponse(BaseModel):
     storage_path: Optional[str] = None
     variacao_percentual: Optional[float] = None
     debito_automatico: bool = False
+    pdf_base64: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -513,6 +514,8 @@ class HistoricoFaturaResponse(BaseModel):
     pdf_nome_original: Optional[str] = None
     storage_path: Optional[str] = None
     debito_automatico: bool = False
+    status: Optional[str] = None
+    base_64: Optional[str] = None
     email_remetente: Optional[str] = None
     email_assunto: Optional[str] = None
     gmail_message_id: Optional[str] = None

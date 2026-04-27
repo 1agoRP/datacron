@@ -828,6 +828,23 @@ export default function CondominiosPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       {historyFaturas.map(f => {
                         const hasAutoDebit = f.debito_automatico === true || String(f.debito_automatico) === 'true';
+                        const isLegacy = !f.status;
+                        const status = f.status || 'processada'; // Default for legacy
+                        
+                        let statusColor = '#10b981'; // Default green
+                        let statusBg = '#f0fdf4';
+                        let statusLabel = status.toUpperCase();
+
+                        if (status === 'pendente') {
+                          statusColor = '#f59e0b';
+                          statusBg = '#fffbeb';
+                        } else if (status === 'erro') {
+                          statusColor = '#ef4444';
+                          statusBg = '#fef2f2';
+                        } else if (status === 'revisao') {
+                          statusColor = '#3b82f6';
+                          statusBg = '#eff6ff';
+                        }
 
                         return (
                           <div key={f.id} style={{
@@ -846,24 +863,24 @@ export default function CondominiosPage() {
                                 width: 48,
                                 height: 48,
                                 borderRadius: 12,
-                                background: '#f0fdf4',
+                                background: statusBg,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                color: '#10b981',
-                                border: '1px solid #d1fae5'
+                                color: statusColor,
+                                border: `1px solid ${statusBg === '#fff' ? '#e2e8f0' : 'transparent'}`
                               }}>
-                                <CheckCircle2 size={24} />
+                                {status === 'processada' || isLegacy ? <CheckCircle2 size={24} /> : <Clock size={24} />}
                               </div>
                               <div>
                                 <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  Vencimento: {f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}
+                                  {f.referencia || 'Fatura'}
                                   {hasAutoDebit && <span style={{ padding: '2px 8px', borderRadius: 6, background: '#e0f2fe', color: '#0369a1', fontSize: '0.65rem', fontWeight: 800 }}>DÉBITO AUTO</span>}
                                 </div>
                                 <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: 10 }}>
                                   <span><Calendar size={13} style={{ display: 'inline', marginRight: 4 }} /> Vencimento: {f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}</span>
                                   <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#cbd5e1' }} />
-                                  <span>Registrado em {f.created_at ? format(new Date(f.created_at), 'dd/MM/yyyy') : '—'}</span>
+                                  <span>Registrada em {f.created_at ? format(new Date(f.created_at), 'dd/MM/yyyy') : '—'}</span>
                                 </div>
 
                                 {f.email_remetente && (
@@ -889,7 +906,7 @@ export default function CondominiosPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                               <div style={{ textAlign: 'right' }}>
                                 <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>{formatCurrencyCeil(f.valor || 0)}</div>
-                                <div style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 700 }}>PROCESSADA</div>
+                                <div style={{ fontSize: '0.72rem', color: statusColor, fontWeight: 700 }}>{statusLabel}</div>
                               </div>
                               <button
                                 onClick={() => handleDownloadFatura(f, f.pdf_nome_original || `fatura_${f.referencia}.pdf`, 'sistema')}
