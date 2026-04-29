@@ -274,7 +274,7 @@ class ApiClient {
 
   async downloadFatura(id: string) {
     const token = this.getToken();
-    const response = await fetchWithRetry(`${API_BASE_URL}/faturas/${id}/download`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/faturas/${id}/pdf`, {
       headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
     });
     if (!response.ok) throw new Error('Falha ao baixar Fatura');
