@@ -86,7 +86,8 @@ async def list_condominios(
     try:
         now = datetime.now()
         fat_result = await db.execute(
-            select(Fatura.condominio_id, func.count(Fatura.id))
+            select(Fatura.condominio_id, func.count(func.distinct(Fatura.concessionaria_id)))
+            .join(Concessionaria, and_(Fatura.concessionaria_id == Concessionaria.id, Concessionaria.ativo == True))
             .where(
                 Fatura.condominio_id.in_(condo_ids),
                 extract("year", Fatura.vencimento) == now.year,

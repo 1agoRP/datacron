@@ -246,11 +246,57 @@ class ApiClient {
   }
 
   async downloadAtaEleicao(id: string) {
-    window.open(`${API_BASE_URL}/condominios/${id}/download/ata_eleicao`, '_blank');
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/download/ata_eleicao`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    });
+    if (!response.ok) throw new Error('Falha ao baixar ATA de Eleição');
+    
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = `ata_eleicao_${id}.pdf`;
+    if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="?([^"]+)"?/);
+        if (matches && matches.length > 1) {
+            filename = matches[1];
+        }
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   }
 
   async downloadFatura(id: string) {
-    window.open(`${API_BASE_URL}/faturas/${id}/download`, '_blank');
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/faturas/${id}/download`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    });
+    if (!response.ok) throw new Error('Falha ao baixar Fatura');
+    
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = `fatura_${id}.pdf`;
+    if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="?([^"]+)"?/);
+        if (matches && matches.length > 1) {
+            filename = matches[1];
+        }
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   }
 
   async deleteAtaEleicao(id: string) {
@@ -266,7 +312,30 @@ class ApiClient {
   }
 
   async downloadAvcb(id: string) {
-    window.open(`${API_BASE_URL}/condominios/${id}/download/avcb`, '_blank');
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/download/avcb`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    });
+    if (!response.ok) throw new Error('Falha ao baixar AVCB');
+    
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = `avcb_${id}.pdf`;
+    if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="?([^"]+)"?/);
+        if (matches && matches.length > 1) {
+            filename = matches[1];
+        }
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   }
 
   async deleteAvcb(id: string) {
@@ -282,7 +351,30 @@ class ApiClient {
   }
 
   async downloadApolice(id: string) {
-    window.open(`${API_BASE_URL}/condominios/${id}/download/apolice`, '_blank');
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/download/apolice`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    });
+    if (!response.ok) throw new Error('Falha ao baixar Apólice');
+    
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = `apolice_${id}.pdf`;
+    if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="?([^"]+)"?/);
+        if (matches && matches.length > 1) {
+            filename = matches[1];
+        }
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   }
 
   async deleteApolice(id: string) {

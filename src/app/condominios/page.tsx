@@ -360,27 +360,6 @@ export default function CondominiosPage() {
 
         // Fallback: Download from API via path
         await api.downloadFatura(fatura.id);
-
-        // Fallback to traditional download endpoint if base64 is missing
-        const token = localStorage.getItem('datacron_token');
-        const endpoint = `/faturas/${fatura.id}/pdf`;
-        const finalUrl = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`.replace(/([^:])\/\//g, '$1/');
-
-        const resp = await fetch(finalUrl, {
-          method: 'GET',
-          mode: 'cors',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!resp.ok) throw new Error('Falha ao baixar do sistema');
-        const blob = await resp.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
       } else {
         await api.downloadGmailFatura(fatura.id, filename);
       }
