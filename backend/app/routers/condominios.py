@@ -242,7 +242,6 @@ async def get_condominio(
         select(Condominio)
         .options(
             selectinload(Condominio.concessionarias),
-            defer(Condominio.ata_eleicao_base64)
         )
         .where(Condominio.id == id)
     )
