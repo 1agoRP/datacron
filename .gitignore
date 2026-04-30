@@ -53,6 +53,32 @@ bin/
 /lib/
 include/
 
-# Datacron Diagnostic/Utility
+# Datacron Diagnostic/Utility — scratch & one-off scripts
 scratch/
+scratch_*.py
+test_dialects.py
+test_kw*.py
 backend/list_users.py
+backend/scratch_*.py
+backend/test_dns.py
+backend/test_hash.py
+backend/test_imap.py
+backend/migrate.py
+backend/migrate2.py
+backend/migrate3.py
+backend/migrate_users.py
+backend/temp_dump.txt
+backend/test_results.txt
+
+# Sensitive data
+Users.tsv
+*.tsv
+
+# Backup files
+*.bak
+
+# Static landing page (served separately)
+datacron-landing.html
+
+# Local PDF storage
+pdfs_storage/
