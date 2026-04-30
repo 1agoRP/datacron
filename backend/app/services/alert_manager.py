@@ -262,22 +262,39 @@ async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura]
         condo = res.scalar_one_or_none()
 
     condo_name = condo.nome if condo else "Sistema"
-    subject = f"🔔 Datacron — {alert.tipo.replace('_', ' ').title()} | {condo_name}"
+    condo_num_str = str(condo.numero).zfill(4) if condo else "0000"
 
-    # 4. Montar corpo em texto simples (fallback)
-    message_text = (
-        f"Alerta Datacron\n\n"
-        f"Tipo: {alert.tipo}\n"
-        f"Gravidade: {alert.gravidade}\n"
-        f"Condomínio: {condo_name}\n"
-        f"Mensagem: {alert.mensagem}\n"
-    )
     if fatura:
-        message_text += (
-            f"\nFatura:\n"
-            f"  Referência: {fatura.referencia}\n"
-            f"  Valor: R$ {fatura.valor:.2f}\n"
-            f"  Vencimento: {fatura.vencimento}\n"
+        from app.models.concessionaria import Concessionaria
+        conc_res = await db.execute(select(Concessionaria).where(Concessionaria.id == fatura.concessionaria_id))
+        conc = conc_res.scalar_one_or_none()
+        
+        tipo_conta = conc.tipo if conc else "N/A"
+        cod_conta = conc.instalacao if conc else "N/A"
+        vencimento_str = fatura.vencimento.strftime("%d/%m/%Y") if fatura.vencimento else "N/A"
+        valor_str = f"R$ {fatura.valor:,.2f}" if fatura.valor else "N/A"
+        
+        subject = f"ALERTA {alert.tipo.upper()}: {condo_num_str} {condo_name} {tipo_conta} {cod_conta} {vencimento_str} {valor_str}"
+        message_text = (
+            f"Aviso de Alerta do Sistema Datacron\n\n"
+            f"Tipo de Alerta: {alert.tipo.replace('_', ' ').title()}\n"
+            f"Mensagem: {alert.mensagem}\n\n"
+            f"Detalhes da Conta:\n"
+            f"Condomínio: {condo_num_str} - {condo_name}\n"
+            f"Concessionária: {tipo_conta}\n"
+            f"Código da Conta: {cod_conta}\n"
+            f"Referência: {fatura.referencia}\n"
+            f"Vencimento: {vencimento_str}\n"
+            f"Valor: {valor_str}\n"
+        )
+    else:
+        subject = f"🔔 Datacron — {alert.tipo.replace('_', ' ').title()} | {condo_name}"
+        message_text = (
+            f"Alerta Datacron\n\n"
+            f"Tipo: {alert.tipo}\n"
+            f"Gravidade: {alert.gravidade}\n"
+            f"Condomínio: {condo_name}\n"
+            f"Mensagem: {alert.mensagem}\n"
         )
 
     # 5. Montar HTML rico

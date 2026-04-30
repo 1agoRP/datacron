@@ -556,29 +556,43 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             await check_and_create_alerts(fatura, conc, db)
             
             # Forward if individualized reading is active
-            if conc.leitura_individualizada:
-                forward_to = "assistente.gerencia4@propstarter.com.br"
-                # Keep original subject for threading
-                subject_fwd = fatura.email_assunto or f"Leitura Individualizada - {condo_name or 'N/A'}"
+            if conc.leitura_individualizada and conc.email_emissao:
+                forward_to = conc.email_emissao
+                condo_num_str = str(condo.numero).zfill(4) if condo else "0000"
+                condo_nome_str = condo.nome if condo else "N/A"
+                vencimento_str = fatura.vencimento.strftime("%d/%m/%Y") if fatura.vencimento else "N/A"
+                valor_str = f"R$ {fatura.valor:,.2f}" if fatura.valor else "N/A"
+                
+                subject_fwd = f"{condo_num_str} {condo_nome_str} {conc.tipo} {conc.instalacao} {vencimento_str} {valor_str}"
                 body_fwd = (
-                    f"Fatura com leitura individualizada identificada.\n\n"
-                    f"Condomínio: {condo_name or 'N/A'}\n"
+                    f"Detalhes da Conta:\n\n"
+                    f"Condomínio: {condo_num_str} - {condo_nome_str}\n"
                     f"Concessionária: {conc.tipo}\n"
-                    f"Instalação: {conc.instalacao}\n"
-                    f"Referência: {referencia}\n\n"
-                    "Arquivo anexo para providências."
+                    f"Código da Conta: {conc.instalacao}\n"
+                    f"Referência: {referencia}\n"
+                    f"Vencimento: {vencimento_str}\n"
+                    f"Valor: {valor_str}\n\n"
+                    "Arquivo da conta desbloqueada em anexo para emissão."
                 )
                 success_fwd = send_notification_email(
                     to=forward_to,
                     subject=subject_fwd,
                     message_text=body_fwd,
                     in_reply_to=msg_id,
-                    attachments=saved_paths # Forward all saved PDF paths
+                    attachments=saved_paths
                 )
                 if success_fwd:
                     logger.info(f"Fatura individualizada encaminhada para {forward_to}")
                 else:
                     logger.error(f"Falha ao encaminhar fatura individualizada para {forward_to}")
+
+    # Sempre encaminha para o backup após o processamento
+    send_notification_email(
+        to="datacroncompany1@gmail.com",
+        subject=f"FWD: {subject}",
+        message_text=f"E-mail processado pelo Datacron.\nRemetente: {sender}\nStatus: Identificado ({condo_name})" if condo_name else f"E-mail não identificado processado.\nRemetente: {sender}",
+        attachments=saved_paths if 'saved_paths' in locals() else []
+    )
 
     await db.commit()
     logger.info(f"Email {msg_id} processed successfully")
@@ -680,13 +694,12 @@ async def run_email_scan():
                         results.append((m_id, None))
                         continue
 
-            # Move emails to labels (reverse order to avoid sequence number issues)
-            for m_id, condo_name in reversed(results):
-                if condo_name:
-                    label = f"Datacron/{condo_name}"
-                else:
-                    label = "Datacron/E-mails nao identificados"
-                move_email_to_label(mail, m_id, label)
+            # Exclui todos os e-mails processados (vão para a lixeira do Gmail)
+            for m_id, _ in reversed(results):
+                try:
+                    mail.store(m_id, '+FLAGS', '(\\Deleted)')
+                except Exception as e:
+                    logger.error(f"Erro ao excluir e-mail processado {m_id}: {e}")
 
             # Expunge all deleted messages at once
             mail.expunge()

@@ -738,7 +738,7 @@ export default function ConcessionariasPage() {
               </div>
               
               <div className="dc-modal-footer" style={{ justifyContent: 'space-between' }}>
-                {editingId && isAdmin ? (
+                {editingId && !readOnly ? (
                   <button type="button" className="dc-btn dc-btn-danger" onClick={handleDelete} style={{ gap: 8 }}>
                     <Trash2 size={15} /> Excluir
                   </button>
