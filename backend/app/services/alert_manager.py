@@ -428,9 +428,9 @@ async def check_document_expirations_and_clean(db: AsyncSession) -> None:
         updated = False
         
         # 1. ATA de Eleição
-        if condo.ata_eleicao_fim and condo.ata_eleicao_base64:
+        if condo.ata_eleicao_fim and condo.ata_eleicao_url:
             if condo.ata_eleicao_fim.date() < today:
-                condo.ata_eleicao_base64 = None
+                condo.ata_eleicao_url = None
                 condo.ata_eleicao_nome = None
                 condo.ata_eleicao_inicio = None
                 condo.ata_eleicao_fim = None
