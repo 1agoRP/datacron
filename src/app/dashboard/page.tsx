@@ -363,7 +363,7 @@ export default function Dashboard() {
                     </td>
                     <td>
                       <div className="dc-cell-primary">{formatCurrency(f.valor)}</div>
-                      {f.variacao_percentual !== undefined && (
+                      {f.variacao_percentual !== undefined && f.variacao_percentual !== null && (
                         <div className={`dc-cell-secondary ${f.variacao_percentual > 0 ? 'text-red' : 'text-green'}`} style={{ fontSize: '0.7rem', fontWeight: 700 }}>
                           {f.variacao_percentual > 0 ? '+' : ''}{f.variacao_percentual.toFixed(1)}% vs anterior
                         </div>
