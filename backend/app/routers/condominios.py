@@ -467,10 +467,17 @@ async def save_ata_eleicao(
         except: return None
 
     try:
+        parsed_inicio = parse_date(data_inicio)
+        parsed_fim = parse_date(data_fim)
+        
         condo.ata_eleicao_url = file_path
         condo.ata_eleicao_nome = pdf_file.filename
-        condo.ata_eleicao_inicio = parse_date(data_inicio)
-        condo.ata_eleicao_fim = parse_date(data_fim)
+        condo.ata_eleicao_inicio = parsed_inicio
+        condo.ata_eleicao_fim = parsed_fim
+        
+        # Auto-preencher mandato
+        condo.mandato_inicio = parsed_inicio
+        condo.mandato_fim = parsed_fim
         
         await db.commit()
         return {"mensagem": "ATA de Eleição salva com sucesso", "ata_eleicao_nome": pdf_file.filename}
