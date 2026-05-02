@@ -68,7 +68,7 @@ async def _is_concessionaria_domain(sender_email: str, db: AsyncSession) -> bool
             Concessionaria.ativo == True
         )
     )
-    return result.scalar_one_or_none() is not None
+    return result.first() is not None
 
 
 def get_imap_connection():
