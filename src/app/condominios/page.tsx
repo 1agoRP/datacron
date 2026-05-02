@@ -896,18 +896,20 @@ export default function CondominiosPage() {
                                 onClick={() => handleDownloadFatura(f, f.pdf_nome_original || `fatura_${f.referencia}.pdf`, 'sistema')}
                                 className="dc-btn"
                                 style={{
-                                  height: 44,
-                                  width: 44,
+                                  height: 40,
+                                  width: 40,
                                   padding: 0,
-                                  borderRadius: 12,
+                                  borderRadius: 10,
                                   background: '#fff',
-                                  border: '1px solid #e2e8f0',
-                                  color: '#0f172a',
-                                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                                  border: '1px solid #10b981',
+                                  color: '#10b981',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
                                 }}
                                 title="Baixar PDF"
                               >
-                                <Download size={20} />
+                                <Download size={18} />
                               </button>
                             </div>
                           </div>
