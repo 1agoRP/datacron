@@ -254,7 +254,7 @@ def render_not_identified_email(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SEND FUNCTION
+# SEND FUNCTION (VIA n8n WEBHOOK)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def send_notification_email(
@@ -263,42 +263,47 @@ def send_notification_email(
     message_text: str,
     in_reply_to: Optional[str] = None,
     attachments: Optional[list[tuple[str, bytes]]] = None,
-    html_body: Optional[str] = None
+    html_body: Optional[str] = None,
+    tipo: str = "alerta"
 ) -> bool:
-    """Sends an email using Gmail SMTP, optionally as a reply to a Message-ID."""
-    if not settings.GMAIL_USER or not settings.GMAIL_PASSWORD:
-        logger.error("Credenciais do Gmail não configuradas para enviar e-mail.")
-        return False
+    """
+    Sends an email by triggering the n8n outbound webhook.
+    tipo can be 'alerta', 'transacional', 'leitura'
+    """
+    import base64
+    import httpx
+    
+    url = "https://n8n-n8n.7vjfup.easypanel.host/webhook/datacron-outbound-email"
+    
+    payload = {
+        "tipo": tipo,
+        "destinatario": to,
+        "assunto": subject,
+        "corpo_html": html_body if html_body else message_text,
+    }
+
+    if attachments:
+        anexos_list = []
+        for filename, data in attachments:
+            b64_data = base64.b64encode(data).decode("utf-8")
+            mime = "application/pdf"
+            if filename.lower().endswith(".png"):
+                mime = "image/png"
+            elif filename.lower().endswith(".jpg") or filename.lower().endswith(".jpeg"):
+                mime = "image/jpeg"
+                
+            anexos_list.append({
+                "nome": filename,
+                "mime": mime,
+                "base64": b64_data
+            })
+        payload["anexos"] = anexos_list
+
     try:
-        msg = EmailMessage()
-        msg.set_content(message_text)
-        if html_body:
-            msg.add_alternative(html_body, subtype='html')
-
-        msg["To"] = to
-        msg["From"] = settings.GMAIL_USER
-        msg["Subject"] = subject
-
-        if in_reply_to:
-            ref_id = f"<{in_reply_to.strip('<>')}>"
-            msg["In-Reply-To"] = ref_id
-            msg["References"] = ref_id
-            if not subject.lower().startswith("re:"):
-                msg["Subject"] = f"Re: {subject}"
-
-        if attachments:
-            for filename, data in attachments:
-                msg.add_attachment(
-                    data,
-                    maintype='application',
-                    subtype='pdf',
-                    filename=filename
-                )
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(settings.GMAIL_USER, settings.GMAIL_PASSWORD)
-            server.send_message(msg)
+        response = httpx.post(url, json=payload, timeout=15.0)
+        response.raise_for_status()
+        logger.info(f"Successfully triggered n8n email webhook for {to} (Tipo: {tipo})")
         return True
     except Exception as e:
-        logger.error(f"Failed to send email to {to}: {str(e)}")
+        logger.error(f"Failed to trigger n8n email webhook to {to}: {str(e)}")
         return False
