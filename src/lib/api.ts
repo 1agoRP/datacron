@@ -152,16 +152,17 @@ class ApiClient {
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('datacron_token', data.access_token);
-      // Extend cookie to 30 days and use Lax for better redirect handling
-      document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Lax; max-age=${60 * 60 * 24 * 30}`;
+      // Ensure session persistence: 48 hours expiry (2880 minutes)
+      const fortyEightHours = 60 * 60 * 48;
+      document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Lax; max-age=${fortyEightHours}`;
     }
     return data;
   }
 
   async logout() {
     localStorage.removeItem('datacron_token');
-    // Clear the cookie so middleware stops allowing access
-    document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
+    // Consistently clear the cookie
+    document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
     window.location.href = '/';
   }
 

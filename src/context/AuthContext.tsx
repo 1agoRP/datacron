@@ -69,10 +69,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const userData = await api.getMe();
             setUser(userData);
-          } catch (err) {
-            // Token likely expired or revoked on server
-            console.warn('Session sync failed, logging out:', err);
-            handleLogoutCleanup();
+          } catch (err: any) {
+            // Only logout if it's explicitly an auth error (401 is handled by api interceptor, 
+            // but we check here if the token is definitely rejected by server)
+            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('não autorizado') || err.message.toLowerCase().includes('expirado'))) {
+              console.warn('Sessão inválida, limpando:', err);
+              handleLogoutCleanup();
+            } else {
+              console.warn('Falha na sincronização (rede/servidor), mantendo sessão local:', err);
+            }
           }
         } else {
           handleLogoutCleanup();
