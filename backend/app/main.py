@@ -17,8 +17,7 @@ from app.limiter import limiter
 
 from app.config import settings
 from app.database import engine, Base
-from app.routers import auth, condominios, concessionarias, faturas, alertas, emails, importacoes, relatorios, dashboard, contratos, reajustes, fornecedores, historico, webhooks
-from app.workers.scheduler import start_scheduler, stop_scheduler
+from app.routers import auth, condominios, concessionarias, faturas, alertas, emails, importacoes, relatorios, dashboard, contratos, reajustes, fornecedores, historico, webhooks, cron
 
 # ─── Logging ────────────────────────────────────────────────
 logging.basicConfig(
@@ -42,13 +41,9 @@ async def lifespan(app: FastAPI):
         logger.error("VULNERABILIDADE CRÍTICA: CORS aberto '*' em ambiente de produção!")
         raise RuntimeError("Deploy cancelado por segurança. Defina ALLOWED_ORIGINS corretamente.")
 
-    # Start background scheduler
-    start_scheduler()
-
     yield  # ← Application is running here
 
     # Shutdown
-    stop_scheduler()
     await engine.dispose()
     logger.info("Datacron API shut down")
 
@@ -96,6 +91,7 @@ app.include_router(reajustes.router,        prefix=API_PREFIX)
 app.include_router(fornecedores.router,     prefix=API_PREFIX)
 app.include_router(historico.router,        prefix=API_PREFIX)
 app.include_router(webhooks.router,         prefix=API_PREFIX)
+app.include_router(cron.router,             prefix=API_PREFIX)
 
 
 # ─── Health check ───────────────────────────────────────────
