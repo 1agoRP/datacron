@@ -292,6 +292,21 @@ export default function ContratosPage() {
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    
+    // Validate required fields
+    if (!form.condominio_id) {
+      alert('Por favor, selecione um Condomínio.');
+      return;
+    }
+    if (!form.empresa) {
+      alert('Por favor, informe a Empresa Contratada.');
+      return;
+    }
+    if (!form.data_inicio) {
+      alert('Por favor, informe a Data de Início do contrato.');
+      return;
+    }
+
     try {
       setSaving(true);
       const payload = { ...form };
