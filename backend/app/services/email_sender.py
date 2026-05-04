@@ -1,6 +1,6 @@
 import logging
 import smtplib
-from datetime import datetime
+from datetime import datetime, date
 from email.message import EmailMessage
 from typing import Optional
 from app.config import settings
