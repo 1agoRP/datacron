@@ -223,16 +223,21 @@ async def find_concessionaria(
             return concs[0], code_from_body or concs[0].instalacao
 
     # 2. BUSCA GLOBAL (Melhoria para e-mails encaminhados)
-    # Se chegamos aqui, ou o remetente não é o oficial (encaminhado) ou não achou a UC nos concs do domínio.
-    # Vamos buscar em TODAS as concessionárias ativas
-    
     all_concs_result = await db.execute(select(Concessionaria).where(Concessionaria.ativo == True))
     all_concs = all_concs_result.scalars().all()
     
-    # Procura por número de instalação exato no assunto ou corpo
+    # Normalizamos o texto para busca mais robusta (removemos caracteres comuns de separação)
+    clean_body = re.sub(r'[\s\./\-]+', '', body_text)
+    clean_subject = re.sub(r'[\s\./\-]+', '', subject)
+
+    # Procura por número de instalação exato ou variações no assunto ou corpo
     for conc in all_concs:
-        if conc.instalacao and len(conc.instalacao) >= 4: # Ignora códigos muito curtos para evitar falso-positivo
-            if conc.instalacao in subject or conc.instalacao in body_text:
+        if conc.instalacao and len(conc.instalacao) >= 4:
+            clean_inst = re.sub(r'[\s\./\-]+', '', conc.instalacao)
+            
+            # Busca exata ou busca 'limpa' (removendo separadores)
+            if (conc.instalacao in subject or conc.instalacao in body_text or 
+                clean_inst in clean_subject or clean_inst in clean_body):
                 logger.info(f"Identificado via Busca Global (UC: {conc.instalacao})")
                 return conc, conc.instalacao
                 

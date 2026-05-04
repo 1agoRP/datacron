@@ -221,12 +221,7 @@ async def notify_alert(
     from app.models.user import User
     from app.models.user_condominio import UserCondominio
 
-    # Alertas sem condomínio não disparam notificação
-    if not alert.condominio_id:
-        logger.info(f"Alert {alert.id} has no condominio_id — skipping notification.")
-        return
-
-    # 1. Buscar todos os admins ativos (eles recebem tudo)
+    # 1. Buscar todos os admins ativos (eles sempre recebem alertas, mesmo sem condomínio identificado)
     res_admins = await db.execute(
         select(User).where(
             User.role == "admin",
@@ -235,29 +230,44 @@ async def notify_alert(
     )
     admin_users = res_admins.scalars().all()
 
-    # 2. Buscar usuários com roles autorizados (exceto admin, já buscados)
-    #    que tenham acesso a este condomínio via user_condominios OU via codigo_condominio
-    non_admin_roles = ALERT_NOTIFICATION_ROLES - {"admin"}
-    
-    # 2a. Via tabela user_condominios
-    res_linked = await db.execute(
-        select(User)
-        .join(UserCondominio, UserCondominio.user_id == User.id)
-        .where(
-            UserCondominio.condominio_id == alert.condominio_id,
-            User.role.in_(non_admin_roles),
-            User.ativo == True,
+    # Se não tem condomínio, apenas admins recebem
+    if not alert.condominio_id:
+        logger.info(f"Alert {alert.id or 'NEW'} has no condominio_id — sending to admins only.")
+        # Segue para o envio abaixo, mas linked_users e carteira_users ficarão vazios
+        linked_users = []
+        carteira_users = []
+    else:
+        # 2. Buscar usuários com roles autorizados (exceto admin, já buscados)
+        #    que tenham acesso a este condomínio via user_condominios OU via codigo_condominio
+        non_admin_roles = ALERT_NOTIFICATION_ROLES - {"admin"}
+        
+        # 2a. Via tabela user_condominios
+        res_linked = await db.execute(
+            select(User)
+            .join(UserCondominio, UserCondominio.user_id == User.id)
+            .where(
+                UserCondominio.condominio_id == alert.condominio_id,
+                User.role.in_(non_admin_roles),
+                User.ativo == True,
+            )
         )
-    )
-    linked_users = res_linked.scalars().all()
+        linked_users = res_linked.scalars().all()
 
-    # 2b. Via campo codigo_condominio (carteira) — buscar o número do condomínio
-    condo = None
-    res_condo = await db.execute(select(Condominio).where(Condominio.id == alert.condominio_id))
-    condo = res_condo.scalar_one_or_none()
-    
-    carteira_users = []
-    if condo:
+        # 2b. Via campo codigo_condominio (carteira)
+        condo = None
+        res_condo = await db.execute(select(Condominio).where(Condominio.id == alert.condominio_id))
+        condo = res_condo.scalar_one_or_none()
+        
+        carteira_users = []
+        if condo:
+            res_carteira = await db.execute(
+                select(User).where(
+                    User.codigo_condominio == str(condo.numero),
+                    User.role.in_(non_admin_roles),
+                    User.ativo == True,
+                )
+            )
+            carteira_users = res_carteira.scalars().all()
         # Users with 'todos' in codigo_condominio or the specific number
         res_carteira = await db.execute(
             select(User).where(
@@ -295,10 +305,11 @@ async def notify_alert(
         recipients.add(u.email)
 
     if not recipients:
-        logger.warning(f"No recipients found for alert {alert.id} on condo {alert.condominio_id}")
+        logger.warning(f"No recipients found for alert {alert.id or 'NEW'} on condo {alert.condominio_id}")
         return
 
-    logger.info(f"Alert {alert.id}: sending to {len(recipients)} recipients: {recipients}")
+    alert_desc = f"ID:{alert.id}" if alert.id else f"Type:{alert.tipo}"
+    logger.info(f"Alert {alert_desc}: sending to {len(recipients)} recipients: {recipients}")
 
     # 4. Buscar contexto
     condo_name = condo.nome if condo else "Sistema"

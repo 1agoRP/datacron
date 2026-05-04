@@ -170,6 +170,8 @@ async def criar_fornecedor(
     new_id = str(uuid.uuid4())
 
     try:
+        # Use simple bind parameters and avoid the ::uuid syntax within the query string
+        # as it can confuse the text() parser when combined with parameters.
         result = await db.execute(
             text("""
                 INSERT INTO database_fornecedores (
@@ -184,7 +186,7 @@ async def criar_fornecedor(
                     created_by_id,
                     created_at
                 ) VALUES (
-                    :id::uuid,
+                    :id,
                     :documento,
                     :nome,
                     :email,
@@ -192,19 +194,19 @@ async def criar_fornecedor(
                     :categoria,
                     :administradora,
                     'ATIVO',
-                    :user_id::uuid,
+                    :user_id,
                     NOW()
                 ) RETURNING *
             """),
             {
-                "id": new_id,
+                "id": uuid.UUID(new_id),
                 "documento": body.documentoFornecedor,
                 "nome": body.nomeFornecedor,
                 "email": body.emailFornecedor,
                 "whatsapp": body.whatsappFornecedor,
                 "categoria": body.categoriaFornecedor,
                 "administradora": administradora,
-                "user_id": str(current_user.id),
+                "user_id": current_user.id,
             },
         )
         await db.commit()

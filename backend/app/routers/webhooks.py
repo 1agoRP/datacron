@@ -186,6 +186,8 @@ async def n8n_email_invoice(
         if conc:
             from app.services.alert_manager import check_and_create_alerts
             await check_and_create_alerts(fatura, conc, db)
+        else:
+            logger.warning(f"Failed to identify concessionaria/condominio for email from {sender} (Subject: {subject})")
 
         # ── Alert for PDF unlock failure ─────────────────────────────────
         if not pdf_unlocked:
