@@ -190,25 +190,32 @@ async def check_missing_bills(db: AsyncSession) -> None:
 
         # Create alert
         condo_nome = conc.condominio.nome if conc.condominio else "Desconhecido"
+        mensagem = (
+            f"Conta da {conc.tipo} do {condo_nome} ainda não foi recebida. "
+            f"Vencimento esperado: dia {conc.dia_vencimento}. "
+            f"(UC: {conc.instalacao})"
+        )
         alert = Alerta(
             condominio_id=conc.condominio_id,
             tipo="conta_nao_recebida",
             gravidade="alta",
-            mensagem=(
-                f"Conta da {conc.tipo} do {condo_nome} ainda não foi recebida. "
-                f"Vencimento esperado: dia {conc.dia_vencimento}."
-            ),
+            mensagem=mensagem,
         )
         db.add(alert)
         await db.flush() # Get ID
-        await notify_alert(db, alert)
+        await notify_alert(db, alert, conc=conc)
         
         logger.info(f"Alert created: missing bill for concessionaria {conc.id}")
 
     await db.commit()
 
 
-async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura] = None) -> None:
+async def notify_alert(
+    db: AsyncSession, 
+    alert: Alerta, 
+    fatura: Optional[Fatura] = None,
+    conc: Optional[Concessionaria] = None
+) -> None:
     """
     Sends an alert notification to the PRIMARY RESPONSIBLE user for the condomínio.
     Never sends alerts to all users — only to those explicitly assigned to this condo.
@@ -264,15 +271,38 @@ async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura]
     condo_name = condo.nome if condo else "Sistema"
     condo_num_str = str(condo.numero).zfill(4) if condo else "0000"
 
-    if fatura:
+    tipo_conta = "N/A"
+    cod_conta = "N/A"
+    vencimento_str = "N/A"
+    valor_str = "N/A"
+    fatura_referencia = None
+    fatura_valor = None
+    fatura_vencimento = None
+
+    if conc:
+        tipo_conta = conc.tipo
+        cod_conta = conc.instalacao
+    elif fatura:
         from app.models.concessionaria import Concessionaria
         conc_res = await db.execute(select(Concessionaria).where(Concessionaria.id == fatura.concessionaria_id))
-        conc = conc_res.scalar_one_or_none()
-        
-        tipo_conta = conc.tipo if conc else "N/A"
-        cod_conta = conc.instalacao if conc else "N/A"
+        conc_obj = conc_res.scalar_one_or_none()
+        if conc_obj:
+            tipo_conta = conc_obj.tipo
+            cod_conta = conc_obj.instalacao
+    
+    # Try to extract code from message if still N/A (for manual alerts or conta_nao_recebida)
+    if cod_conta == "N/A":
+        import re
+        m = re.search(r"\(UC:\s*([^\)]+)\)", alert.mensagem)
+        if m:
+            cod_conta = m.group(1)
+
+    if fatura:
         vencimento_str = fatura.vencimento.strftime("%d/%m/%Y") if fatura.vencimento else "N/A"
         valor_str = f"R$ {fatura.valor:,.2f}" if fatura.valor else "N/A"
+        fatura_referencia = fatura.referencia
+        fatura_valor = fatura.valor
+        fatura_vencimento = fatura.vencimento
         
         subject = f"ALERTA {alert.tipo.upper()}: {condo_num_str} {condo_name} {tipo_conta} {cod_conta} {vencimento_str} {valor_str}"
         message_text = (
@@ -283,7 +313,7 @@ async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura]
             f"Condomínio: {condo_num_str} - {condo_name}\n"
             f"Concessionária: {tipo_conta}\n"
             f"Código da Conta: {cod_conta}\n"
-            f"Referência: {fatura.referencia}\n"
+            f"Referência: {fatura_referencia}\n"
             f"Vencimento: {vencimento_str}\n"
             f"Valor: {valor_str}\n"
         )
@@ -306,9 +336,10 @@ async def notify_alert(db: AsyncSession, alert: Alerta, fatura: Optional[Fatura]
         email_remetente=getattr(alert, "email_remetente", None),
         email_assunto=getattr(alert, "email_assunto", None),
         email_data=getattr(alert, "email_data", None),
-        fatura_referencia=fatura.referencia if fatura else None,
-        fatura_valor=fatura.valor if fatura else None,
-        fatura_vencimento=fatura.vencimento if fatura else None,
+        fatura_referencia=fatura_referencia,
+        fatura_valor=fatura_valor,
+        fatura_vencimento=fatura_vencimento,
+        instalacao=cod_conta
     )
 
     # 6. Anexar PDF se disponível

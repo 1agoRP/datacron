@@ -419,15 +419,29 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         # Somente notifica o próprio remetente se ele for usuário cadastrado
         if is_known_user:
             from app.services.email_sender import send_notification_email, render_not_identified_email
+            
+            # Try to find some identification even if not matched
+            tipo_sug = "Concessionária"
+            codigo_sug = codigo_encontrado or "N/D"
+            if not codigo_encontrado:
+                for t in ['Enel', 'Sabesp', 'Comgás']:
+                    if t.lower() in subject.lower():
+                        tipo_sug = t
+                        break
+            elif conc:
+                tipo_sug = conc.tipo
+
             html = render_not_identified_email(
                 sender_name=sender,
                 original_subject=subject,
                 original_body=body_text,
                 received_at=received_at,
+                codigo_sugerido=codigo_sug,
+                tipo_sugerido=tipo_sug
             )
             send_notification_email(
                 to=sender,
-                subject="Datacron: E-mail não identificado",
+                subject=f"Datacron: {tipo_sug} não identificada",
                 message_text=(
                     f"Olá,\n\nRecebemos o e-mail que você encaminhou mas não conseguimos "
                     f"identificar o condomínio automaticamente.\n\n"
@@ -452,6 +466,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             condo_name = f"{numero_pad} - {condo.nome}"
         password = conc.gerar_senha_pdf(condo.cnpj_digits if condo else "")
     
+    body_data = {}
     if conc:
         body_data = extract_data_from_body(body_text, conc.tipo)
     else:

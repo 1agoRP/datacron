@@ -5,13 +5,14 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_write, get_user_condo_ids
 from app.models.user import User
 from app.models.alerta import Alerta
 from app.schemas import AlertaResponse
-from app.services.email_sender import send_notification_email
+from app.services.email_sender import send_notification_email, render_resolution_email, render_unidentified_sender_email
 from app.services.alert_manager import notify_alert
 
 router = APIRouter(prefix="/alertas", tags=["Alertas"])
@@ -104,7 +105,11 @@ async def resolve_alerta(
     current_user: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    result = await db.execute(select(Alerta).where(Alerta.id == id))
+    result = await db.execute(
+        select(Alerta)
+        .options(joinedload(Alerta.condominio))
+        .where(Alerta.id == id)
+    )
     a = result.scalar_one_or_none()
     if not a:
         raise HTTPException(status_code=404, detail="Alerta nao encontrado")
@@ -122,6 +127,7 @@ async def resolve_alerta(
         a.tipo,
         a.mensagem,
         current_user.email,
+        a.condominio.nome if a.condominio else None,
         a.email_remetente,
         a.email_assunto,
     )
@@ -137,6 +143,7 @@ def process_alert_resolution_emails(
     alerta_tipo: str,
     alerta_mensagem: str,
     manager_email: str,
+    condo_nome: str = None,
     email_remetente: str = None,
     email_assunto: str = None,
 ):
@@ -160,7 +167,7 @@ def process_alert_resolution_emails(
 
         # 2. Notify the manager
         _send_manager_confirmation(
-            manager_email, alerta_tipo, alerta_mensagem, email_remetente, email_assunto
+            manager_email, alerta_tipo, alerta_mensagem, condo_nome, email_remetente, email_assunto
         )
     except Exception as e:
         import logging
@@ -171,38 +178,38 @@ def process_alert_resolution_emails(
 def _send_reply_to_sender(recipient: str, original_subject: str):
     import re
 
-    subj_upper = original_subject.upper()
-    if "ENEL" in subj_upper or "ELETROPAULO" in subj_upper:
-        tipo_label, codigo_label = "Enel", "Instalação"
-    elif "SABESP" in subj_upper:
-        tipo_label, codigo_label = "Sabesp", "Fornecimento"
-    elif "COMGÁS" in subj_upper or "COMGAS" in subj_upper:
-        tipo_label, codigo_label = "Comgas", "Código de Usuário"
-    else:
-        tipo_label, codigo_label = "Concessionária", "Código"
-
-    code_match = re.search(r"(\d{6,})", original_subject)
+    # Extract code from subject
+    code_match = re.search(r"(\d{5,15})", original_subject)
     code = code_match.group(1) if code_match else "N/D"
 
-    subject = f"{tipo_label} - {codigo_label} {code} - nao reconhecida no cadastro"
+    # Identify Concessionária type for better labeling
+    tipo_label = "Concessionária"
+    codigo_label = "Código / Instalação"
 
-    body_html = f"""<!DOCTYPE html>
-<html lang="pt-BR">
-<body style="font-family: sans-serif; padding: 20px; color: #334155;">
-    <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px;">
-        <h2 style="color: #1e40af;">Datacron - Concessionaria Nao Identificada</h2>
-        <p>Prezado(a), o e-mail recebido ({original_subject}) nao foi identificado em nosso sistema.</p>
-        <p>Sera necessaria uma revisao manual pela administracao.</p>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
-        <p style="font-size: 12px; color: #64748b;">Este e uma mensagem automatica, por favor nao responda.</p>
-    </div>
-</body>
-</html>"""
+    subj_lower = original_subject.lower()
+    if "enel" in subj_lower:
+        tipo_label = "Enel"
+        codigo_label = "Instalação"
+    elif "sabesp" in subj_lower:
+        tipo_label = "Sabesp"
+        codigo_label = "Fornecimento"
+    elif "comgas" in subj_lower or "comgás" in subj_lower:
+        tipo_label = "Comgás"
+        codigo_label = "Código do Usuário"
+
+    subject = f"Aviso: {tipo_label} não identificada no Datacron"
+
+    body_html = render_unidentified_sender_email(
+        original_subject=original_subject,
+        tipo_label=tipo_label,
+        codigo_label=codigo_label,
+        codigo_valor=code
+    )
 
     send_notification_email(
         to=recipient,
         subject=subject,
-        message_text=f"Aviso: Concessionaria nao identificada no sistema para o assunto: {original_subject}",
+        message_text=f"E-mail ({original_subject}) não identificado. Verifique seu cadastro no Datacron.",
         html_body=body_html,
     )
 
@@ -211,42 +218,25 @@ def _send_manager_confirmation(
     recipient: str,
     alerta_tipo: str,
     alerta_mensagem: str,
+    condo_nome: str = None,
     email_remetente: str = None,
     email_assunto: str = None,
 ):
+    import re
+    # Extract code from message if possible (e.g. UC: 123456)
+    cod_match = re.search(r"\(UC:\s*([^\)]+)\)", alerta_mensagem)
+    instalacao = cod_match.group(1) if cod_match else None
+
     subject = f"✅ Pendência Resolvida: {alerta_tipo.replace('_', ' ').title()}"
 
-    email_info_html = ""
-    if email_remetente or email_assunto:
-        email_info_html = f"""
-        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px;">E-mail Original</div>
-            <div style="font-size: 13px; color: #475569;">
-                <strong>De:</strong> {email_remetente or "N/D"}<br>
-                <strong>Assunto:</strong> {email_assunto or "N/D"}
-            </div>
-        </div>
-        """
-
-    body_html = f"""<!DOCTYPE html>
-<html lang="pt-BR">
-<body style="font-family: sans-serif; padding: 20px; color: #334155;">
-    <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px;">
-        <div style="background: #f0fdf4; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
-             <h2 style="color: #16a34a; margin: 0; font-size: 18px;">Resolução Confirmada</h2>
-        </div>
-        <p>O alerta abaixo foi marcado como <strong>resolvido</strong>:</p>
-        <div style="background: #f8fafc; padding: 16px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #16a34a;">
-            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Tipo do Alerta</div>
-            <div style="font-weight: bold; margin-bottom: 8px; color: #1e293b;">{alerta_tipo.upper()}</div>
-            <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Mensagem</div>
-            <div style="color: #475569; font-size: 14px; line-height: 1.5;">{alerta_mensagem}</div>
-            {email_info_html}
-        </div>
-        <p style="font-size: 12px; color: #94a3b8;">Sistema Datacron - {datetime.now().strftime("%d/%m/%Y %H:%M")}</p>
-    </div>
-</body>
-</html>"""
+    body_html = render_resolution_email(
+        tipo=alerta_tipo,
+        mensagem=alerta_mensagem,
+        condo_nome=condo_nome,
+        email_remetente=email_remetente,
+        email_assunto=email_assunto,
+        instalacao=instalacao
+    )
 
     send_notification_email(
         to=recipient,
