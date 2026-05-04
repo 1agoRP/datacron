@@ -187,6 +187,39 @@ async def n8n_email_invoice(
             from app.services.alert_manager import check_and_create_alerts
             await check_and_create_alerts(fatura, conc, db)
 
+        # ── Alert for PDF unlock failure ─────────────────────────────────
+        if not pdf_unlocked:
+            from app.models.alerta import Alerta
+            from app.services.alert_manager import notify_alert
+
+            condo_nome = condo.nome if condo else "Não identificado"
+            conc_tipo = conc.tipo if conc else "N/A"
+            conc_instalacao = conc.instalacao if conc else (codigo_encontrado or "N/A")
+
+            mensagem = (
+                f"Falha no desbloqueio do PDF da {conc_tipo} do {condo_nome}. "
+                f"Verifique a regra de senha configurada. "
+                f"(UC: {conc_instalacao}) "
+                f"Remetente: {sender} | Assunto: {subject}"
+            )
+
+            alert = Alerta(
+                condominio_id=conc.condominio_id if conc else None,
+                fatura_id=fatura.id,
+                tipo="pdf_erro",
+                gravidade="alta",
+                mensagem=mensagem,
+            )
+            db.add(alert)
+            await db.flush()
+
+            # Send notification email with full context
+            await notify_alert(db, alert, fatura=fatura, conc=conc)
+            logger.warning(
+                f"PDF unlock FAILED for {conc_tipo} | UC: {conc_instalacao} | "
+                f"Condo: {condo_nome} | Sender: {sender} | Subject: {subject}"
+            )
+
         await db.commit()
 
         return {

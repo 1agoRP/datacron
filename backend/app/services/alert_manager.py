@@ -115,25 +115,11 @@ async def _check_value_variation(
 
 
 async def _check_pdf_failure(fatura: Fatura, db: AsyncSession) -> Optional[Alerta]:
-
-    """Creates an alert if the PDF could not be unlocked."""
-    if not fatura.pdf_desbloqueado and fatura.pdf_path:
-        alert = Alerta(
-            condominio_id=fatura.condominio_id,
-            fatura_id=fatura.id,
-            tipo="pdf_erro",
-            gravidade="media",
-            mensagem=(
-                f"PDF da fatura {fatura.referencia} não pôde ser desbloqueado automaticamente. "
-                "Verifique a regra de senha da concessionária."
-            ),
-            email_remetente=fatura.email_remetente,
-            email_assunto=fatura.email_assunto,
-            # We don't have fatura.email_data directly, but created_at is usually the same or we could add it
-        )
-        db.add(alert)
-        logger.info(f"Alert created: PDF unlock failure for fatura {fatura.id}")
-        return alert
+    """
+    Previously created pdf_erro alerts here, but this is now handled directly
+    in the webhook (routers/webhooks.py) with full email context and notification.
+    Keeping this function as a no-op to avoid breaking the call chain.
+    """
     return None
 
 

@@ -651,10 +651,11 @@ export default function CondominiosPage() {
                 </div>
               </div>
               <div className="dc-form-group">
-                <label className="dc-checkbox-wrapper">
-                  <input type="checkbox" checked={newCondo.leitura_individualizada_ativa} onChange={e => setNewCondo({ ...newCondo, leitura_individualizada_ativa: e.target.checked })} />
-                  <span>Este condomínio possui Leitura Individualizada?</span>
-                </label>
+                <label>Leitura Individualizada</label>
+                <div className="dc-segmented-control">
+                  <button type="button" className={newCondo.leitura_individualizada_ativa ? 'active' : ''} onClick={() => setNewCondo({ ...newCondo, leitura_individualizada_ativa: true })}>Sim</button>
+                  <button type="button" className={!newCondo.leitura_individualizada_ativa ? 'active active-negative' : ''} onClick={() => setNewCondo({ ...newCondo, leitura_individualizada_ativa: false })}>Não</button>
+                </div>
               </div>
               <div className="dc-modal-footer">
                 <button type="button" className="dc-btn dc-btn-secondary" onClick={() => setIsModalOpen(false)}>Cancelar</button>
@@ -706,10 +707,11 @@ export default function CondominiosPage() {
                 </div>
               </div>
               <div className="dc-form-group">
-                <label className="dc-checkbox-wrapper">
-                  <input type="checkbox" disabled={readOnly} checked={editCondo.leitura_individualizada_ativa || false} onChange={e => setEditCondo({ ...editCondo, leitura_individualizada_ativa: e.target.checked })} />
-                  <span>Este condomínio possui Leitura Individualizada</span>
-                </label>
+                <label>Leitura Individualizada</label>
+                <div className="dc-segmented-control">
+                  <button type="button" className={editCondo.leitura_individualizada_ativa ? 'active' : ''} disabled={readOnly} onClick={() => setEditCondo({ ...editCondo, leitura_individualizada_ativa: true })}>Sim</button>
+                  <button type="button" className={!editCondo.leitura_individualizada_ativa ? 'active active-negative' : ''} disabled={readOnly} onClick={() => setEditCondo({ ...editCondo, leitura_individualizada_ativa: false })}>Não</button>
+                </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="dc-form-group">
