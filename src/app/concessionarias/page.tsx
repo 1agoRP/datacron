@@ -700,30 +700,17 @@ export default function ConcessionariasPage() {
                     </div>
                   </div>
                   <div className="dc-form-group">
-                    <label>Leitura Individualizada</label>
-                    <div className="dc-segmented-control">
-                      <button 
-                        type="button" 
-                        className={formConc.leitura_individualizada ? 'active' : ''} 
-                        disabled={readOnly}
-                        onClick={() => setFormConc({...formConc, leitura_individualizada: true})}
-                      >Ativa</button>
-                      <button 
-                        type="button" 
-                        className={!formConc.leitura_individualizada ? 'active active-negative' : ''} 
-                        disabled={readOnly}
-                        onClick={() => setFormConc({...formConc, leitura_individualizada: false})}
-                      >Inativa</button>
-                    </div>
+                    <label>Senha do Portal</label>
+                    <input className="dc-form-input" disabled={readOnly} value={formConc.senha_portal || ''} onChange={e => setFormConc({...formConc, senha_portal: e.target.value})} placeholder="Senha de acesso ao portal" />
                   </div>
                 </div>
-                {formConc.leitura_individualizada && (
+                {/* E-mail emissão: shown when the selected condo has leitura individualizada ativa */}
+                {formConc.condominio_id && condos.find((c: any) => c.id === formConc.condominio_id)?.leitura_individualizada_ativa && (
                   <div className="dc-form-group">
                     <label>E-mail para Emissão (Leitura Individualizada)</label>
                     <div style={{ position: 'relative' }}>
                       <input 
                         className="dc-form-input" 
-                        required={formConc.leitura_individualizada}
                         disabled={readOnly} 
                         value={formConc.email_emissao || ''} 
                         onChange={e => setFormConc({...formConc, email_emissao: e.target.value})} 

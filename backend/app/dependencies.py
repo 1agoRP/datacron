@@ -170,4 +170,16 @@ async def get_user_condo_ids(
     )
     final_ids.update(res_uc.scalars().all())
     
+    # 3. Restrição especial para role "emissao": só vê condominios com leitura individualizada ativa
+    if user.role == "emissao":
+        if not final_ids:
+            return []
+        res_indiv = await db.execute(
+            select(Condominio.id).where(
+                Condominio.id.in_(list(final_ids)),
+                Condominio.leitura_individualizada_ativa == True,
+            )
+        )
+        final_ids = set(res_indiv.scalars().all())
+    
     return list(final_ids)

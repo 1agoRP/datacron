@@ -708,7 +708,7 @@ export default function CondominiosPage() {
               <div className="dc-form-group">
                 <label className="dc-checkbox-wrapper">
                   <input type="checkbox" disabled={readOnly} checked={editCondo.leitura_individualizada_ativa || false} onChange={e => setEditCondo({ ...editCondo, leitura_individualizada_ativa: e.target.checked })} />
-                  <span>Ativar Leitura Individualizada para este Condomínio</span>
+                  <span>Este condomínio possui Leitura Individualizada</span>
                 </label>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

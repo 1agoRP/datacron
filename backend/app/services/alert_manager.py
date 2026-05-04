@@ -142,15 +142,17 @@ async def check_missing_bills(db: AsyncSession) -> None:
     """
     Scheduled job: checks if any expected bill has not arrived.
     Run once per day. Generates 'conta_nao_recebida' alerts.
+    Only fires after a 3-day grace period past the due date.
+    Uses vencimento month/year for reliable fatura detection.
     """
     from datetime import date, datetime
-
+    from sqlalchemy import extract
     from sqlalchemy.orm import selectinload
     from app.models.concessionaria import Concessionaria
     from app.models.condominio import Condominio
 
     today = date.today()
-    current_month = today.strftime("%B/%Y")  # e.g. "Março/2026" — simplified
+    grace_days = 3  # Days after vencimento before firing alert
 
     result = await db.execute(
         select(Concessionaria)
@@ -160,15 +162,16 @@ async def check_missing_bills(db: AsyncSession) -> None:
     all_conc = result.scalars().all()
 
     for conc in all_conc:
-        # If today is past the expected due day, check if fatura received
-        if today.day < conc.dia_vencimento:
-            continue  # Not due yet
+        # Only check after the due day + grace period
+        if today.day < (conc.dia_vencimento + grace_days):
+            continue  # Not due yet (within grace period)
 
-        # Check if fatura exists for this month
+        # Check if fatura exists for the current month using vencimento date
         fatura_result = await db.execute(
             select(Fatura).where(
                 Fatura.concessionaria_id == conc.id,
-                Fatura.referencia.ilike(f"%{today.year}%"),
+                extract("year", Fatura.vencimento) == today.year,
+                extract("month", Fatura.vencimento) == today.month,
                 Fatura.status.in_(["processada", "revisao", "pendente"]),
             )
         )
@@ -176,13 +179,14 @@ async def check_missing_bills(db: AsyncSession) -> None:
         if fatura:
             continue  # Bill arrived
 
-        # Check if alert already exists for this month
+        # Check if alert already exists for this concessionária this month
         existing_alert = await db.execute(
             select(Alerta).where(
                 Alerta.condominio_id == conc.condominio_id,
                 Alerta.tipo == "conta_nao_recebida",
                 Alerta.resolvido == False,
                 Alerta.mensagem.ilike(f"%{conc.tipo}%"),
+                Alerta.mensagem.ilike(f"%{conc.instalacao}%"),
             )
         )
         if existing_alert.scalar_one_or_none():
@@ -210,6 +214,10 @@ async def check_missing_bills(db: AsyncSession) -> None:
     await db.commit()
 
 
+# Roles authorized to receive alert email notifications
+ALERT_NOTIFICATION_ROLES = {"admin", "assistente", "concessionarias", "gerencia"}
+
+
 async def notify_alert(
     db: AsyncSession, 
     alert: Alerta, 
@@ -217,57 +225,96 @@ async def notify_alert(
     conc: Optional[Concessionaria] = None
 ) -> None:
     """
-    Sends an alert notification to the PRIMARY RESPONSIBLE user for the condomínio.
-    Never sends alerts to all users — only to those explicitly assigned to this condo.
-    If no condominio_id is set (unidentified email), no notification is sent here
-    (that responsibility falls on process_email_message).
+    Sends alert notification emails to authorized users.
+    Only sends to users with roles: admin, assistente, concessionarias, gerencia.
+    For non-admin roles, only sends to users who have access to the condomínio.
     """
     import os
-    from sqlalchemy import select
+    from sqlalchemy import select, or_
     from app.models.condominio import Condominio
     from app.models.user import User
     from app.models.user_condominio import UserCondominio
 
-    # Alertas sem condomínio não disparam notificação em massa
+    # Alertas sem condomínio não disparam notificação
     if not alert.condominio_id:
-        logger.info(f"Alert {alert.id} has no condominio_id — skipping mass notification.")
+        logger.info(f"Alert {alert.id} has no condominio_id — skipping notification.")
         return
 
-    # 1. Buscar APENAS o responsável principal do cond (primeiro usuário ativo vinculado)
-    res = await db.execute(
+    # 1. Buscar todos os admins ativos (eles recebem tudo)
+    res_admins = await db.execute(
+        select(User).where(
+            User.role == "admin",
+            User.ativo == True,
+        )
+    )
+    admin_users = res_admins.scalars().all()
+
+    # 2. Buscar usuários com roles autorizados (exceto admin, já buscados)
+    #    que tenham acesso a este condomínio via user_condominios OU via codigo_condominio
+    non_admin_roles = ALERT_NOTIFICATION_ROLES - {"admin"}
+    
+    # 2a. Via tabela user_condominios
+    res_linked = await db.execute(
         select(User)
         .join(UserCondominio, UserCondominio.user_id == User.id)
         .where(
             UserCondominio.condominio_id == alert.condominio_id,
+            User.role.in_(non_admin_roles),
             User.ativo == True,
         )
-        .order_by(User.created_at.asc())  # o mais antigo é o principal
-        .limit(1)
     )
-    primary_user = res.scalar_one_or_none()
+    linked_users = res_linked.scalars().all()
 
-    # 2. Também incluir admins
-    res_admins = await db.execute(
-        select(User).where(User.role == "admin", User.ativo == True)
-    )
-    admins = res_admins.scalars().all()
+    # 2b. Via campo codigo_condominio (carteira) — buscar o número do condomínio
+    condo = None
+    res_condo = await db.execute(select(Condominio).where(Condominio.id == alert.condominio_id))
+    condo = res_condo.scalar_one_or_none()
+    
+    carteira_users = []
+    if condo:
+        # Users with 'todos' in codigo_condominio or the specific number
+        res_carteira = await db.execute(
+            select(User).where(
+                User.role.in_(non_admin_roles),
+                User.ativo == True,
+                User.codigo_condominio.is_not(None),
+            )
+        )
+        potential_users = res_carteira.scalars().all()
+        condo_num = str(condo.numero).strip()
+        
+        for u in potential_users:
+            codigo_str = u.codigo_condominio or ""
+            if "todos" in codigo_str.lower():
+                carteira_users.append(u)
+            else:
+                codes = [c.strip() for c in codigo_str.split(",") if c.strip()]
+                # Check with common padding variations
+                all_codes = set(codes)
+                for c in codes:
+                    if c.isdigit():
+                        all_codes.add(c.zfill(2))
+                        all_codes.add(c.zfill(3))
+                        all_codes.add(c.zfill(4))
+                if condo_num in all_codes:
+                    carteira_users.append(u)
 
+    # 3. Montar lista de destinatários (de-duplicar por email)
     recipients = set()
-    if primary_user:
-        recipients.add(primary_user.email)
-    for admin in admins:
-        recipients.add(admin.email)
+    for u in admin_users:
+        recipients.add(u.email)
+    for u in linked_users:
+        recipients.add(u.email)
+    for u in carteira_users:
+        recipients.add(u.email)
 
     if not recipients:
         logger.warning(f"No recipients found for alert {alert.id} on condo {alert.condominio_id}")
         return
 
-    # 3. Buscar contexto
-    condo = None
-    if alert.condominio_id:
-        res = await db.execute(select(Condominio).where(Condominio.id == alert.condominio_id))
-        condo = res.scalar_one_or_none()
+    logger.info(f"Alert {alert.id}: sending to {len(recipients)} recipients: {recipients}")
 
+    # 4. Buscar contexto
     condo_name = condo.nome if condo else "Sistema"
     condo_num_str = str(condo.numero).zfill(4) if condo else "0000"
 
