@@ -371,6 +371,7 @@ export default function Dashboard() {
               <thead>
                 <tr>
                   <th style={{ paddingLeft: 24 }}>Unidade / ID</th>
+                  <th>Cód. Instalação</th>
                   <th>Vencimento</th>
                   <th>Tipo</th>
                   <th>Valor</th>
@@ -383,6 +384,11 @@ export default function Dashboard() {
                     <td style={{ paddingLeft: 24 }}>
                       <div className="dc-cell-primary">{f.condominio?.nome || 'Processando...'}</div>
                       <div className="dc-cell-secondary"># {f.id.slice(0, 8)}</div>
+                    </td>
+                    <td>
+                      <div className="dc-cell-primary" style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                        {f.concessionaria?.instalacao || '—'}
+                      </div>
                     </td>
                     <td>
                       <div className="dc-cell-primary" style={{ fontSize: '0.82rem', fontWeight: 600 }}>
@@ -410,7 +416,7 @@ export default function Dashboard() {
                 ))}
                 {(!stats?.faturas || stats.faturas.length === 0) && (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '64px', color: '#94a3b8' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '64px', color: '#94a3b8' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
                         <FileText size={40} strokeWidth={1} />
                         <span>Aguardando recebimento de faturas</span>
