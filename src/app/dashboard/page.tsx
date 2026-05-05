@@ -55,7 +55,7 @@ export default function Dashboard() {
   } = useSWR<DashboardStats>('dashboard/stats', async () => {
     try {
       const [kpis, latestFaturas, alertas] = await Promise.all([
-        api.getDashboardKpis().catch(e => ({ condominios_count: 0, active_alerts: 0, recebidas_hoje: 0, total_faturado: 0 })),
+        api.getDashboardKpis().catch(e => ({ condominios_count: 0, active_alerts: 0, recebidas_hoje: 0, total_faturado: 0, condos_sem_ata: 0 })),
         api.getFaturas({ limit: 6 }).catch(e => []),
         api.getAlertas({ limit: 5, resolvido: false }).catch(e => []),
       ]);
