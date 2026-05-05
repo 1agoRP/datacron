@@ -201,7 +201,7 @@ export default function Dashboard() {
       <div className="dc-dashboard-main dc-animate-fade-in">
         {/* Analytics Section - Admin Only */}
         {user?.role === 'admin' && (
-          <div className="dc-card dc-card-vibrant dc-glass-card">
+          <div className="dc-card dc-card-vibrant dc-glass-card" style={{ gridColumn: '1 / -1' }}>
             <div className="dc-card-header" style={{ border: 'none', paddingBottom: 0 }}>
               <div>
                 <span className="dc-card-title">Análise de Faturamento</span>
@@ -311,7 +311,7 @@ export default function Dashboard() {
         )}
 
         {/* Performance by Condominium Chart */}
-        <div className="dc-card">
+        <div className="dc-card" style={{ gridColumn: '1 / -1' }}>
           <div className="dc-card-header">
             <div>
               <span className="dc-card-title">Desempenho por Condomínio</span>
