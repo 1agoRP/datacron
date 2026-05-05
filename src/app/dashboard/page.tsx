@@ -3,10 +3,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
-  Building2, Zap, FileText, AlertCircle,
+  Building2, FileText, AlertCircle,
   TrendingUp, Clock, CheckCircle2, ChevronRight,
   Filter, Calendar, DollarSign, Download, Upload, ArrowUpRight,
-  Mail, FileSignature
+  FileSignature
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
@@ -38,10 +38,10 @@ function formatChartLabel(name: string): string {
 type ChartGroup = 'mes' | 'concessionaria' | 'condominio';
 
 export default function Dashboard() {
-  const router = useRouter();
   const { user } = useAuth();
+  const router = useRouter();
   const [currentTime, setCurrentTime] = useState(new Date());
-
+  
   // Chart controls
   const [chartMonths, setChartMonths] = useState(6);
   const [chartGroup, setChartGroup] = useState<ChartGroup>('mes');
@@ -360,17 +360,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Tables Section */}
-      <div className="dc-dashboard-bottom dc-animate-fade-in">
+      {/* Faturas Recentes - Full Width */}
+      <div className="dc-animate-fade-in" style={{ marginTop: 20 }}>
         <div className="dc-card">
           <div className="dc-card-header">
             <span className="dc-card-title">Fluxo de Faturas Recentes</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="dc-btn-mini" onClick={() => router.push('/faturas')}>Explorar Todas</button>
-              <button className="dc-btn-mini" onClick={() => api.exportFaturas()}>
-                <Download size={14} />
-              </button>
-            </div>
           </div>
           <div className="dc-table-wrapper">
             <table className="dc-table">
@@ -378,13 +372,14 @@ export default function Dashboard() {
                 <tr>
                   <th style={{ paddingLeft: 24 }}>Unidade / ID</th>
                   <th>Vencimento</th>
-                  <th>Volume</th>
+                  <th>Tipo</th>
+                  <th>Valor</th>
                   <th style={{ paddingRight: 24 }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {stats?.faturas?.map((f: any) => (
-                  <tr key={f.id} onClick={() => router.push(`/faturas`)} style={{ cursor: 'pointer' }}>
+                  <tr key={f.id}>
                     <td style={{ paddingLeft: 24 }}>
                       <div className="dc-cell-primary">{f.condominio?.nome || 'Processando...'}</div>
                       <div className="dc-cell-secondary"># {f.id.slice(0, 8)}</div>
@@ -425,69 +420,6 @@ export default function Dashboard() {
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
-
-        {/* Intelligence / Systems Status */}
-        <div className="dc-card dc-card-p" style={{ background: '#0f172a', color: '#fff', border: 'none' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(59, 130, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
-                <Zap size={22} />
-              </div>
-              <div>
-                <span style={{ fontSize: '1rem', fontWeight: 800, display: 'block' }}>Agente Datacron</span>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Monitoramento Autônomo</span>
-              </div>
-            </div>
-            <div className="dc-badge dc-badge-green" style={{ background: 'rgba(22, 163, 74, 0.2)', border: 'none' }}>
-              <span className="dc-badge-dot" /> ONLINE
-            </div>
-          </div>
-
-          <div className="dc-space-y-4">
-            <div style={{ padding: '16px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8' }}>Processamento da Fila</span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#3b82f6' }}>100%</span>
-              </div>
-              <div style={{ height: 6, borderRadius: 10, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-                <div style={{ width: '100%', height: '100%', background: '#3b82f6' }} />
-              </div>
-            </div>
-
-            <div className="dc-alert-item" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'default' }}>
-              <Mail size={18} style={{ color: '#3b82f6' }} />
-              <div style={{ flex: 1 }}>
-                <div className="dc-alert-msg" style={{ color: '#fff', fontSize: '0.8rem' }}>Varredura de E-mails</div>
-                <div className="dc-alert-date" style={{ color: '#64748b' }}>Último check: 2 min atrás</div>
-              </div>
-              {user?.role === 'admin' && (
-                <button
-                  className="dc-btn-mini-ghost"
-                  onClick={async () => {
-                    try {
-                      await api.forceEmailScan();
-                      mutateStats();
-                    } catch (e: any) { alert(e.message); }
-                  }}
-                >Sync</button>
-              )}
-            </div>
-
-            <div
-              style={{
-                marginTop: 32,
-                padding: '16px',
-                borderRadius: 12,
-                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(37, 99, 235, 0))',
-                border: '1px dashed rgba(59, 130, 246, 0.3)',
-                textAlign: 'center'
-              }}
-            >
-              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>PROXIMA ATUALIZAÇÃO</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginTop: 4 }}>03:45</div>
-            </div>
           </div>
         </div>
       </div>
