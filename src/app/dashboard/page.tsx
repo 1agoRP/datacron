@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
-  Building2, FileText, AlertCircle,
+  Building2, FileText, AlertCircle, Zap,
   TrendingUp, Clock, CheckCircle2, ChevronRight,
   Filter, Calendar, DollarSign, Download, Upload, ArrowUpRight,
   FileSignature
