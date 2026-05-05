@@ -41,7 +41,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const router = useRouter();
   const [currentTime, setCurrentTime] = useState(new Date());
-  
+
   // Chart controls
   const [chartMonths, setChartMonths] = useState(6);
   const [chartGroup, setChartGroup] = useState<ChartGroup>('mes');
@@ -320,7 +320,7 @@ export default function Dashboard() {
               </p>
             </div>
             <div className="dc-badge" style={{ background: '#f1f5f9', color: '#64748b', fontWeight: 700 }}>
-               {format(new Date(), 'MMMM', { locale: ptBR }).toUpperCase()}
+              {format(new Date(), 'MMMM', { locale: ptBR }).toUpperCase()}
             </div>
           </div>
           <div style={{ padding: '24px 24px 0 24px', height: 350, position: 'relative' }}>
@@ -332,22 +332,22 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={contasPorCondo || []} margin={{ bottom: 70 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="displayName" 
-                  axisLine={false} 
-                  tickLine={false} 
+                <XAxis
+                  dataKey="displayName"
+                  axisLine={false}
+                  tickLine={false}
                   tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
                   interval={0}
                   angle={-45}
                   textAnchor="end"
                   height={80}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} 
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
                 />
-                <Tooltip 
+                <Tooltip
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', padding: '12px' }}
                   itemStyle={{ fontSize: '0.8rem', fontWeight: 700 }}
