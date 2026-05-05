@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime, date
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func, extract, cast, String, case, Date
+from sqlalchemy import select, func, extract, cast, String, case, Date, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -177,7 +177,7 @@ async def contas_por_condominio(
         .outerjoin(expected_sub, Condominio.id == expected_sub.c.condominio_id)
         .outerjoin(received_sub, Condominio.id == received_sub.c.condominio_id)
         .where(Condominio.ativo == True)
-        .order_by(Condominio.numero)
+        .order_by(cast(Condominio.numero, Integer))
     )
 
     if allowed_condo_ids is not None:
