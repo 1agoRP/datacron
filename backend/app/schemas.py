@@ -474,31 +474,6 @@ class ReajusteConcessionariaResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ─── Reajuste Mercado ─────────────────────────────────────────
-
-
-class ReajusteMercadoCreate(BaseModel):
-    categoria: str
-    categoria_personalizada: Optional[str] = None
-    percentual: float
-    vigencia: str
-    descricao: Optional[str] = None
-
-
-class ReajusteMercadoResponse(BaseModel):
-    id: uuid.UUID
-    categoria: str
-    categoria_personalizada: Optional[str] = None
-    percentual: float
-    vigencia: str
-    descricao: Optional[str] = None
-    documento_nome: Optional[str] = None
-    documento_base64: Optional[str] = None
-    storage_path: Optional[str] = None
-    created_at: datetime
-    model_config = {"from_attributes": True}
-
-
 # ─── Histórico Fatura ───────────────────────────────────────────
 
 

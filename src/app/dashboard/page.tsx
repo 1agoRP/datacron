@@ -6,7 +6,7 @@ import {
   Building2, Zap, FileText, AlertCircle,
   TrendingUp, Clock, CheckCircle2, ChevronRight,
   Filter, Calendar, DollarSign, Download, Upload, ArrowUpRight,
-  Mail
+  Mail, FileSignature
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
@@ -67,6 +67,7 @@ export default function Dashboard() {
         activeAlerts: kpis.active_alerts,
         recebidasHoje: kpis.recebidas_hoje,
         totalFaturado: kpis.total_faturado,
+        condosSemAta: kpis.condos_sem_ata,
       };
     } catch (err) {
       console.error("Dashboard fetch error:", err);
@@ -80,8 +81,15 @@ export default function Dashboard() {
   );
 
   const { data: chartData, isLoading: chartLoading } = useSWR<ChartData[]>(
-    ['dashboard/chart', chartMonths, chartGroup],
     () => api.getDashboardChart(chartMonths, chartGroup).catch(() => [])
+  );
+
+  const { data: contasPorCondo, isLoading: loadingPorCondo } = useSWR('dashboard/contas-por-condo',
+    () => api.getContasPorCondominio().then(data => data.map(c => ({
+      ...c,
+      displayName: `${c.numero} - ${c.nome}`
+    }))).catch(() => []),
+    { revalidateOnFocus: false, refreshInterval: 300000 }
   );
 
   useEffect(() => {
@@ -146,16 +154,29 @@ export default function Dashboard() {
           iconColor="#2563eb"
           badge="Gestão Central"
         />
-        <StatCard
-          title="Faturamento Total"
-          value={formatCurrency(stats?.totalFaturado || 0)}
-          subtitle="Volume acumulado"
-          icon={<DollarSign size={24} />}
-          gradient={['#f0fdf4', '#dcfce7']}
-          iconColor="#16a34a"
-          badge="Consolidado"
-          positive
-        />
+        {user?.role === 'admin' ? (
+          <StatCard
+            title="Faturamento Total"
+            value={formatCurrency(stats?.totalFaturado || 0)}
+            subtitle="Volume acumulado"
+            icon={<DollarSign size={24} />}
+            gradient={['#f0fdf4', '#dcfce7']}
+            iconColor="#16a34a"
+            badge="Consolidado"
+            positive
+          />
+        ) : (
+          <StatCard
+            title="Ata de Eleição"
+            value={String(stats?.condosSemAta || 0)}
+            subtitle="Condomínios s/ ata vinculada"
+            icon={<FileSignature size={24} />}
+            gradient={['#fef2f2', '#fee2e2']}
+            iconColor="#dc2626"
+            badge="Pendente"
+            danger={Number(stats?.condosSemAta) > 0}
+          />
+        )}
         <StatCard
           title="Faturas Processadas"
           value={contasEsperadas ? `${contasEsperadas.recebidas}/${contasEsperadas.total_esperadas}` : '0/0'}
@@ -178,148 +199,163 @@ export default function Dashboard() {
       </div>
 
       <div className="dc-dashboard-main dc-animate-fade-in">
-        {/* Analytics Section */}
-        <div className="dc-card dc-card-vibrant dc-glass-card">
-          <div className="dc-card-header" style={{ border: 'none', paddingBottom: 0 }}>
-            <div>
-              <span className="dc-card-title">Análise de Faturamento</span>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
-                Distribuição financeira por {chartGroup === 'mes' ? 'período' : chartGroup === 'concessionaria' ? 'categoria' : 'unidade'}
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div className="dc-btn-group" style={{ background: '#f1f5f9', padding: 4, borderRadius: 10, display: 'flex' }}>
-                <button
-                  className={`dc-btn-mini ${chartGroup === 'mes' ? 'active' : ''}`}
-                  onClick={() => handleChartFilterChange(chartMonths, 'mes')}
-                >Mês</button>
-                <button
-                  className={`dc-btn-mini ${chartGroup === 'concessionaria' ? 'active' : ''}`}
-                  onClick={() => handleChartFilterChange(chartMonths, 'concessionaria')}
-                >Tipo</button>
-                <button
-                  className={`dc-btn-mini ${chartGroup === 'condominio' ? 'active' : ''}`}
-                  onClick={() => handleChartFilterChange(chartMonths, 'condominio')}
-                >Condomínio</button>
+        {/* Analytics Section - Admin Only */}
+        {user?.role === 'admin' && (
+          <div className="dc-card dc-card-vibrant dc-glass-card">
+            <div className="dc-card-header" style={{ border: 'none', paddingBottom: 0 }}>
+              <div>
+                <span className="dc-card-title">Análise de Faturamento</span>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
+                  Distribuição financeira por {chartGroup === 'mes' ? 'período' : chartGroup === 'concessionaria' ? 'categoria' : 'unidade'}
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div className="dc-btn-group" style={{ background: '#f1f5f9', padding: 4, borderRadius: 10, display: 'flex' }}>
+                  <button
+                    className={`dc-btn-mini ${chartGroup === 'mes' ? 'active' : ''}`}
+                    onClick={() => handleChartFilterChange(chartMonths, 'mes')}
+                  >Mês</button>
+                  <button
+                    className={`dc-btn-mini ${chartGroup === 'concessionaria' ? 'active' : ''}`}
+                    onClick={() => handleChartFilterChange(chartMonths, 'concessionaria')}
+                  >Tipo</button>
+                  <button
+                    className={`dc-btn-mini ${chartGroup === 'condominio' ? 'active' : ''}`}
+                    onClick={() => handleChartFilterChange(chartMonths, 'condominio')}
+                  >Condomínio</button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div style={{ padding: '24px', height: 320, position: 'relative' }}>
-            {chartLoading && (
+            <div style={{ padding: '24px', height: 320, position: 'relative' }}>
+              {chartLoading && (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                  <div className="dc-loading-spinner" />
+                </div>
+              )}
+              <ResponsiveContainer width="100%" height="100%">
+                {chartGroup === 'mes' ? (
+                  <AreaChart data={chartData || []}>
+                    <defs>
+                      <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
+                      dy={10}
+                      tickFormatter={formatChartLabel}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
+                      tickFormatter={(v: any) => `R$ ${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`}
+                    />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', padding: '12px' }}
+                      itemStyle={{ fontWeight: 700, fontSize: '0.85rem' }}
+                      labelStyle={{ marginBottom: 4, color: '#64748b', fontSize: '0.75rem', fontWeight: 600 }}
+                      formatter={(v: any) => [formatCurrency(Number(v)), 'Volume']}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="valor"
+                      stroke="#2563eb"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#colorVal)"
+                      dot={{ r: 4, fill: '#fff', stroke: '#2563eb', strokeWidth: 2 }}
+                      activeDot={{ r: 6, strokeWidth: 0 }}
+                    />
+                  </AreaChart>
+                ) : (
+                  <BarChart data={chartData || []} layout="horizontal">
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                      dy={10}
+                      interval={0}
+                      angle={(chartData || []).length > 6 ? -30 : 0}
+                      textAnchor={(chartData || []).length > 6 ? "end" : "middle"}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
+                      tickFormatter={(v: any) => `R$ ${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`}
+                    />
+                    <Tooltip
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+                      formatter={(v: any) => [formatCurrency(Number(v)), 'Total']}
+                    />
+                    <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={24}>
+                      {(chartData || []).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'][index % 5]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Performance by Condominium Chart */}
+        <div className="dc-card">
+          <div className="dc-card-header">
+            <div>
+              <span className="dc-card-title">Desempenho por Condomínio</span>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
+                Relação entre contas esperadas (azul) e recebidas (verde) para o mês vigente
+              </p>
+            </div>
+            <div className="dc-badge" style={{ background: '#f1f5f9', color: '#64748b', fontWeight: 700 }}>
+               {format(new Date(), 'MMMM', { locale: ptBR }).toUpperCase()}
+            </div>
+          </div>
+          <div style={{ padding: '24px 24px 0 24px', height: 350, position: 'relative' }}>
+            {loadingPorCondo && (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
                 <div className="dc-loading-spinner" />
               </div>
             )}
             <ResponsiveContainer width="100%" height="100%">
-              {chartGroup === 'mes' ? (
-                <AreaChart data={chartData || []}>
-                  <defs>
-                    <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
-                    dy={10}
-                    tickFormatter={formatChartLabel}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
-                    tickFormatter={(v: any) => `R$ ${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`}
-                  />
-                  <Tooltip
-                    contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', padding: '12px' }}
-                    itemStyle={{ fontWeight: 700, fontSize: '0.85rem' }}
-                    labelStyle={{ marginBottom: 4, color: '#64748b', fontSize: '0.75rem', fontWeight: 600 }}
-                    formatter={(v: any) => [formatCurrency(Number(v)), 'Volume']}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="valor"
-                    stroke="#2563eb"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#colorVal)"
-                    dot={{ r: 4, fill: '#fff', stroke: '#2563eb', strokeWidth: 2 }}
-                    activeDot={{ r: 6, strokeWidth: 0 }}
-                  />
-                </AreaChart>
-              ) : (
-                <BarChart data={chartData || []} layout="horizontal">
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
-                    dy={10}
-                    interval={0}
-                    angle={(chartData || []).length > 6 ? -30 : 0}
-                    textAnchor={(chartData || []).length > 6 ? "end" : "middle"}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
-                    tickFormatter={(v: any) => `R$ ${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`}
-                  />
-                  <Tooltip
-                    cursor={{ fill: '#f8fafc' }}
-                    contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
-                    formatter={(v: any) => [formatCurrency(Number(v)), 'Total']}
-                  />
-                  <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={24}>
-                    {(chartData || []).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'][index % 5]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              )}
+              <BarChart data={contasPorCondo || []} margin={{ bottom: 70 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="displayName" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
+                  interval={0}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} 
+                />
+                <Tooltip 
+                  cursor={{ fill: '#f8fafc' }}
+                  contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', padding: '12px' }}
+                  itemStyle={{ fontSize: '0.8rem', fontWeight: 700 }}
+                />
+                <Bar dataKey="esperadas" name="Esperadas" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={15} />
+                <Bar dataKey="recebidas" name="Recebidas" fill="#10b981" radius={[4, 4, 0, 0]} barSize={15} />
+              </BarChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Alerts / Activity */}
-        <div className="dc-card">
-          <div className="dc-card-header">
-            <span className="dc-card-title">Atenção Requerida</span>
-            <button className="dc-card-link" onClick={() => router.push('/alertas')}>Central de Alertas</button>
-          </div>
-          <div className="dc-card-p dc-space-y-3" style={{ paddingTop: 0 }}>
-            {stats?.alertas?.map((a: any) => (
-              <div key={a.id} className="dc-alert-item premium" onClick={() => router.push('/alertas')}>
-                <div className={`dc-alert-icon-wrap ${a.gravidade === 'alta' ? 'high' : 'medium'}`}>
-                  {a.gravidade === 'alta' ? <AlertCircle size={18} /> : <Clock size={18} />}
-                </div>
-                <div className="dc-alert-content">
-                  <div className="dc-alert-msg">{a.mensagem}</div>
-                  <div className="dc-alert-date">
-                    <Building2 size={11} style={{ display: 'inline', marginRight: 4 }} />
-                    {a.condominio?.nome || 'Geral'}
-                  </div>
-                </div>
-                <ChevronRight size={16} style={{ color: '#cbd5e1' }} />
-              </div>
-            ))}
-            {(!stats?.alertas || stats.alertas.length === 0) && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 0', color: '#94a3b8', gap: 12 }}>
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
-                  <CheckCircle2 size={32} />
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a', display: 'block' }}>Sem pendências críticas</span>
-                  <span style={{ fontSize: '0.8rem' }}>Todos os condomínios estão em conformidade</span>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

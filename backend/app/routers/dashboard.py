@@ -54,18 +54,29 @@ async def dashboard_stats(
     result = await db.execute(alert_stmt)
     active_alerts = result.scalar_one()
 
-    # Total faturado (sum of faturas in current month or year? Let's keep all time but rename if needed)
+    # Total faturado
     total_faturado_stmt = select(func.sum(Fatura.valor))
     if allowed_condo_ids is not None:
         total_faturado_stmt = total_faturado_stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
     result = await db.execute(total_faturado_stmt)
     total_faturado = result.scalar() or 0.0
 
+    # Condominios without ATA (Active only)
+    ata_stmt = select(func.count(Condominio.id)).where(
+        Condominio.ativo == True,
+        (Condominio.ata_eleicao_nome == None) | (Condominio.ata_eleicao_nome == "")
+    )
+    if allowed_condo_ids is not None:
+        ata_stmt = ata_stmt.where(Condominio.id.in_(allowed_condo_ids))
+    result = await db.execute(ata_stmt)
+    condos_sem_ata = result.scalar_one()
+
     return {
         "condominios_count": condominios_count,
-        "recebidas_hoje": recebidas_mes,  # Renaming internally for logic, but keeping key as today for frontend compatibility
+        "recebidas_hoje": recebidas_mes,
         "active_alerts": active_alerts,
         "total_faturado": round(float(total_faturado), 2),
+        "condos_sem_ata": condos_sem_ata,
     }
 
 
@@ -113,6 +124,78 @@ async def contas_esperadas(
         "recebidas": recebidas,
         "mes": f"{y}-{str(m).zfill(2)}",
     }
+
+
+@router.get("/contas-por-condominio")
+async def contas_por_condominio(
+    mes: Optional[str] = Query(None, description="Formato: YYYY-MM"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
+):
+    """
+    Returns the count of expected (active concessionárias) and received (faturas)
+    accounts for each condominium in the given month.
+    """
+    if mes:
+        try:
+            year, month = mes.split("-")
+            y, m = int(year), int(month)
+        except (ValueError, IndexError):
+            y, m = datetime.now().year, datetime.now().month
+    else:
+        y, m = datetime.now().year, datetime.now().month
+
+    # Subquery for expected counts per condo
+    expected_sub = (
+        select(Concessionaria.condominio_id, func.count(Concessionaria.id).label("esperadas"))
+        .where(Concessionaria.ativo == True)
+        .group_by(Concessionaria.condominio_id)
+        .subquery()
+    )
+
+    # Subquery for received counts per condo in the target month
+    received_sub = (
+        select(Fatura.condominio_id, func.count(Fatura.id).label("recebidas"))
+        .where(
+            extract("year", Fatura.vencimento) == y,
+            extract("month", Fatura.vencimento) == m
+        )
+        .group_by(Fatura.condominio_id)
+        .subquery()
+    )
+
+    # Main query to join with Condominio
+    stmt = (
+        select(
+            Condominio.id,
+            Condominio.nome,
+            Condominio.numero,
+            func.coalesce(expected_sub.c.esperadas, 0).label("esperadas"),
+            func.coalesce(received_sub.c.recebidas, 0).label("recebidas")
+        )
+        .outerjoin(expected_sub, Condominio.id == expected_sub.c.condominio_id)
+        .outerjoin(received_sub, Condominio.id == received_sub.c.condominio_id)
+        .where(Condominio.ativo == True)
+        .order_by(Condominio.numero)
+    )
+
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Condominio.id.in_(allowed_condo_ids))
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    return [
+        {
+            "id": str(row.id),
+            "nome": row.nome,
+            "numero": row.numero,
+            "esperadas": row.esperadas,
+            "recebidas": row.recebidas
+        }
+        for row in rows
+    ]
 
 
 @router.get("/chart")

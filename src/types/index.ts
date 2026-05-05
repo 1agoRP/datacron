@@ -100,6 +100,7 @@ export interface DashboardStats {
   activeAlerts: number;
   recebidasHoje: number;
   totalFaturado: number;
+  condosSemAta?: number;
   faturas: Fatura[];
   alertas: Alerta[];
 }
@@ -141,17 +142,5 @@ export interface ReajusteConcessionaria {
   documento_base64?: string | null;
   aplicado_por: string;
   registros_afetados: number;
-  created_at: string;
-}
-
-export interface ReajusteMercado {
-  id: string;
-  categoria: string;
-  categoria_personalizada?: string | null;
-  percentual: number;
-  vigencia: string;
-  descricao?: string | null;
-  documento_nome?: string | null;
-  documento_base64?: string | null;
   created_at: string;
 }

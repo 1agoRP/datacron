@@ -177,33 +177,33 @@ export default function CondominiosPage() {
     const { type, condoId } = docUploadModal;
     try {
       setUploadingDoc(true);
-      
+
       // Direct Upload (Base64) to Backend
       if (type === 'ata') {
-        await api.saveAtaEleicao(condoId, { 
-          file: docUploadFile, 
-          data_inicio: docDates.inicio, 
-          data_fim: docDates.fim 
+        await api.saveAtaEleicao(condoId, {
+          file: docUploadFile,
+          data_inicio: docDates.inicio,
+          data_fim: docDates.fim
         });
         if (detailsCondo && detailsCondo.id === condoId) {
           setDetailsCondo({ ...detailsCondo, ata_eleicao_nome: docUploadFile.name, ata_eleicao_inicio: docDates.inicio, ata_eleicao_fim: docDates.fim });
         }
         alert('ATA enviada com sucesso!');
       } else if (type === 'avcb') {
-        await api.saveAvcb(condoId, { 
-          file: docUploadFile, 
-          data_inicio: docDates.inicio, 
-          data_fim: docDates.fim 
+        await api.saveAvcb(condoId, {
+          file: docUploadFile,
+          data_inicio: docDates.inicio,
+          data_fim: docDates.fim
         });
         if (detailsCondo && detailsCondo.id === condoId) {
           setDetailsCondo({ ...detailsCondo, avcb_url: 'data:application/pdf;base64,...', avcb_inicio: docDates.inicio, avcb_fim: docDates.fim });
         }
         alert('AVCB enviado com sucesso!');
       } else if (type === 'apolice') {
-        await api.saveApolice(condoId, { 
-          file: docUploadFile, 
-          data_inicio: docDates.inicio, 
-          data_fim: docDates.fim 
+        await api.saveApolice(condoId, {
+          file: docUploadFile,
+          data_inicio: docDates.inicio,
+          data_fim: docDates.fim
         });
         if (detailsCondo && detailsCondo.id === condoId) {
           setDetailsCondo({ ...detailsCondo, apolice_seguro_url: 'data:application/pdf;base64,...', apolice_seguro_inicio: docDates.inicio, apolice_seguro_fim: docDates.fim });
@@ -696,16 +696,6 @@ export default function CondominiosPage() {
                 <label>Endereço Completo</label>
                 <input required disabled={!isAdmin} value={editCondo.endereco} onChange={e => setEditCondo({ ...editCondo, endereco: e.target.value })} className="dc-form-input" />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div className="dc-form-group">
-                  <label>Mandato Síndico (Início)</label>
-                  <input type="date" disabled={readOnly} value={editCondo.mandato_inicio || ''} onChange={e => setEditCondo({ ...editCondo, mandato_inicio: e.target.value })} className="dc-form-input" />
-                </div>
-                <div className="dc-form-group">
-                  <label>Mandato Síndico (Fim)</label>
-                  <input type="date" disabled={readOnly} value={editCondo.mandato_fim || ''} onChange={e => setEditCondo({ ...editCondo, mandato_fim: e.target.value })} className="dc-form-input" />
-                </div>
-              </div>
               <div className="dc-form-group">
                 <label>Leitura Individualizada</label>
                 <div className="dc-segmented-control">
@@ -816,7 +806,7 @@ export default function CondominiosPage() {
                         const hasAutoDebit = f.debito_automatico === true || String(f.debito_automatico) === 'true';
                         const isLegacy = !f.status;
                         const status = f.status || 'processada'; // Default for legacy
-                        
+
                         let statusColor = '#10b981'; // Default green
                         let statusBg = '#f0fdf4';
                         let statusLabel = status.toUpperCase();
@@ -1221,8 +1211,8 @@ export default function CondominiosPage() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {statusItems.some(i => i.fatura) && (
-                  <button 
-                    className="dc-btn dc-btn-secondary" 
+                  <button
+                    className="dc-btn dc-btn-secondary"
                     style={{ height: 36, fontSize: '0.8rem', gap: 8, background: '#f8fafc' }}
                     onClick={async () => {
                       const ids = statusItems.filter(i => i.fatura).map(i => i.fatura.id);

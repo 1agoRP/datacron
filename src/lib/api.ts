@@ -3,7 +3,7 @@
  * Centralized fetch wrapper with support for JWT authentication.
  */
 
-import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData, ReajusteConcessionaria, ReajusteMercado } from '@/types';
+import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData, ReajusteConcessionaria } from '@/types';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -621,12 +621,18 @@ class ApiClient {
       recebidas_hoje: number; 
       active_alerts: number;
       total_faturado: number;
+      condos_sem_ata: number;
     }>('/dashboard/stats');
   }
 
   async getDashboardContasEsperadas(mes?: string) {
     const params = mes ? `?mes=${mes}` : '';
     return this.request<{ total_esperadas: number; recebidas: number; mes: string }>(`/dashboard/contas-esperadas${params}`);
+  }
+
+  async getContasPorCondominio(mes?: string) {
+    const params = mes ? `?mes=${mes}` : '';
+    return this.request<{ id: string; nome: string; numero: string; esperadas: number; recebidas: number }[]>(`/dashboard/contas-por-condominio${params}`);
   }
 
   async getDashboardChart(meses: number = 6, agrupar: string = 'mes') {
@@ -752,13 +758,6 @@ class ApiClient {
     return this.request<string[]>('/fornecedores/categorias');
   }
 
-  // Reajustes Mercado
-  async getReajustesMercado(categoria?: string) {
-    const baseUrl = '/reajustes';
-    const param = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
-    return this.request<ReajusteMercado[]>(`${baseUrl}/${param}`);
-  }
-
   async getHistoricoFaturas(condominioId?: string, concessionariaId?: string) {
     const params = new URLSearchParams();
     if (condominioId) params.append('condominio_id', condominioId);
@@ -770,41 +769,6 @@ class ApiClient {
     return this.request<any[]>('/fornecedores');
   }
 
-
-  async deleteReajusteMercado(id: string) {
-    return this.request(`/reajustes/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async downloadDocumentoReajusteMercado(id: string) {
-    const token = this.getToken();
-    const response = await fetchWithRetry(`${API_BASE_URL}/reajustes/${id}/documento`, {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
-    });
-    if (!response.ok) throw new Error('Falha ao baixar documento');
-    const blob = await response.blob();
-    
-    const disposition = response.headers.get('Content-Disposition');
-    let filename = `reajuste_${id}.pdf`;
-    if (disposition && disposition.includes('filename=')) {
-        const matches = disposition.match(/filename="(.+)"/);
-        if (matches && matches.length > 1) {
-            filename = matches[1];
-        }
-    }
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  }
 
   async downloadDocumentoReajusteConcessionaria(id: string) {
     const token = this.getToken();
@@ -833,10 +797,6 @@ class ApiClient {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
-  }
-
-  async createReajusteMercado(formData: FormData) {
-    return this.requestMultipart<ReajusteMercado>('/reajustes', formData, { method: 'POST' });
   }
 
   // Histórico

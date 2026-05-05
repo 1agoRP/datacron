@@ -11,12 +11,12 @@ import { useAuth } from '@/context/AuthContext';
 import { isReadOnly } from '@/types';
 
 const COLOR_MAP: Record<string, { bg: string; color: string }> = {
-  enel:   { bg: '#eff6ff', color: '#2563eb' },
+  enel: { bg: '#eff6ff', color: '#2563eb' },
   sabesp: { bg: '#ecfeff', color: '#0891b2' },
   'comgás': { bg: '#fff7ed', color: '#ea580c' },
-  claro:  { bg: '#fef2f2', color: '#ef4444' },
-  vivo:   { bg: '#faf5ff', color: '#9333ea' },
-  tim:    { bg: '#eff6ff', color: '#1e3a8a' },
+  claro: { bg: '#fef2f2', color: '#ef4444' },
+  vivo: { bg: '#faf5ff', color: '#9333ea' },
+  tim: { bg: '#eff6ff', color: '#1e3a8a' },
   outros: { bg: '#f8fafc', color: '#475569' },
 };
 
@@ -50,7 +50,7 @@ const selectStyles = {
   }),
   singleValue: (base: any, state: any) => ({ ...base, color: state.isDisabled ? '#94a3b8' : '#0f172a' }),
   placeholder: (base: any) => ({ ...base, color: '#94a3b8' }),
-  indicatorSeparator: (base: any) => ({...base, display: 'none'})
+  indicatorSeparator: (base: any) => ({ ...base, display: 'none' })
 };
 
 function getColors(tipo: string) {
@@ -84,6 +84,7 @@ function cnpjToDigits(cnpj: string): string {
 function generatePasswordPreview(regra: string, cnpjDigits: string, senhaManual: string): string {
   if (regra === 'manual') return senhaManual || '(não definida)';
   if (regra === '5_primeiros_cnpj') return cnpjDigits.slice(0, 5) || '(selecione condomínio)';
+  if (regra === '4_primeiros_cnpj') return cnpjDigits.slice(0, 4) || '(selecione condomínio)';
   if (regra === '3_primeiros_cnpj') return cnpjDigits.slice(0, 3) || '(selecione condomínio)';
   if (regra === 'cnpj_completo') return cnpjDigits || '(selecione condomínio)';
   return '—';
@@ -124,8 +125,7 @@ export default function ConcessionariasPage() {
     valor_medio: 0,
     nome_personalizado: '',
     leitura_individualizada: false,
-    debito_automatico: false,
-    senha_portal: ''
+    debito_automatico: true,
   };
 
   const [formConc, setFormConc] = useState<any>({ ...defaultConc });
@@ -171,7 +171,7 @@ export default function ConcessionariasPage() {
       if (payload.regra_senha !== 'manual') {
         payload.senha_manual = undefined;
       }
-      
+
       if (!payload.valor_medio) payload.valor_medio = 0;
 
       // Remove fields not in ConcessionariaUpdate schema for editing
@@ -182,7 +182,7 @@ export default function ConcessionariasPage() {
       } else {
         await api.createConcessionaria(payload);
       }
-      
+
       handleCloseModal();
       mutateConcs(); // SWR revalidation — instant UI update
       setIsModalOpen(false);
@@ -199,7 +199,7 @@ export default function ConcessionariasPage() {
       alert("Preencha todos os campos obrigatórios corretamente.");
       return;
     }
-    
+
     try {
       setAplicandoReajuste(true);
       const formData = new FormData();
@@ -209,7 +209,7 @@ export default function ConcessionariasPage() {
       if (pdfReajuste) {
         formData.append('pdf_file', pdfReajuste);
       }
-      
+
       await api.aplicarReajusteConcessionaria(formData);
       await mutateConcs();
       await mutateHistorico();
@@ -234,7 +234,7 @@ export default function ConcessionariasPage() {
   const handleDelete = async () => {
     if (!editingId) return;
     if (!confirm('Deseja realmente excluir esta concessionária e todas as suas automações? Ação irreversível!')) return;
-    
+
     try {
       await api.deleteConcessionaria(editingId);
       handleCloseModal();
@@ -259,7 +259,6 @@ export default function ConcessionariasPage() {
       nome_personalizado: conc.nome_personalizado || '',
       leitura_individualizada: conc.leitura_individualizada || false,
       debito_automatico: conc.debito_automatico || false,
-      senha_portal: conc.senha_portal || '',
       email_emissao: conc.email_emissao || ''
     });
     setEditingId(conc.id);
@@ -305,10 +304,10 @@ export default function ConcessionariasPage() {
     let result = [...concs].filter((c: any) => {
       const matchesTab = tab === 'Todas' || c.tipo.toLowerCase() === tab.toLowerCase();
       if (!matchesTab) return false;
-      
+
       // Use condominio data from the API response (selectinload)
       const condo = c.condominio;
-      
+
       if (!searchTerm.trim()) return true;
       const q = searchTerm.toLowerCase();
       return (
@@ -325,13 +324,13 @@ export default function ConcessionariasPage() {
         const condoB = b.condominio;
         const valA = condoA ? condoA[sortField] : '';
         const valB = condoB ? condoB[sortField] : '';
-        
+
         if (sortField === 'numero') {
           const numA = parseInt(valA as string) || 0;
           const numB = parseInt(valB as string) || 0;
           return sortDir === 'asc' ? numA - numB : numB - numA;
         }
-        
+
         const cmp = String(valA).localeCompare(String(valB), 'pt-BR', { sensitivity: 'base' });
         return sortDir === 'asc' ? cmp : -cmp;
       });
@@ -345,8 +344,8 @@ export default function ConcessionariasPage() {
   const SortIcon = ({ field }: { field: 'nome' | 'numero' }) => (
     <ArrowUpDown
       size={13}
-      style={{ 
-        marginLeft: 4, cursor: 'pointer', 
+      style={{
+        marginLeft: 4, cursor: 'pointer',
         color: sortField === field ? '#2563eb' : '#cbd5e1',
         transition: 'color 0.15s',
       }}
@@ -471,7 +470,7 @@ export default function ConcessionariasPage() {
                         {conc.regra_senha === 'manual' ? 'Senha Manual' : conc.regra_senha.replace(/_/g, ' ')}
                       </div>
                     </td>
-                    
+
                     <td>
                       <div className="dc-cell-primary">Dia {conc.dia_vencimento}</div>
                     </td>
@@ -567,7 +566,7 @@ export default function ConcessionariasPage() {
                   <Select
                     options={condos.map(c => ({ value: c.id, label: `${c.nome} (Nº ${c.numero})` }))}
                     value={formConc.condominio_id ? { value: formConc.condominio_id, label: condos.find(c => c.id === formConc.condominio_id) ? `${condos.find(c => c.id === formConc.condominio_id)?.nome} (Nº ${condos.find(c => c.id === formConc.condominio_id)?.numero})` : formConc.condominio_id } : null}
-                    onChange={(option: any) => setFormConc({...formConc, condominio_id: option?.value || ''})}
+                    onChange={(option: any) => setFormConc({ ...formConc, condominio_id: option?.value || '' })}
                     placeholder="Busque por nome ou número..."
                     isDisabled={!!editingId}
                     styles={selectStyles}
@@ -583,7 +582,7 @@ export default function ConcessionariasPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>Tipo</label>
-                    <select disabled={readOnly} value={formConc.tipo} onChange={e => setFormConc({...formConc, tipo: e.target.value})} className="dc-input dc-form-select">
+                    <select disabled={readOnly} value={formConc.tipo} onChange={e => setFormConc({ ...formConc, tipo: e.target.value })} className="dc-input dc-form-select">
                       <option value="Enel">Enel</option>
                       <option value="Sabesp">Sabesp</option>
                       <option value="Comgás">Comgás</option>
@@ -596,18 +595,18 @@ export default function ConcessionariasPage() {
                   {formConc.tipo === 'Outros' ? (
                     <div className="dc-form-group">
                       <label>Nome da Concessionária</label>
-                      <input className="dc-form-input" required value={formConc.nome_personalizado || ''} onChange={e => setFormConc({...formConc, nome_personalizado: e.target.value})} placeholder="Ex: Sanasa" disabled={!!editingId || readOnly} />
+                      <input className="dc-form-input" required value={formConc.nome_personalizado || ''} onChange={e => setFormConc({ ...formConc, nome_personalizado: e.target.value })} placeholder="Ex: Sanasa" disabled={!!editingId || readOnly} />
                     </div>
                   ) : null}
                   <div className="dc-form-group">
                     <label>{getCodigoLabel(formConc.tipo)}</label>
-                    <input className="dc-form-input" required value={formConc.instalacao} onChange={e => setFormConc({...formConc, instalacao: e.target.value})} placeholder="Ex: 82736412" disabled={!!editingId || readOnly} />
+                    <input className="dc-form-input" required value={formConc.instalacao} onChange={e => setFormConc({ ...formConc, instalacao: e.target.value })} placeholder="Ex: 82736412" disabled={!!editingId || readOnly} />
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>Regra de Senha PDF</label>
-                    <select disabled={readOnly} value={formConc.regra_senha} onChange={e => setFormConc({...formConc, regra_senha: e.target.value})} className="dc-input dc-form-select">
+                    <select disabled={readOnly} value={formConc.regra_senha} onChange={e => setFormConc({ ...formConc, regra_senha: e.target.value })} className="dc-input dc-form-select">
                       <option value="5_primeiros_cnpj">5 Primeiros CNPJ (Enel)</option>
                       <option value="3_primeiros_cnpj">3 Primeiros CNPJ (Sabesp/Comgas)</option>
                       <option value="cnpj_completo">CNPJ Completo</option>
@@ -616,7 +615,7 @@ export default function ConcessionariasPage() {
                   </div>
                   <div className="dc-form-group">
                     <label>Dia de Vencimento</label>
-                    <input className="dc-form-input" type="number" required disabled={readOnly} value={formConc.dia_vencimento} onChange={e => setFormConc({...formConc, dia_vencimento: parseInt(e.target.value)})} placeholder="Ex: 10" />
+                    <input className="dc-form-input" type="number" required disabled={readOnly} value={formConc.dia_vencimento} onChange={e => setFormConc({ ...formConc, dia_vencimento: parseInt(e.target.value) })} placeholder="Ex: 10" />
                   </div>
                 </div>
 
@@ -631,7 +630,7 @@ export default function ConcessionariasPage() {
                         required
                         disabled={readOnly}
                         value={formConc.senha_manual}
-                        onChange={e => setFormConc({...formConc, senha_manual: e.target.value})}
+                        onChange={e => setFormConc({ ...formConc, senha_manual: e.target.value })}
                         placeholder="Digite a senha do arquivo"
                         style={{ paddingRight: 40 }}
                       />
@@ -673,35 +672,31 @@ export default function ConcessionariasPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>E-mail do Remetente (Opcional)</label>
-                    <input className="dc-form-input" disabled={readOnly} value={formConc.email_esperado} onChange={e => setFormConc({...formConc, email_esperado: e.target.value})} placeholder="Ex: fatura@enel.com.br" />
+                    <input className="dc-form-input" disabled={readOnly} value={formConc.email_esperado} onChange={e => setFormConc({ ...formConc, email_esperado: e.target.value })} placeholder="Ex: fatura@enel.com.br" />
                   </div>
                   <div className="dc-form-group">
                     <label>Valor Médio Mensal (R$)</label>
-                    <input className="dc-form-input" type="number" step="0.01" required disabled={readOnly} value={formConc.valor_medio} onChange={e => setFormConc({...formConc, valor_medio: parseFloat(e.target.value) || 0})} placeholder="Ex: 500.50" />
+                    <input className="dc-form-input" type="number" step="0.01" required disabled={readOnly} value={formConc.valor_medio} onChange={e => setFormConc({ ...formConc, valor_medio: parseFloat(e.target.value) || 0 })} placeholder="Ex: 500.50" />
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div style={{ display: 'block', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>Débito Automático</label>
                     <div className="dc-segmented-control">
-                      <button 
-                        type="button" 
-                        className={formConc.debito_automatico ? 'active' : ''} 
+                      <button
+                        type="button"
+                        className={formConc.debito_automatico ? 'active' : ''}
                         disabled={readOnly}
-                        onClick={() => setFormConc({...formConc, debito_automatico: true})}
+                        onClick={() => setFormConc({ ...formConc, debito_automatico: true })}
                       >Sim</button>
-                      <button 
-                        type="button" 
-                        className={!formConc.debito_automatico ? 'active active-negative' : ''} 
+                      <button
+                        type="button"
+                        className={!formConc.debito_automatico ? 'active active-negative' : ''}
                         disabled={readOnly}
-                        onClick={() => setFormConc({...formConc, debito_automatico: false})}
+                        onClick={() => setFormConc({ ...formConc, debito_automatico: false })}
                       >Não</button>
                     </div>
-                  </div>
-                  <div className="dc-form-group">
-                    <label>Senha do Portal</label>
-                    <input className="dc-form-input" disabled={readOnly} value={formConc.senha_portal || ''} onChange={e => setFormConc({...formConc, senha_portal: e.target.value})} placeholder="Senha de acesso ao portal" />
                   </div>
                 </div>
                 {/* E-mail emissão: shown when the selected condo has leitura individualizada ativa */}
@@ -709,12 +704,12 @@ export default function ConcessionariasPage() {
                   <div className="dc-form-group">
                     <label>E-mail para Emissão (Leitura Individualizada)</label>
                     <div style={{ position: 'relative' }}>
-                      <input 
-                        className="dc-form-input" 
-                        disabled={readOnly} 
-                        value={formConc.email_emissao || ''} 
-                        onChange={e => setFormConc({...formConc, email_emissao: e.target.value})} 
-                        placeholder="Ex: emissao@administradora.com.br" 
+                      <input
+                        className="dc-form-input"
+                        disabled={readOnly}
+                        value={formConc.email_emissao || ''}
+                        onChange={e => setFormConc({ ...formConc, email_emissao: e.target.value })}
+                        placeholder="Ex: emissao@administradora.com.br"
                         style={{ paddingLeft: 40 }}
                       />
                       <Mail size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
@@ -723,7 +718,7 @@ export default function ConcessionariasPage() {
                   </div>
                 )}
               </div>
-              
+
               <div className="dc-modal-footer" style={{ justifyContent: 'space-between' }}>
                 {editingId && !readOnly ? (
                   <button type="button" className="dc-btn dc-btn-danger" onClick={handleDelete} style={{ gap: 8 }}>
@@ -757,7 +752,7 @@ export default function ConcessionariasPage() {
             <form onSubmit={handleAplicarReajuste} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="dc-form-group">
                 <label>Tipo de Concessionária</label>
-                <select value={formReajuste.tipo_concessionaria} onChange={e => setFormReajuste({...formReajuste, tipo_concessionaria: e.target.value})} className="dc-input dc-form-select">
+                <select value={formReajuste.tipo_concessionaria} onChange={e => setFormReajuste({ ...formReajuste, tipo_concessionaria: e.target.value })} className="dc-input dc-form-select">
                   <option value="Enel">Enel</option>
                   <option value="Sabesp">Sabesp</option>
                   <option value="Comgás">Comgás</option>
@@ -772,11 +767,11 @@ export default function ConcessionariasPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="dc-form-group">
                   <label>Percentual (%)</label>
-                  <input type="number" step="0.01" className="dc-form-input" required value={formReajuste.percentual || ''} onChange={e => setFormReajuste({...formReajuste, percentual: parseFloat(e.target.value)})} placeholder="Ex: 5.32" />
+                  <input type="number" step="0.01" className="dc-form-input" required value={formReajuste.percentual || ''} onChange={e => setFormReajuste({ ...formReajuste, percentual: parseFloat(e.target.value) })} placeholder="Ex: 5.32" />
                 </div>
                 <div className="dc-form-group">
                   <label>Mês Presumido</label>
-                  <input type="month" className="dc-form-input" required value={formReajuste.mes_aplicacao} onChange={e => setFormReajuste({...formReajuste, mes_aplicacao: e.target.value})} />
+                  <input type="month" className="dc-form-input" required value={formReajuste.mes_aplicacao} onChange={e => setFormReajuste({ ...formReajuste, mes_aplicacao: e.target.value })} />
                 </div>
               </div>
 
