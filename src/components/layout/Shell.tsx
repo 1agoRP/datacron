@@ -15,17 +15,15 @@ const allNav = [
   { href: '/dashboard',      icon: BarChart3,    label: 'Dashboard',        module: null },
   { href: '/condominios',    icon: Building2,    label: 'Condomínios',      module: null },
   { href: '/concessionarias',icon: Zap,          label: 'Concessionárias',  module: null },
-  { href: '/contratos',      icon: FileSignature,label: 'Contratos',        module: null },
   { href: '/reajustes',      icon: TrendingUp,   label: 'Reajustes',        module: null },
   { href: '/recebimentos',   icon: Mail,         label: 'Recebimentos',     module: 'gmail' },
-  { href: '/faturas',        icon: FileText,     label: 'Faturas',          module: 'faturas' },
   { href: '/alertas',        icon: AlertCircle,  label: 'Alertas',          module: null },
   { href: '/relatorios',     icon: BarChart2,    label: 'Relatórios',       module: 'relatorios' },
   { href: '/importacoes',    icon: Download,     label: 'Importações',      module: 'importacoes' },
   { href: '/configuracoes',  icon: Settings,     label: 'Configurações',    module: null },
 ];
 
-const ADMIN_ONLY_MODULES = new Set(['relatorios', 'importacoes', 'notificacoes', 'gmail', 'faturas']);
+const ADMIN_ONLY_MODULES = new Set(['relatorios', 'importacoes', 'notificacoes', 'gmail']);
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',
@@ -61,7 +59,7 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
       
       const restrictedRoles = ['concessionarias', 'contabilidade', 'orçamento', 'emissao', 'financeiro', 'providencias', 'geral'];
       if (restrictedRoles.includes(role)) {
-         const restrictedLinks = ['/contratos', '/reajustes', '/alertas'];
+         const restrictedLinks = ['/reajustes', '/alertas'];
          if (restrictedLinks.includes(item.href)) return false;
       }
       

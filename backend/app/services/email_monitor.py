@@ -529,6 +529,19 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
 
         referencia = _standardize_referencia(extracted.get("referencia"), vencimento)
 
+        # ── Check for existing duplicate Fatura ──
+        if conc:
+            existing_fatura = await db.execute(
+                select(Fatura).where(
+                    Fatura.condominio_id == conc.condominio_id,
+                    Fatura.concessionaria_id == conc.id,
+                    Fatura.referencia == referencia
+                )
+            )
+            if existing_fatura.scalar_one_or_none():
+                logger.info(f"Fatura already exists for {conc.tipo} ({referencia}), skipping duplicate.")
+                continue
+
         fatura = Fatura(
             condominio_id=conc.condominio_id if conc else None,
             concessionaria_id=conc.id if conc else None,

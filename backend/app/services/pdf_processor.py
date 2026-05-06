@@ -145,16 +145,22 @@ def _parse_fields(text: str, result: Dict[str, Any]):
     patterns_venc = [
         r"VENCIMENTO[:\s]*(\d{2}[/.-]\d{2}[/.-]\d{4})",
         r"PAG[AA]R\s+AT[EÉ][:\s]*(\d{2}[/.-]\d{2}[/.-]\d{4})",
+        r"VENCIMENTO\s+VALOR\s+[\d.,]+\s+[\w\s\/]*\s+(\d{2}[/]\d{2}[/]\d{4})", # Claro specific
+        r"(\d{2}[/]\d{2}[/]\d{4})", # Generic fallback (last resort)
     ]
     for p in patterns_venc:
-        m = re.search(p, text, re.IGNORECASE)
-        if m:
-            raw_date = m.group(1)
+        matches = re.finditer(p, text, re.IGNORECASE)
+        for m in matches:
+            raw_date = m.group(1) if m.groups() else m.group(0)
             parts = re.split(r"[/.-]", raw_date)
             if len(parts) == 3:
                 d, m, y = parts
-                result["vencimento"] = f"{y}-{m}-{d}"
-                break
+                # Basic validation: year should be reasonable
+                if 2000 <= int(y) <= 2100:
+                    result["vencimento"] = f"{y}-{m}-{d}"
+                    break
+        if result["vencimento"]:
+            break
 
     # ─── Código de Barras ────────────────────────────────────
     # Digitable line: 12345.12345 12345.123456...

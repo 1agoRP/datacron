@@ -38,13 +38,13 @@ async def dashboard_stats(
     condominios_count = result.scalar_one()
 
     # Faturas received in Current Month (KPI is more useful than just 'today')
-    fatura_stmt = select(func.count(Fatura.id)).where(
+    fatura_count_stmt = select(func.count(Fatura.id)).where(
         extract("month", Fatura.vencimento) == today.month,
         extract("year", Fatura.vencimento) == today.year
     )
     if allowed_condo_ids is not None:
-        fatura_stmt = fatura_stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
-    result = await db.execute(fatura_stmt)
+        fatura_count_stmt = fatura_count_stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
+    result = await db.execute(fatura_count_stmt)
     recebidas_mes = result.scalar_one()
 
     # Active (unresolved) alerts count
@@ -71,12 +71,39 @@ async def dashboard_stats(
     result = await db.execute(ata_stmt)
     condos_sem_ata = result.scalar_one()
 
+    # Recent Faturas (limit 6)
+    fatura_list_stmt = (
+        select(Fatura)
+        .options(selectinload(Fatura.condominio), selectinload(Fatura.concessionaria))
+        .order_by(Fatura.created_at.desc())
+        .limit(6)
+    )
+    if allowed_condo_ids is not None:
+        fatura_list_stmt = fatura_list_stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
+    result = await db.execute(fatura_list_stmt)
+    recent_faturas = result.scalars().all()
+
+    # Recent Alerts (limit 5, unresolved)
+    alerta_list_stmt = (
+        select(Alerta)
+        .options(selectinload(Alerta.condominio))
+        .where(Alerta.resolvido == False)
+        .order_by(Alerta.created_at.desc())
+        .limit(5)
+    )
+    if allowed_condo_ids is not None:
+        alerta_list_stmt = alerta_list_stmt.where(Alerta.condominio_id.in_(allowed_condo_ids))
+    result = await db.execute(alerta_list_stmt)
+    recent_alertas = result.scalars().all()
+
     return {
         "condominios_count": condominios_count,
         "recebidas_hoje": recebidas_mes,
         "active_alerts": active_alerts,
         "total_faturado": round(float(total_faturado), 2),
         "condos_sem_ata": condos_sem_ata,
+        "faturas": recent_faturas,
+        "alertas": recent_alertas
     }
 
 

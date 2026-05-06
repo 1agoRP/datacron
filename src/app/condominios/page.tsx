@@ -67,7 +67,6 @@ export default function CondominiosPage() {
   const [detailsCondo, setDetailsCondo] = useState<any>(null);
   const [editCondo, setEditCondo] = useState<any>(null);
   const [condoConcs, setCondoConcs] = useState<any[]>([]);
-  const [condoContratos, setCondoContratos] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [docUploadModal, setDocUploadModal] = useState<{ type: 'ata' | 'avcb' | 'apolice', condoId: string } | null>(null);
   const [docUploadFile, setDocUploadFile] = useState<File | null>(null);
@@ -146,12 +145,8 @@ export default function CondominiosPage() {
     setHistoryConc(null);
     try {
       setLoadingDetails(true);
-      const [concs, contratos] = await Promise.all([
-        api.getConcessionarias({ condominio_id: condo.id }),
-        api.getContratos()
-      ]);
+      const concs = await api.getConcessionarias({ condominio_id: condo.id });
       setCondoConcs(concs);
-      setCondoContratos(contratos.filter((c: any) => c.condominio_id === condo.id));
     } catch (err) {
       console.error(err);
     } finally {
@@ -1103,43 +1098,6 @@ export default function CondominiosPage() {
                     </div>
                   </div>
 
-                  {/* Contratos Vinculados */}
-                  <div style={{ marginTop: 24 }}>
-                    <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <FileSignature size={16} color="#10b981" /> Contratos Vinculados
-                    </h4>
-                    {loadingDetails ? (
-                      <div style={{ padding: '20px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
-                    ) : condoContratos.length === 0 ? (
-                      <div style={{ padding: 24, textAlign: 'center', background: '#f8fafc', borderRadius: 8, fontSize: '0.9rem', color: '#64748b', border: '1px dashed #cbd5e1' }}>
-                        Nenhum contrato ativo vinculado.
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {condoContratos.map(contrato => (
-                          <div key={contrato.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                              <div style={{ width: 38, height: 38, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', fontWeight: 800 }}>
-                                {contrato.tipo_contrato[0]}
-                              </div>
-                              <div>
-                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>{contrato.empresa}</div>
-                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{contrato.tipo_contrato} {contrato.tipo_personalizado ? `(${contrato.tipo_personalizado})` : ''}</div>
-                              </div>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <span className={`dc-badge ${contrato.status === 'ativo' ? 'dc-badge-green' : contrato.status === 'vencido' ? 'dc-badge-red' : 'dc-badge-amber'}`}>
-                                {contrato.status}
-                              </span>
-                              <div className="dc-cell-secondary" style={{ marginTop: 4 }}>
-                                {formatCurrencyCeil(contrato.valor_atual || 0)}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
 
                   {/* Concessionarias List */}
                   <div style={{ marginTop: 24 }}>

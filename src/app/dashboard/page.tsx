@@ -54,20 +54,15 @@ export default function Dashboard() {
     mutate: mutateStats
   } = useSWR<DashboardStats>('dashboard/stats', async () => {
     try {
-      const [kpis, latestFaturas, alertas] = await Promise.all([
-        api.getDashboardKpis().catch(e => ({ condominios_count: 0, active_alerts: 0, recebidas_hoje: 0, total_faturado: 0, condos_sem_ata: 0 })),
-        api.getFaturas({ limit: 6 }).catch(e => []),
-        api.getAlertas({ limit: 5, resolvido: false }).catch(e => []),
-      ]);
-
+      const data = await api.getDashboardStats();
       return {
-        condominiosCount: kpis.condominios_count,
-        faturas: latestFaturas as Fatura[],
-        alertas: alertas as Alerta[],
-        activeAlerts: kpis.active_alerts,
-        recebidasHoje: kpis.recebidas_hoje,
-        totalFaturado: kpis.total_faturado,
-        condosSemAta: kpis.condos_sem_ata,
+        condominiosCount: data.kpis.condominios_count,
+        faturas: data.kpis.faturas as Fatura[],
+        alertas: data.kpis.alertas as Alerta[],
+        activeAlerts: data.kpis.active_alerts,
+        recebidasHoje: data.kpis.recebidas_hoje,
+        totalFaturado: data.kpis.total_faturado,
+        condosSemAta: data.kpis.condos_sem_ata,
       };
     } catch (err) {
       console.error("Dashboard fetch error:", err);

@@ -186,15 +186,13 @@ class ApiClient {
 
   // Dashboard & Stats
   async getDashboardStats() {
-    const [faturas, alertas, countAlertas] = await Promise.all([
-      this.getFaturas({ limit: 5 }),
-      this.getAlertas({ limit: 5 }),
+    const [kpis, countAlertas] = await Promise.all([
+      this.getDashboardKpis(),
       this.request<{ nao_lidos: number }>('/alertas/contagem')
     ]);
     
     return {
-      faturas,
-      alertas,
+      kpis,
       countAlertas,
     };
   }
@@ -273,32 +271,6 @@ class ApiClient {
     document.body.removeChild(a);
   }
 
-  async downloadFatura(id: string) {
-    const token = this.getToken();
-    const response = await fetchWithRetry(`${API_BASE_URL}/faturas/${id}/pdf`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
-    });
-    if (!response.ok) throw new Error('Falha ao baixar Fatura');
-    
-    const blob = await response.blob();
-    const disposition = response.headers.get('Content-Disposition');
-    let filename = `fatura_${id}.pdf`;
-    if (disposition && disposition.includes('filename=')) {
-        const matches = disposition.match(/filename="?([^"]+)"?/);
-        if (matches && matches.length > 1) {
-            filename = matches[1];
-        }
-    }
-    
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  }
 
   async deleteAtaEleicao(id: string) {
     return this.request(`/condominios/${id}/ata-eleicao`, { method: 'DELETE' });
@@ -423,42 +395,6 @@ class ApiClient {
     return this.request<ReajusteConcessionaria[]>(`/concessionarias/reajustes/historico${param}`);
   }
 
-  // Faturas
-  async getFaturas(params: Record<string, string | number | boolean> = {}) {
-    const safeParams: Record<string, string> = {};
-    for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
-    const query = new URLSearchParams(safeParams).toString();
-    return this.request<Fatura[]>(`/faturas?${query}`);
-  }
-
-  async getFatura(id: string) {
-    return this.request<Fatura>(`/faturas/${id}`);
-  }
-
-  async exportFaturas(formato: 'excel' | 'csv' = 'excel') {
-    const token = this.getToken();
-    const headers = {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-    };
-
-    const response = await fetchWithRetry(`${API_BASE_URL}/faturas/exportar?formato=${formato}`, {
-      headers
-    });
-
-    if (!response.ok) {
-      throw new Error('Falha ao exportar faturas');
-    }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `faturas.${formato === 'excel' ? 'xlsx' : 'csv'}`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  }
 
   // Alertas
   async getAlertas(params: Record<string, string | boolean | number> = {}) {
@@ -571,17 +507,16 @@ class ApiClient {
     periodo?: string,
     condominio_id?: string
   ) {
-    // Reports use the faturas export endpoint with appropriate filters
     const token = this.getToken();
     const params = new URLSearchParams();
-    params.set('formato', formato === 'pdf' ? 'excel' : formato); // PDF uses Excel then converts
+    params.set('formato', formato === 'pdf' ? 'excel' : formato); 
     if (periodo) params.set('referencia', periodo);
     if (condominio_id) params.set('condominio_id', condominio_id);
 
     const headers: any = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetchWithRetry(`${API_BASE_URL}/faturas/exportar?${params.toString()}`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/relatorios/exportar?${params.toString()}`, {
       headers
     });
 
@@ -615,13 +550,17 @@ class ApiClient {
   }
 
   // Dashboard
-  async getDashboardKpis() {
+  async getDashboardStats() {
     return this.request<{ 
-      condominios_count: number; 
-      recebidas_hoje: number; 
-      active_alerts: number;
-      total_faturado: number;
-      condos_sem_ata: number;
+      kpis: {
+        condominios_count: number; 
+        recebidas_hoje: number; 
+        active_alerts: number;
+        total_faturado: number;
+        condos_sem_ata: number;
+        faturas: Fatura[];
+        alertas: Alerta[];
+      }
     }>('/dashboard/stats');
   }
 
@@ -639,101 +578,7 @@ class ApiClient {
     return this.request<{ name: string; valor: number }[]>(`/dashboard/chart?meses=${meses}&agrupar=${agrupar}`);
   }
 
-  // Faturas by condominio (for history)
-  async getFaturasByCondominio(condominioId: string, concessionariaId?: string) {
-    let url = `/faturas?condominio_id=${condominioId}&limit=100`;
-    if (concessionariaId) {
-      url += `&concessionaria_id=${concessionariaId}`;
-    }
-    return this.request<Fatura[]>(url);
-  }
 
-  async getGmailHistory(condominioId: string, concessionariaId: string) {
-    return this.request<any[]>(`/condominios/${condominioId}/gmail-history?concessionaria_id=${concessionariaId}`);
-  }
-
-  async downloadGmailFatura(messageId: string, filename: string) {
-    const response = await fetch(`${API_BASE_URL}/faturas/gmail-download/${messageId}`, {
-      headers: {
-        'Authorization': `Bearer ${this.getToken()}`
-      }
-    });
-
-    if (!response.ok) throw new Error('Não foi possível baixar o arquivo do Gmail');
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  }
-
-  // Contratos
-  async getContratos(params: Record<string, string | number> = {}) {
-    const safeParams: Record<string, string> = {};
-    for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
-    const query = new URLSearchParams(safeParams).toString();
-    return this.request<any[]>(`/contratos?${query}`);
-  }
-
-  async getContractTypes() {
-    return this.request<string[]>('/contratos/tipos');
-  }
-
-  async getContratosStats() {
-    return this.request<{ total: number; ativos: number; a_vencer: number; vencidos: number }>('/contratos/stats');
-  }
-
-  async createContrato(data: any) {
-    return this.request('/contratos/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateContrato(id: string, data: any) {
-    return this.request(`/contratos/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async deleteContrato(id: string) {
-    return this.request(`/contratos/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async uploadContratoPdf(formData: FormData) {
-    return this.requestMultipart('/contratos/upload-pdf', formData, { method: 'POST' });
-  }
-
-  async uploadContratoArquivo(id: string, formData: FormData) {
-    return this.requestMultipart(`/contratos/${id}/arquivo`, formData, { method: 'POST' });
-  }
-
-  async downloadContratoArquivo(id: string) {
-    const token = this.getToken();
-    const response = await fetchWithRetry(`${API_BASE_URL}/contratos/${id}/arquivo`, {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
-    });
-    if (!response.ok) throw new Error('Falha ao baixar arquivo');
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `contrato_${id}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  }
 
   // Fornecedores
   async buscarFornecedorPorCnpj(cnpj: string) {
@@ -809,7 +654,7 @@ class ApiClient {
 
   async downloadLoteFaturas(ids: string[]) {
     const token = this.getToken();
-    const response = await fetchWithRetry(`${API_BASE_URL}/faturas/download-lote`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/relatorios/download-lote`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

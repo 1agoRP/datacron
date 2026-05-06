@@ -110,7 +110,7 @@ export default function RelatoriosPage() {
     if (dataInicio) params.set('data_inicio', dataInicio);
     if (dataFim) params.set('data_fim', dataFim);
 
-    const response = await fetch(`${API_BASE_URL}/faturas/exportar?${params.toString()}`, {
+    const response = await fetch(`${API_BASE_URL}/relatorios/exportar?${params.toString()}`, {
       headers
     });
 
@@ -163,7 +163,7 @@ export default function RelatoriosPage() {
         const headers: any = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const response = await fetch(`${API_BASE_URL}/faturas/relatorio-analitico/download`, {
+        const response = await fetch(`${API_BASE_URL}/relatorios/relatorio-analitico/download`, {
           headers
         });
 
@@ -215,7 +215,7 @@ export default function RelatoriosPage() {
         const headers: any = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const response = await fetch(`${API_BASE_URL}/faturas/relatorio-analitico/download`, { headers });
+        const response = await fetch(`${API_BASE_URL}/relatorios/relatorio-analitico/download`, { headers });
         if (!response.ok) throw new Error('Falha ao baixar relatório analítico de IA');
 
         const blob = await response.blob();

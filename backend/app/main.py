@@ -17,7 +17,7 @@ from app.limiter import limiter
 
 from app.config import settings
 from app.database import engine, Base
-from app.routers import auth, condominios, concessionarias, faturas, alertas, emails, importacoes, relatorios, dashboard, contratos, fornecedores, historico, webhooks, cron
+from app.routers import auth, condominios, concessionarias, alertas, emails, importacoes, relatorios, dashboard, fornecedores, historico, webhooks, cron
 
 # ─── Logging ────────────────────────────────────────────────
 logging.basicConfig(
@@ -80,13 +80,11 @@ API_PREFIX = "/api"
 app.include_router(auth.router,             prefix=API_PREFIX)
 app.include_router(condominios.router,      prefix=API_PREFIX)
 app.include_router(concessionarias.router,  prefix=API_PREFIX)
-app.include_router(faturas.router,          prefix=API_PREFIX)
 app.include_router(alertas.router,          prefix=API_PREFIX)
 app.include_router(emails.router,           prefix=API_PREFIX)
 app.include_router(importacoes.router,      prefix=API_PREFIX)
 app.include_router(relatorios.router,       prefix=API_PREFIX)
 app.include_router(dashboard.router,        prefix=API_PREFIX)
-app.include_router(contratos.router,        prefix=API_PREFIX)
 app.include_router(fornecedores.router,     prefix=API_PREFIX)
 app.include_router(historico.router,        prefix=API_PREFIX)
 app.include_router(webhooks.router,         prefix=API_PREFIX)
