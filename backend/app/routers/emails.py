@@ -139,3 +139,76 @@ async def get_gmail_auth_url(request: Request, _: User = Depends(require_module(
     frontend_url = request.headers.get("origin", "http://localhost:3000")
     dummy_oauth_url = f"{frontend_url}/api/auth/simulated-google-popup"
     return {"url": dummy_oauth_url}
+
+
+@router.get("/gmail-download/{message_id}")
+async def download_gmail_fatura(
+    message_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Fetches a specific email from Gmail and returns the PDF attachment if found."""
+    import imaplib
+    import email
+    import io
+    from fastapi.responses import StreamingResponse
+    from fastapi.concurrency import run_in_threadpool
+    from app.config import settings
+
+    def _get_pdf_from_gmail():
+        if not settings.GMAIL_USER or not settings.GMAIL_PASSWORD:
+            raise Exception("Credenciais do Gmail não configuradas")
+            
+        mail = imaplib.IMAP4_SSL(settings.GMAIL_HOST)
+        try:
+            mail.login(settings.GMAIL_USER, settings.GMAIL_PASSWORD)
+            mail.select("inbox")
+            
+            # Fetch message by Gmail Message ID (X-GM-MSGID) if supported, 
+            # but usually we use search or fetch UID. 
+            # The system stores Gmail Message ID which is unique.
+            res, data = mail.search(None, f'X-GM-MSGID {message_id}')
+            if res != 'OK' or not data[0]:
+                raise Exception("Mensagem não encontrada no Gmail")
+                
+            msg_uid = data[0].split()[0]
+            res, msg_data = mail.fetch(msg_uid, '(RFC822)')
+            
+            raw_email = msg_data[0][1]
+            msg = email.message_from_bytes(raw_email)
+            
+            pdf_content = None
+            filename = "fatura_gmail.pdf"
+
+            for part in msg.walk():
+                if part.get_content_maintype() == 'multipart':
+                    continue
+                if part.get('Content-Disposition') is None:
+                    continue
+                
+                part_filename = part.get_filename()
+                if part_filename and part_filename.lower().endswith('.pdf'):
+                    pdf_content = part.get_payload(decode=True)
+                    filename = part_filename
+                    break
+            
+            if not pdf_content:
+                raise Exception("Nenhum anexo PDF encontrado neste e-mail")
+
+            return pdf_content, filename
+        finally:
+            try:
+                mail.logout()
+            except:
+                pass
+
+    try:
+        content, filename = await run_in_threadpool(_get_pdf_from_gmail)
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(e))
