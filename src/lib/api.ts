@@ -625,6 +625,35 @@ class ApiClient {
     document.body.removeChild(a);
   }
 
+  async downloadFatura(id: string) {
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/relatorios/faturas/${id}/pdf`, {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    });
+    if (!response.ok) throw new Error('Falha ao baixar fatura');
+    const blob = await response.blob();
+    
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = `fatura_${id}.pdf`;
+    if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="(.+)"/);
+        if (matches && matches.length > 1) {
+            filename = matches[1];
+        }
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
   async getFornecedorCategorias() {
     return this.request<string[]>('/fornecedores/categorias');
   }

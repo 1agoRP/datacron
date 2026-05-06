@@ -275,3 +275,62 @@ async def download_lote(
         media_type="application/zip",
         headers={"Content-Disposition": "attachment; filename=faturas_datacron.zip"},
     )
+
+
+@router.get("/faturas/{id}/pdf")
+async def download_fatura_pdf(
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Serves the PDF for download. Priority: Supabase Storage → legacy base64 → local file."""
+    import os
+    import base64
+    from app.storage import get_file_content
+
+    result = await db.execute(select(Fatura).where(Fatura.id == id))
+    f = result.scalar_one_or_none()
+    if not f:
+        raise HTTPException(status_code=404, detail="Fatura não encontrada")
+
+    filename = f.pdf_nome_original or f"fatura_{id}.pdf"
+
+    # 1. Try Supabase Storage first
+    if f.storage_path:
+        try:
+            content = await get_file_content(f.storage_path)
+            return StreamingResponse(
+                io.BytesIO(content),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"attachment; filename={filename}"},
+            )
+        except Exception as e:
+            # Fall through to legacy methods if storage fails
+            pass
+
+    # 2. Try base64 from database
+    if f.pdf_base64:
+        try:
+            pdf_data = base64.b64decode(f.pdf_base64)
+            return StreamingResponse(
+                io.BytesIO(pdf_data),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"attachment; filename={filename}"},
+            )
+        except Exception as e:
+            pass
+
+    # 3. Fallback to local file on disk
+    if f.pdf_path and os.path.exists(f.pdf_path):
+        def file_iterator(path: str):
+            with open(path, "rb") as file:
+                while chunk := file.read(8192):
+                    yield chunk
+
+        return StreamingResponse(
+            file_iterator(f.pdf_path),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+    raise HTTPException(status_code=404, detail="PDF não encontrado para esta fatura")
