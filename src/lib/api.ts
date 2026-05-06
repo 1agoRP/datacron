@@ -184,18 +184,6 @@ class ApiClient {
     });
   }
 
-  // Dashboard & Stats
-  async getDashboardStats() {
-    const [kpis, countAlertas] = await Promise.all([
-      this.getDashboardKpis(),
-      this.request<{ nao_lidos: number }>('/alertas/contagem')
-    ]);
-    
-    return {
-      kpis,
-      countAlertas,
-    };
-  }
 
   // Condominios
   async getCondominios(params: Record<string, string | number | boolean> = {}) {
