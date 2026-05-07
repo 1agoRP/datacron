@@ -716,6 +716,20 @@ class ApiClient {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   }
+
+  async createFaturaManual(data: {
+    condominio_id: string;
+    concessionaria_id: string;
+    valor: number;
+    vencimento: string;
+    referencia?: string;
+  }) {
+    return this.request<Fatura>('/faturas/manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  }
 }
 
 export const api = new ApiClient();

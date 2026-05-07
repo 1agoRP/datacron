@@ -86,6 +86,12 @@ export default function CondominiosPage() {
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
+  // Manual fatura modal
+  const [isManualFaturaModalOpen, setIsManualFaturaModalOpen] = useState(false);
+  const [manualFaturaConc, setManualFaturaConc] = useState<any>(null);
+  const [manualFaturaData, setManualFaturaData] = useState({ valor: '', vencimento: '' });
+  const [savingManualFatura, setSavingManualFatura] = useState(false);
+
   // Removed manual fetchData in favor of useSWR
 
   const handleCreate = async (e?: React.FormEvent) => {
@@ -1291,9 +1297,15 @@ export default function CondominiosPage() {
                             </button>
                           </div>
                         ) : (
-                          <div style={{ padding: '6px 14px', borderRadius: 20, background: '#fff7ed', color: '#ea580c', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #ffedd5' }}>
+                          <button
+                            style={{ padding: '6px 14px', borderRadius: 20, background: '#fff7ed', color: '#ea580c', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #ffedd5', cursor: 'pointer', transition: 'transform 0.2s' }}
+                            onClick={() => { setManualFaturaConc(item.concessionaria); setManualFaturaData({ valor: '', vencimento: '' }); setIsManualFaturaModalOpen(true); }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                            title="Clique para cadastrar manualmente"
+                          >
                             <AlertCircle size={15} /> Pendente
-                          </div>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1304,6 +1316,105 @@ export default function CondominiosPage() {
 
             <div className="dc-modal-footer">
               <button type="button" className="dc-btn dc-btn-secondary" style={{ width: '100%', height: 48 }} onClick={() => setIsStatusModalOpen(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cadastro Manual de Fatura */}
+      {isManualFaturaModalOpen && manualFaturaConc && (
+        <div className="dc-modal-overlay">
+          <div className="dc-modal-content" style={{ maxWidth: 450 }}>
+            <div className="dc-modal-header">
+              <h2 className="dc-modal-title">Cadastrar Fatura Manual</h2>
+              <button className="dc-modal-close" onClick={() => setIsManualFaturaModalOpen(false)}><X size={20} /></button>
+            </div>
+            <div className="dc-modal-body dc-space-y-4">
+              <div style={{ padding: 12, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.85rem' }}>
+                <div style={{ fontWeight: 700, color: '#0f172a' }}>
+                  {manualFaturaConc.tipo === 'Outros' ? manualFaturaConc.nome_personalizado : manualFaturaConc.tipo}
+                </div>
+                <div style={{ color: '#64748b', marginTop: 4 }}>
+                  Condomínio: {statusModalCondo?.nome}
+                </div>
+                {manualFaturaConc.instalacao && (
+                  <div style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                    {manualFaturaConc.tipo === 'Sabesp' ? `Fornecimento: ${manualFaturaConc.instalacao}` : `Instalação: ${manualFaturaConc.instalacao}`}
+                  </div>
+                )}
+              </div>
+
+              <div className="dc-form-group">
+                <label>Valor (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="dc-form-input"
+                  value={manualFaturaData.valor}
+                  onChange={(e) => setManualFaturaData(prev => ({ ...prev, valor: e.target.value }))}
+                  placeholder="0,00"
+                  required
+                />
+              </div>
+
+              <div className="dc-form-group">
+                <label>Data de Vencimento</label>
+                <input
+                  type="date"
+                  className="dc-form-input"
+                  value={manualFaturaData.vencimento}
+                  onChange={(e) => setManualFaturaData(prev => ({ ...prev, vencimento: e.target.value }))}
+                  required
+                />
+              </div>
+
+              <div style={{ padding: 10, background: '#eff6ff', borderRadius: 6, fontSize: '0.75rem', color: '#1e40af' }}>
+                <strong>Informações automáticas:</strong><br/>
+                • Status: <strong>Pendente</strong><br/>
+                • Registrado por: <strong>{user?.nome}</strong><br/>
+                • Data de registro: <strong>{format(new Date(), 'dd/MM/yyyy')}</strong>
+              </div>
+            </div>
+            <div className="dc-modal-footer">
+              <button
+                type="button"
+                className="dc-btn dc-btn-secondary"
+                onClick={() => setIsManualFaturaModalOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="dc-btn dc-btn-primary"
+                disabled={savingManualFatura || !manualFaturaData.valor || !manualFaturaData.vencimento}
+                onClick={async () => {
+                  if (!manualFaturaData.valor || !manualFaturaData.vencimento) {
+                    alert('Por favor, preencha o valor e a data de vencimento.');
+                    return;
+                  }
+                  try {
+                    setSavingManualFatura(true);
+                    await api.createFaturaManual({
+                      condominio_id: statusModalCondo?.id,
+                      concessionaria_id: manualFaturaConc.id,
+                      valor: parseFloat(manualFaturaData.valor),
+                      vencimento: manualFaturaData.vencimento,
+                    });
+                    setIsManualFaturaModalOpen(false);
+                    // Refresh status data
+                    handleOpenStatus(statusModalCondo);
+                    alert('Fatura cadastrada com sucesso!');
+                  } catch (err: any) {
+                    alert(err.message || 'Erro ao cadastrar fatura');
+                  } finally {
+                    setSavingManualFatura(false);
+                  }
+                }}
+                style={{ minWidth: 140 }}
+              >
+                {savingManualFatura ? 'Salvando...' : 'Cadastrar'}
+              </button>
             </div>
           </div>
         </div>
