@@ -404,7 +404,7 @@ export default function Dashboard() {
                     <td style={{ paddingRight: 24 }}>
                       <span className={`dc-badge ${f.status === 'processada' ? 'dc-badge-green' : f.status === 'erro' ? 'dc-badge-red' : 'dc-badge-amber'}`}>
                         <span className="dc-badge-dot" />
-                        {f.status === 'processada' ? 'Auditada' : f.status === 'erro' ? 'Erro' : 'Em Análise'}
+                        {f.status === 'processada' ? 'Conferida' : f.status === 'erro' ? 'Erro' : 'Em Análise'}
                       </span>
                     </td>
                   </tr>
