@@ -1,4 +1,5 @@
 from typing import Optional
+import uuid
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func
