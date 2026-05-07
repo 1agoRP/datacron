@@ -837,121 +837,126 @@ export default function CondominiosPage() {
 
                   {loadingHistory ? (
                     <div style={{ padding: 80, textAlign: 'center' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
-                  ) : historyFaturas.length === 0 ? (
-                    <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8', background: '#fff', border: '1px solid #f3f4f6', borderRadius: 16 }}>
-                      <FileText size={56} style={{ margin: '0 auto 20px', opacity: 0.15 }} />
-                      <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#475569' }}>Nenhum registro no histórico</div>
-                      <div style={{ fontSize: '0.9rem', marginTop: 10 }}>As faturas processadas aparecerão aqui automaticamente.</div>
-                    </div>
                   ) : activeHistoryTab === 'sistema' ? (
-                    /* CARD-BASED LIST */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      {historyFaturas.map(f => {
-                        const hasAutoDebit = f.debito_automatico === true || String(f.debito_automatico) === 'true';
-                        const isLegacy = !f.status;
-                        const status = f.status || 'processada'; // Default for legacy
+                    /* SISTEMA TAB */
+                    <>
+                      {historyFaturas.length === 0 ? (
+                        <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8', background: '#fff', border: '1px solid #f3f4f6', borderRadius: 16 }}>
+                          <FileText size={56} style={{ margin: '0 auto 20px', opacity: 0.15 }} />
+                          <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#475569' }}>Nenhum registro no histórico</div>
+                          <div style={{ fontSize: '0.9rem', marginTop: 10 }}>As faturas processadas aparecerão aqui automaticamente.</div>
+                        </div>
+                      ) : (
+                        /* CARD-BASED LIST */
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {historyFaturas.map(f => {
+                            const hasAutoDebit = f.debito_automatico === true || String(f.debito_automatico) === 'true';
+                            const isLegacy = !f.status;
+                            const status = f.status || 'processada'; // Default for legacy
 
-                        let statusColor = '#10b981'; // Default green
-                        let statusBg = '#f0fdf4';
-                        let statusLabel = status.toUpperCase();
+                            let statusColor = '#10b981'; // Default green
+                            let statusBg = '#f0fdf4';
+                            let statusLabel = status.toUpperCase();
 
-                        if (status === 'pendente') {
-                          statusColor = '#f59e0b';
-                          statusBg = '#fffbeb';
-                        } else if (status === 'erro') {
-                          statusColor = '#ef4444';
-                          statusBg = '#fef2f2';
-                        } else if (status === 'revisao') {
-                          statusColor = '#3b82f6';
-                          statusBg = '#eff6ff';
-                        }
+                            if (status === 'pendente') {
+                              statusColor = '#f59e0b';
+                              statusBg = '#fffbeb';
+                            } else if (status === 'erro') {
+                              statusColor = '#ef4444';
+                              statusBg = '#fef2f2';
+                            } else if (status === 'revisao') {
+                              statusColor = '#3b82f6';
+                              statusBg = '#eff6ff';
+                            }
 
-                        return (
-                          <div key={f.id} style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '18px 20px',
-                            background: '#fff',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: 14,
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                            transition: 'transform 0.2s'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                              <div style={{
-                                width: 48,
-                                height: 48,
-                                borderRadius: 12,
-                                background: statusBg,
+                            return (
+                              <div key={f.id} style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                color: statusColor,
-                                border: `1px solid ${statusBg === '#fff' ? '#e2e8f0' : 'transparent'}`
+                                justifyContent: 'space-between',
+                                padding: '18px 20px',
+                                background: '#fff',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: 14,
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                                transition: 'transform 0.2s'
                               }}>
-                                {status === 'processada' || isLegacy ? <CheckCircle2 size={24} /> : <Clock size={24} />}
-                              </div>
-                              <div>
-                                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  {f.referencia || 'Fatura'}
-                                  {hasAutoDebit && <span style={{ padding: '2px 8px', borderRadius: 6, background: '#e0f2fe', color: '#0369a1', fontSize: '0.65rem', fontWeight: 800 }}>DÉBITO AUTO</span>}
-                                </div>
-                                <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: 10 }}>
-                                  <span><Calendar size={13} style={{ display: 'inline', marginRight: 4 }} /> Vencimento: {f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}</span>
-                                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#cbd5e1' }} />
-                                  <span>Registrada em {f.created_at ? format(new Date(f.created_at), 'dd/MM/yyyy') : '—'}</span>
-                                </div>
-
-                                {f.email_remetente && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                                   <div style={{
-                                    fontSize: '0.75rem',
-                                    color: '#94a3b8',
-                                    marginTop: 6,
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 12,
+                                    background: statusBg,
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: 5,
-                                    borderTop: '1px dashed #f1f5f9',
-                                    paddingTop: 6
+                                    justifyContent: 'center',
+                                    color: statusColor,
+                                    border: `1px solid ${statusBg === '#fff' ? '#e2e8f0' : 'transparent'}`
                                   }}>
-                                    <Mail size={12} />
-                                    <span style={{ maxWidth: 350, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      <strong>{f.email_remetente}</strong>: {f.email_assunto}
-                                    </span>
+                                    {status === 'processada' || isLegacy ? <CheckCircle2 size={24} /> : <Clock size={24} />}
                                   </div>
-                                )}
-                              </div>
-                            </div>
+                                  <div>
+                                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      {f.referencia || 'Fatura'}
+                                      {hasAutoDebit && <span style={{ padding: '2px 8px', borderRadius: 6, background: '#e0f2fe', color: '#0369a1', fontSize: '0.65rem', fontWeight: 800 }}>DÉBITO AUTO</span>}
+                                    </div>
+                                    <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: 10 }}>
+                                      <span><Calendar size={13} style={{ display: 'inline', marginRight: 4 }} /> Vencimento: {f.vencimento ? format(new Date(f.vencimento + 'T12:00:00'), 'dd/MM/yyyy') : '—'}</span>
+                                      <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#cbd5e1' }} />
+                                      <span>Registrada em {f.created_at ? format(new Date(f.created_at), 'dd/MM/yyyy') : '—'}</span>
+                                    </div>
 
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                              <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>R$ {formatCurrencyCeil(f.valor || 0)}</div>
-                                <div style={{ fontSize: '0.72rem', color: statusColor, fontWeight: 700 }}>{statusLabel}</div>
+                                    {f.email_remetente && (
+                                      <div style={{
+                                        fontSize: '0.75rem',
+                                        color: '#94a3b8',
+                                        marginTop: 6,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 5,
+                                        borderTop: '1px dashed #f1f5f9',
+                                        paddingTop: 6
+                                      }}>
+                                        <Mail size={12} />
+                                        <span style={{ maxWidth: 350, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          <strong>{f.email_remetente}</strong>: {f.email_assunto}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                                  <div style={{ textAlign: 'right' }}>
+                                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>R$ {formatCurrencyCeil(f.valor || 0)}</div>
+                                    <div style={{ fontSize: '0.72rem', color: statusColor, fontWeight: 700 }}>{statusLabel}</div>
+                                  </div>
+                                  <button
+                                    onClick={() => handleDownloadFatura(f, f.pdf_nome_original || `fatura_${f.referencia}.pdf`, 'sistema')}
+                                    className="dc-btn"
+                                    style={{
+                                      height: 40,
+                                      width: 40,
+                                      padding: 0,
+                                      borderRadius: 10,
+                                      background: '#fff',
+                                      border: '1px solid #10b981',
+                                      color: '#10b981',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center'
+                                    }}
+                                    title="Baixar PDF"
+                                  >
+                                    <Download size={18} />
+                                  </button>
+                                </div>
                               </div>
-                              <button
-                                onClick={() => handleDownloadFatura(f, f.pdf_nome_original || `fatura_${f.referencia}.pdf`, 'sistema')}
-                                className="dc-btn"
-                                style={{
-                                  height: 40,
-                                  width: 40,
-                                  padding: 0,
-                                  borderRadius: 10,
-                                  background: '#fff',
-                                  border: '1px solid #10b981',
-                                  color: '#10b981',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}
-                                title="Baixar PDF"
-                              >
-                                <Download size={18} />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
                   ) : activeHistoryTab === 'gmail' ? (
                     /* ARCHIVE VIEW */
                     <div style={{ padding: 16, background: '#fff', border: '1px solid #f3f4f6', borderRadius: 12 }}>
@@ -979,7 +984,7 @@ export default function CondominiosPage() {
                         ))}
                       </div>
                     </div>
-                  )}
+                  ) : null}
 
 
                 </div>
