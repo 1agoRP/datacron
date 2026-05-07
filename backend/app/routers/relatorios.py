@@ -1,5 +1,6 @@
 from typing import Optional
 import uuid
+print("--- LOADING RELATORIOS ROUTER VERSION 3 ---")
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func
