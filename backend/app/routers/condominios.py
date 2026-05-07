@@ -164,6 +164,7 @@ async def get_status_contas(
                 "nome_personalizado": getattr(c, "nome_personalizado", None),
                 "instalacao": c.instalacao,
                 "dia_vencimento": c.dia_vencimento,
+                "debito_automatico": c.debito_automatico,
             },
             "fatura": {
                 "id": str(fat.id),

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, ArrowDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database, CreditCard, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, ArrowDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database, CreditCard, CheckCircle2, AlertCircle, Clock, Paperclip } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
 import { format } from 'date-fns';
 import { ShieldAlert, Flame, ShieldCheck, HardHat } from 'lucide-react';
@@ -90,6 +90,7 @@ export default function CondominiosPage() {
   const [isManualFaturaModalOpen, setIsManualFaturaModalOpen] = useState(false);
   const [manualFaturaConc, setManualFaturaConc] = useState<any>(null);
   const [manualFaturaData, setManualFaturaData] = useState({ valor: '', vencimento: '' });
+  const [manualFaturaPdf, setManualFaturaPdf] = useState<File | null>(null);
   const [savingManualFatura, setSavingManualFatura] = useState(false);
 
   // Removed manual fetchData in favor of useSWR
@@ -786,11 +787,53 @@ export default function CondominiosPage() {
                     </div>
                   </div>
 
-                  {/* Toolbar de Ações Rápidas */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                    <h5 style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e293b', margin: 0 }}>Faturas Registradas</h5>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{historyFaturas.length} documento(s) encontrado(s)</div>
+                  {/* Tab Switcher */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 20, padding: 4, background: '#f1f5f9', borderRadius: 10 }}>
+                    <button
+                      onClick={() => setActiveHistoryTab('sistema')}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        border: 'none',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        background: activeHistoryTab === 'sistema' ? '#fff' : 'transparent',
+                        color: activeHistoryTab === 'sistema' ? '#0f172a' : '#64748b',
+                        boxShadow: activeHistoryTab === 'sistema' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                      }}
+                    >
+                      Sistema
+                    </button>
+                    <button
+                      onClick={() => setActiveHistoryTab('gmail')}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        border: 'none',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        background: activeHistoryTab === 'gmail' ? '#fff' : 'transparent',
+                        color: activeHistoryTab === 'gmail' ? '#0f172a' : '#64748b',
+                        boxShadow: activeHistoryTab === 'gmail' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                      }}
+                    >
+                      Arquivo Gmail
+                    </button>
                   </div>
+
+                  {/* Toolbar de Ações Rápidas (only for Sistema) */}
+                  {activeHistoryTab === 'sistema' && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                      <h5 style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e293b', margin: 0 }}>Faturas Registradas</h5>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{historyFaturas.length} documento(s) encontrado(s)</div>
+                    </div>
+                  )}
 
                   {loadingHistory ? (
                     <div style={{ padding: 80, textAlign: 'center' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
@@ -909,12 +952,12 @@ export default function CondominiosPage() {
                         );
                       })}
                     </div>
-                  ) : (
-                    /* ARCHIVE VIEW (Only shown if specifically requested or if result is 0 and user clicked) */
+                  ) : activeHistoryTab === 'gmail' ? (
+                    /* ARCHIVE VIEW */
                     <div style={{ padding: 16, background: '#fff', border: '1px solid #f3f4f6', borderRadius: 12 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                        <h5 style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1f2937' }}>Arquivo do Gmail</h5>
-                        <button onClick={() => setActiveHistoryTab('sistema')} style={{ color: '#3b82f6', background: 'none', border: 'none', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>Voltar para Lista</button>
+                        <h5 style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1f2937', margin: 0 }}>Arquivo do Gmail</h5>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{gmailHistory.length} documento(s) encontrado(s)</div>
                       </div>
                       <div className="dc-space-y-3">
                         {gmailHistory.map((g, idx) => (
@@ -1299,7 +1342,7 @@ export default function CondominiosPage() {
                         ) : (
                           <button
                             style={{ padding: '6px 14px', borderRadius: 20, background: '#fff7ed', color: '#ea580c', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, border: '1px solid #ffedd5', cursor: 'pointer', transition: 'transform 0.2s' }}
-                            onClick={() => { setManualFaturaConc(item.concessionaria); setManualFaturaData({ valor: '', vencimento: '' }); setIsManualFaturaModalOpen(true); }}
+                            onClick={() => { setManualFaturaConc(item.concessionaria); setManualFaturaData({ valor: '', vencimento: '' }); setManualFaturaPdf(null); setIsManualFaturaModalOpen(true); }}
                             onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
                             onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                             title="Clique para cadastrar manualmente"
@@ -1369,6 +1412,60 @@ export default function CondominiosPage() {
                 />
               </div>
 
+              <div className="dc-form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Paperclip size={14} color="#64748b" /> Anexar PDF da Fatura
+                </label>
+                <div style={{
+                  position: 'relative',
+                  border: `2px dashed ${manualFaturaPdf ? '#10b981' : '#cbd5e1'}`,
+                  borderRadius: 10,
+                  padding: manualFaturaPdf ? '12px 16px' : '24px 16px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  background: manualFaturaPdf ? '#f0fdf4' : '#f8fafc',
+                }}>
+                  {manualFaturaPdf ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 8, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+                          <FileText size={18} />
+                        </div>
+                        <div style={{ textAlign: 'left' }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{manualFaturaPdf.name}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{(manualFaturaPdf.size / 1024).toFixed(1)} KB</div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setManualFaturaPdf(null); }}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}
+                        title="Remover arquivo"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label style={{ cursor: 'pointer', display: 'block' }}>
+                      <Upload size={24} style={{ margin: '0 auto 8px', color: '#94a3b8' }} />
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#475569' }}>Clique para selecionar um PDF</div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 }}>Máx. 10 MB • Formato PDF</div>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) setManualFaturaPdf(file);
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 4 }}>Opcional — o arquivo ficará vinculado à fatura.</div>
+              </div>
+
               <div style={{ padding: 10, background: '#eff6ff', borderRadius: 6, fontSize: '0.75rem', color: '#1e40af' }}>
                 <strong>Informações automáticas:</strong><br/>
                 • Status: <strong>Pendente</strong><br/>
@@ -1400,8 +1497,10 @@ export default function CondominiosPage() {
                       concessionaria_id: manualFaturaConc.id,
                       valor: parseFloat(manualFaturaData.valor),
                       vencimento: manualFaturaData.vencimento,
+                      pdf_file: manualFaturaPdf || undefined,
                     });
                     setIsManualFaturaModalOpen(false);
+                    setManualFaturaPdf(null);
                     // Refresh status data
                     handleOpenStatus(statusModalCondo);
                     alert('Fatura cadastrada com sucesso!');

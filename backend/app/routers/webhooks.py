@@ -141,6 +141,23 @@ async def n8n_email_invoice(
                 pass
 
         referencia = _standardize_referencia(extracted.get("referencia"), vencimento)
+        
+        # ── Check for existing duplicate Fatura ──
+        if conc:
+            # Duplicate criteria: mesmo valor, mesmo Condomínio, mesmo vencimento e mesma concessionária
+            existing_fatura = await db.execute(
+                select(Fatura).where(
+                    Fatura.condominio_id == conc.condominio_id,
+                    Fatura.concessionaria_id == conc.id,
+                    Fatura.valor == valor,
+                    Fatura.vencimento == vencimento
+                )
+            )
+            if existing_fatura.scalar_one_or_none():
+                logger.info(f"Fatura already exists for {conc.tipo} (Valor: {valor}, Vencimento: {vencimento}), skipping duplicate.")
+                # We still update the log to point to the existing fatura if we want, or just return.
+                # Here we just stop processing to avoid duplicates.
+                return {"status": "duplicate_invoice", "msg_id": msg_id}
 
         fatura = Fatura(
             condominio_id=conc.condominio_id if conc else None,

@@ -162,7 +162,14 @@ async def download_gmail_fatura(
         mail = imaplib.IMAP4_SSL(settings.GMAIL_HOST)
         try:
             mail.login(settings.GMAIL_USER, settings.GMAIL_PASSWORD)
-            mail.select("inbox")
+            
+            # Tenta selecionar "Todos os e-mails" (Gmail All Mail) para busca global
+            # Português é o padrão, mas tentamos Inglês como fallback
+            status, _ = mail.select('"[Gmail]/Todos os e-mails"', readonly=True)
+            if status != "OK":
+                status, _ = mail.select('"[Gmail]/All Mail"', readonly=True)
+            if status != "OK":
+                mail.select("inbox", readonly=True)
             
             # Fetch message by Gmail Message ID (X-GM-MSGID) if supported, 
             # but usually we use search or fetch UID. 

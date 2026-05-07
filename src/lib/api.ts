@@ -401,16 +401,22 @@ class ApiClient {
     });
   }
 
-  async resolveAlerta(id: string) {
+  async resolveAlerta(id: string, justificativa: string) {
     return this.request(`/alertas/${id}/resolver`, {
       method: 'PUT',
+      body: JSON.stringify({ justificativa }),
     });
   }
 
-  async deleteAlerta(id: string) {
+  async deleteAlerta(id: string, justificativa: string) {
     return this.request(`/alertas/${id}`, {
       method: 'DELETE',
+      body: JSON.stringify({ justificativa }),
     });
+  }
+
+  async getAlertasAuditLog() {
+    return this.request<any[]>('/alertas/audit-log');
   }
 
   // Email Agent
@@ -723,12 +729,16 @@ class ApiClient {
     valor: number;
     vencimento: string;
     referencia?: string;
+    pdf_file?: File;
   }) {
-    return this.request<Fatura>('/faturas/manual', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
+    const formData = new FormData();
+    formData.append('condominio_id', data.condominio_id);
+    formData.append('concessionaria_id', data.concessionaria_id);
+    formData.append('valor', String(data.valor));
+    formData.append('vencimento', data.vencimento);
+    if (data.referencia) formData.append('referencia', data.referencia);
+    if (data.pdf_file) formData.append('pdf_file', data.pdf_file);
+    return this.requestMultipart<Fatura>('/faturas/manual', formData, { method: 'POST' });
   }
 }
 

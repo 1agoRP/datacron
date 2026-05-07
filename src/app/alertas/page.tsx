@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Shell from '@/components/layout/Shell';
-import { AlertCircle, Clock, CheckCircle2, ArrowUpRight, Trash2, Shield, XCircle } from 'lucide-react';
+import { AlertCircle, Clock, CheckCircle2, ArrowUpRight, Trash2, Shield, XCircle, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { format } from 'date-fns';
 import useSWR from 'swr';
@@ -18,112 +18,66 @@ export default function AlertasPage() {
   const [activeTab, setActiveTab] = useState('Todos');
   const [resolving, setResolving] = useState<string | null>(null);
   const [discarding, setDiscarding] = useState<string | null>(null);
-  const [bulkResolving, setBulkResolving] = useState(false);
-  const [bulkDiscarding, setBulkDiscarding] = useState(false);
+
+  // Justification modal state
+  const [justModal, setJustModal] = useState<{ alerta: any; acao: 'resolver' | 'descartar' } | null>(null);
+  const [justificativa, setJustificativa] = useState('');
+  const [justSubmitting, setJustSubmitting] = useState(false);
 
   const { user } = useAuth();
   const readOnly = isReadOnly(user);
 
-  const handleResolve = async (alerta: any) => {
+  const handleResolve = (alerta: any) => {
+    setJustModal({ alerta, acao: 'resolver' });
+    setJustificativa('');
+  };
+
+  const handleDiscard = (alerta: any) => {
+    setJustModal({ alerta, acao: 'descartar' });
+    setJustificativa('');
+  };
+
+  const handleJustSubmit = async () => {
+    if (!justModal || !justificativa.trim()) return;
+    const { alerta, acao } = justModal;
     try {
-      setResolving(alerta.id);
-      await api.resolveAlerta(alerta.id);
+      setJustSubmitting(true);
+      if (acao === 'resolver') {
+        setResolving(alerta.id);
+        await api.resolveAlerta(alerta.id, justificativa.trim());
 
-      const isEmailIssue = alerta.tipo === 'email_nao_identificado';
-      const senderMatch = alerta.mensagem.match(/de '([^']+)'/);
-      const sender = senderMatch ? senderMatch[1] : 'remetente';
+        const isEmailIssue = alerta.tipo === 'email_nao_identificado';
+        const senderMatch = alerta.mensagem.match(/de '([^']+)'/);
+        const sender = senderMatch ? senderMatch[1] : 'remetente';
 
-      if (isEmailIssue) {
-        alert(
-          `✅ Pendência resolvida!\n\n` +
-          `Uma resposta padrão foi enviada para '${sender}' informando que a concessionária não foi ` +
-          `localizada no cadastro.\n\n` +
-          `Você também receberá um e-mail de confirmação.`
-        );
+        if (isEmailIssue) {
+          alert(
+            `✅ Pendência resolvida!\n\n` +
+            `Uma resposta padrão foi enviada para '${sender}' informando que a concessionária não foi ` +
+            `localizada no cadastro.\n\n` +
+            `Você também receberá um e-mail de confirmação.`
+          );
+        } else {
+          alert(
+            `✅ Alerta resolvido!\n\n` +
+            `O alerta foi marcado como resolvido com sucesso.\n\n` +
+            `Um e-mail de confirmação foi enviado para sua conta (${user?.email}).`
+          );
+        }
       } else {
-        alert(
-          `✅ Alerta resolvido!\n\n` +
-          `O alerta foi marcado como resolvido com sucesso.\n\n` +
-          `Um e-mail de confirmação foi enviado para sua conta (${user?.email}).`
-        );
+        setDiscarding(alerta.id);
+        await api.deleteAlerta(alerta.id, justificativa.trim());
+        alert('🗑️ Alerta descartado com sucesso.');
       }
-
-      // Optimistic update: remove from cache, then revalidate
+      setJustModal(null);
+      setJustificativa('');
       mutate();
     } catch (err: any) {
-      alert('Erro ao resolver: ' + (err.message || 'Erro desconhecido'));
+      alert('Erro: ' + (err.message || 'Erro desconhecido'));
     } finally {
-      if (!resolving) setResolving(null); // only clear if we are not retrying
-    }
-  };
-
-  const handleDiscard = async (id: string) => {
-    if (!confirm('Tem certeza que deseja descartar este alerta?')) return;
-    try {
-      setDiscarding(id);
-      await api.deleteAlerta(id);
-      mutate();
-    } catch (err: any) {
-      alert('Erro ao descartar: ' + (err.message || 'Erro desconhecido'));
-    } finally {
-      if (!discarding) setDiscarding(null);
-    }
-  };
-
-  const handleResolveAll = async () => {
-    if (!confirm(
-      `Tem certeza que deseja resolver TODAS as ${alertas.length} pendências?\n\n` +
-      `Um e-mail padrão será enviado para cada remetente informando que a concessionária não foi localizada no cadastro.`
-    )) return;
-
-    try {
-      setBulkResolving(true);
-      let resolved = 0;
-      let errors = 0;
-
-      for (const alerta of alertas) {
-        try {
-          await api.resolveAlerta(alerta.id);
-          resolved++;
-        } catch {
-          errors++;
-        }
-      }
-
-      alert(`✅ Ação em massa concluída!\n\n${resolved} pendência(s) resolvida(s).\n${errors > 0 ? `${errors} erro(s).` : ''}`);
-      mutate();
-    } catch (err: any) {
-      alert('Erro: ' + err.message);
-    } finally {
-      setBulkResolving(false);
-    }
-  };
-
-  const handleDiscardAll = async () => {
-    if (!confirm(
-      `Tem certeza que deseja DESCARTAR TODOS os ${alertas.length} alertas?\n\nEsta ação não pode ser desfeita.`
-    )) return;
-
-    try {
-      setBulkDiscarding(true);
-      let discarded = 0;
-      let errors = 0;
-
-      for (const alerta of alertas) {
-        try {
-          await api.deleteAlerta(alerta.id);
-          discarded++;
-        } catch {
-          errors++;
-        }
-      }
-
-      alert(`🗑️ Ação em massa concluída!\n\n${discarded} alerta(s) descartado(s).\n${errors > 0 ? `${errors} erro(s).` : ''}`);
-      mutate();
-    } catch (err: any) {
-      alert('Erro: ' + err.message);
-    } finally {
-      setBulkDiscarding(false);
+      setJustSubmitting(false);
+      setResolving(null);
+      setDiscarding(null);
     }
   };
 
@@ -157,7 +111,7 @@ export default function AlertasPage() {
         </div>
       </div>
 
-      {/* Bulk actions bar */}
+      {/* Alert count bar */}
       {alertas.length > 0 && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -172,34 +126,6 @@ export default function AlertasPage() {
               {alertas.length} alerta{alertas.length !== 1 ? 's' : ''} ativo{alertas.length !== 1 ? 's' : ''}
             </span>
           </div>
-          {!readOnly && (
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                className="dc-btn dc-btn-primary"
-                style={{ height: 38, fontSize: '0.82rem', gap: 7, padding: '0 16px' }}
-                onClick={handleResolveAll}
-                disabled={bulkResolving || bulkDiscarding}
-              >
-                {bulkResolving ? (
-                  <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} /> Resolvendo...</>
-                ) : (
-                  <><ArrowUpRight size={15} /> Resolver Todas as Pendências</>
-                )}
-              </button>
-              <button
-                className="dc-btn dc-btn-danger"
-                style={{ height: 38, fontSize: '0.82rem', gap: 7, padding: '0 16px' }}
-                onClick={handleDiscardAll}
-                disabled={bulkResolving || bulkDiscarding}
-              >
-                {bulkDiscarding ? (
-                  <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2 }} /> Descartando...</>
-                ) : (
-                  <><XCircle size={15} /> Descartar Todos</>
-                )}
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -251,7 +177,7 @@ export default function AlertasPage() {
                       className="dc-btn dc-btn-primary"
                       style={{ height: 34, padding: '0 14px', fontSize: '0.8rem', gap: 6 }}
                       onClick={() => handleResolve(a)}
-                      disabled={isResolvingThis || bulkResolving}
+                      disabled={isResolvingThis}
                     >
                       {isResolvingThis ? (
                         <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} /> Resolvendo...</>
@@ -262,8 +188,8 @@ export default function AlertasPage() {
                     <button
                       className="dc-btn dc-btn-danger"
                       style={{ height: 34, padding: '0 14px', fontSize: '0.8rem', gap: 6 }}
-                      onClick={() => handleDiscard(a.id)}
-                      disabled={isDiscardingThis || bulkDiscarding}
+                      onClick={() => handleDiscard(a)}
+                      disabled={isDiscardingThis}
                     >
                       {isDiscardingThis ? (
                         <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2 }} /> Descartando...</>
@@ -299,6 +225,69 @@ export default function AlertasPage() {
           </div>
         )}
       </div>
+
+      {/* Justification Modal */}
+      {justModal && (
+        <div className="dc-modal-overlay">
+          <div className="dc-modal-content" style={{ maxWidth: 480 }}>
+            <div className="dc-modal-header">
+              <h2 className="dc-modal-title">
+                {justModal.acao === 'resolver' ? '✅ Resolver Pendência' : '🗑️ Descartar Alerta'}
+              </h2>
+              <button className="dc-modal-close" onClick={() => setJustModal(null)}><X size={20} /></button>
+            </div>
+            <div className="dc-modal-body dc-space-y-4">
+              <div style={{ padding: 12, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.85rem' }}>
+                <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+                  {justModal.alerta.tipo.replace(/_/g, ' ').toUpperCase()}
+                </div>
+                <div style={{ color: '#64748b', fontSize: '0.82rem' }}>
+                  {justModal.alerta.mensagem}
+                </div>
+              </div>
+
+              <div className="dc-form-group">
+                <label style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                  Justificativa <span style={{ color: '#dc2626' }}>*</span>
+                </label>
+                <textarea
+                  className="dc-form-input"
+                  style={{ minHeight: 100, resize: 'vertical', fontFamily: 'inherit' }}
+                  placeholder="Descreva o motivo dessa ação..."
+                  value={justificativa}
+                  onChange={(e) => setJustificativa(e.target.value)}
+                  required
+                />
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 }}>
+                  Registrado por: <strong>{user?.nome}</strong> ({user?.email})
+                </div>
+              </div>
+            </div>
+            <div className="dc-modal-footer">
+              <button
+                type="button"
+                className="dc-btn dc-btn-secondary"
+                onClick={() => setJustModal(null)}
+                disabled={justSubmitting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={`dc-btn ${justModal.acao === 'resolver' ? 'dc-btn-primary' : 'dc-btn-danger'}`}
+                disabled={justSubmitting || !justificativa.trim()}
+                onClick={handleJustSubmit}
+                style={{ minWidth: 160 }}
+              >
+                {justSubmitting
+                  ? (justModal.acao === 'resolver' ? 'Resolvendo...' : 'Descartando...')
+                  : (justModal.acao === 'resolver' ? 'Confirmar Resolução' : 'Confirmar Descarte')
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Shell>
   );
 }

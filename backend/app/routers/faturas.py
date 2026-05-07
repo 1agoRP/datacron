@@ -1,8 +1,9 @@
 import uuid
+import base64
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Form, UploadFile, File as FastAPIFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,35 +14,32 @@ from app.models.fatura import Fatura
 from app.models.condominio import Condominio
 from app.models.concessionaria import Concessionaria
 from app.schemas import FaturaResponse
-from pydantic import BaseModel
+
 
 router = APIRouter(prefix="/faturas", tags=["Faturas"])
 
 
-class FaturaManualCreate(BaseModel):
-    condominio_id: uuid.UUID
-    concessionaria_id: uuid.UUID
-    valor: float
-    vencimento: date
-    referencia: Optional[str] = None
-
-
 @router.post("/manual", response_model=FaturaResponse)
 async def create_fatura_manual(
-    body: FaturaManualCreate,
+    condominio_id: uuid.UUID = Form(...),
+    concessionaria_id: uuid.UUID = Form(...),
+    valor: float = Form(...),
+    vencimento: date = Form(...),
+    referencia: Optional[str] = Form(None),
+    pdf_file: Optional[UploadFile] = FastAPIFile(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Cria manualmente uma fatura para uma concessionária."""
+    """Cria manualmente uma fatura para uma concessionária, opcionalmente com PDF."""
 
     # Verify access to the condominio
-    if allowed_condo_ids is not None and body.condominio_id not in allowed_condo_ids:
+    if allowed_condo_ids is not None and condominio_id not in allowed_condo_ids:
         raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
 
     # Verify condominio exists
     result = await db.execute(
-        select(Condominio).where(Condominio.id == body.condominio_id)
+        select(Condominio).where(Condominio.id == condominio_id)
     )
     condo = result.scalar_one_or_none()
     if not condo:
@@ -50,8 +48,8 @@ async def create_fatura_manual(
     # Verify concessionaria exists and belongs to the condominio
     result = await db.execute(
         select(Concessionaria).where(
-            Concessionaria.id == body.concessionaria_id,
-            Concessionaria.condominio_id == body.condominio_id,
+            Concessionaria.id == concessionaria_id,
+            Concessionaria.condominio_id == condominio_id,
         )
     )
     conc = result.scalar_one_or_none()
@@ -62,7 +60,6 @@ async def create_fatura_manual(
         )
 
     # Generate reference if not provided (e.g., "Maio/2026")
-    referencia = body.referencia
     if not referencia:
         mes_nome = [
             "Janeiro",
@@ -78,20 +75,56 @@ async def create_fatura_manual(
             "Novembro",
             "Dezembro",
         ]
-        mes = body.vencimento.month
-        ano = body.vencimento.year
+        mes = vencimento.month
+        ano = vencimento.year
         referencia = f"{mes_nome[mes - 1]}/{ano}"
+
+    # Check for existing duplicate in Fatura or HistoricoFatura
+    # We join with Concessionaria to ensure the same 'instalacao' is checked, as requested by the user.
+    from app.models.concessionaria import Concessionaria as ConcModel
+    from app.models.historico_fatura import HistoricoFatura
+
+    async def check_duplicate(model):
+        stmt = select(model).join(ConcModel, model.concessionaria_id == ConcModel.id).where(
+            model.condominio_id == condominio_id,
+            ConcModel.instalacao == conc.instalacao,
+            model.valor == valor,
+            model.vencimento == vencimento
+        )
+        res = await db.execute(stmt)
+        return res.scalar_one_or_none()
+
+    if await check_duplicate(Fatura) or await check_duplicate(HistoricoFatura):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Erro: Já existe uma fatura idêntica (Valor: R$ {valor}, Vencimento: {vencimento}, UC: {conc.instalacao}) registrada no sistema ou no histórico."
+        )
+
+    # Handle PDF upload
+    pdf_base64 = None
+    pdf_nome_original = None
+    pdf_desbloqueado = False
+    if pdf_file and pdf_file.filename:
+        content = await pdf_file.read()
+        if len(content) > 10 * 1024 * 1024:  # 10MB limit
+            raise HTTPException(status_code=413, detail="Arquivo PDF muito grande (máx. 10MB)")
+        pdf_base64 = base64.b64encode(content).decode("utf-8")
+        pdf_nome_original = pdf_file.filename
+        pdf_desbloqueado = True
 
     # Create the fatura
     nova_fatura = Fatura(
-        condominio_id=body.condominio_id,
-        concessionaria_id=body.concessionaria_id,
-        valor=body.valor,
-        vencimento=body.vencimento,
+        condominio_id=condominio_id,
+        concessionaria_id=concessionaria_id,
+        valor=valor,
+        vencimento=vencimento,
         referencia=referencia,
         status="pendente",
         email_remetente=f"Manual - {user.email}",
         email_assunto=f"Entrada manual por {user.nome}",
+        pdf_base64=pdf_base64,
+        pdf_nome_original=pdf_nome_original,
+        pdf_desbloqueado=pdf_desbloqueado,
     )
 
     db.add(nova_fatura)

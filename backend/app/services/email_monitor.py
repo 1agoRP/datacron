@@ -531,15 +531,17 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
 
         # ── Check for existing duplicate Fatura ──
         if conc:
+            # Duplicate criteria: mesmo valor, mesmo Condomínio, mesmo vencimento e mesma concessionária
             existing_fatura = await db.execute(
                 select(Fatura).where(
                     Fatura.condominio_id == conc.condominio_id,
                     Fatura.concessionaria_id == conc.id,
-                    Fatura.referencia == referencia
+                    Fatura.valor == valor,
+                    Fatura.vencimento == vencimento
                 )
             )
             if existing_fatura.scalar_one_or_none():
-                logger.info(f"Fatura already exists for {conc.tipo} ({referencia}), skipping duplicate.")
+                logger.info(f"Fatura already exists for {conc.tipo} (Valor: {valor}, Vencimento: {vencimento}), skipping duplicate.")
                 continue
 
         fatura = Fatura(
@@ -786,15 +788,19 @@ def get_gmail_history(label_name: str, filter_text: str) -> list[dict]:
         for m_uid in reversed(msg_uids): # Mais novos primeiro
             try:
                 m_uid_str = m_uid.decode('utf-8')
-                # Pegamos apenas o Header para ser rápido
-                res, data = mail.uid('fetch', m_uid, "(BODY[HEADER.FIELDS (SUBJECT DATE MESSAGE-ID)])")
+                # Pegamos o Header e o ID Permanente do Gmail (X-GM-MSGID)
+                res, data = mail.uid('fetch', m_uid, "(X-GM-MSGID BODY[HEADER.FIELDS (SUBJECT DATE MESSAGE-ID)])")
                 if res == "OK":
+                    # Extrair X-GM-MSGID (formato: (b'1 (X-GM-MSGID 1234567890123456789 BODY[HEADER...]', b'headers...'))
+                    msg_id_match = re.search(r'X-GM-MSGID\s+(\d+)', str(data[0][0]))
+                    gm_msg_id = msg_id_match.group(1) if msg_id_match else m_uid_str
+
                     msg = email.message_from_bytes(data[0][1])
                     subject = _decode_header_value(msg.get("Subject", "Sem Assunto"))
                     date_str = msg.get("Date", "")
                     
                     history.append({
-                        "id": m_uid_str, # Usamos o UID para download posterior
+                        "id": gm_msg_id, # Usamos o ID Permanente do Gmail
                         "referencia": subject,
                         "vencimento": date_str,
                         "status": "gmail_archive",

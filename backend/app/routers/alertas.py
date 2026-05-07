@@ -2,18 +2,41 @@ import uuid
 from typing import Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Body
+from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.database import get_db
-from app.dependencies import get_current_user, require_write, get_user_condo_ids
+from app.dependencies import get_current_user, require_write, get_user_condo_ids, require_role
 from app.models.user import User
 from app.models.alerta import Alerta
+from app.models.alerta_audit_log import AlertaAuditLog
 from app.schemas import AlertaResponse
 from app.services.email_sender import send_notification_email, render_resolution_email, render_unidentified_sender_email
 from app.services.alert_manager import notify_alert
+
+
+class JustificativaBody(BaseModel):
+    justificativa: str
+
+
+class AlertaAuditLogResponse(BaseModel):
+    id: uuid.UUID
+    alerta_id: uuid.UUID
+    alerta_tipo: str
+    alerta_gravidade: str
+    alerta_mensagem: str
+    condominio_id: Optional[uuid.UUID] = None
+    acao: str
+    justificativa: str
+    usuario_id: uuid.UUID
+    usuario_nome: str
+    usuario_email: str
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
 
 router = APIRouter(prefix="/alertas", tags=["Alertas"])
 
@@ -101,6 +124,7 @@ async def mark_as_read(
 async def resolve_alerta(
     id: uuid.UUID,
     background_tasks: BackgroundTasks,
+    body: JustificativaBody = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
@@ -120,6 +144,21 @@ async def resolve_alerta(
         and a.condominio_id not in allowed_condo_ids
     ):
         raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
+
+    # Record audit log
+    audit = AlertaAuditLog(
+        alerta_id=a.id,
+        alerta_tipo=a.tipo,
+        alerta_gravidade=a.gravidade,
+        alerta_mensagem=a.mensagem,
+        condominio_id=a.condominio_id,
+        acao="resolvido",
+        justificativa=body.justificativa,
+        usuario_id=current_user.id,
+        usuario_nome=current_user.nome,
+        usuario_email=current_user.email,
+    )
+    db.add(audit)
 
     # Send emails in background to avoid "Failed to fetch" (timeouts)
     background_tasks.add_task(
@@ -246,11 +285,12 @@ def _send_manager_confirmation(
     )
 
 
-@router.delete("/{id}", status_code=204)
+@router.delete("/{id}")
 async def delete_alerta(
     id: uuid.UUID,
+    body: JustificativaBody = Body(...),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_write()),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Alerta).where(Alerta.id == id))
@@ -264,8 +304,25 @@ async def delete_alerta(
         and a.condominio_id not in allowed_condo_ids
     ):
         raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
+
+    # Record audit log before deleting
+    audit = AlertaAuditLog(
+        alerta_id=a.id,
+        alerta_tipo=a.tipo,
+        alerta_gravidade=a.gravidade,
+        alerta_mensagem=a.mensagem,
+        condominio_id=a.condominio_id,
+        acao="descartado",
+        justificativa=body.justificativa,
+        usuario_id=current_user.id,
+        usuario_nome=current_user.nome,
+        usuario_email=current_user.email,
+    )
+    db.add(audit)
+
     await db.delete(a)
     await db.commit()
+    return {"status": "descartado"}
 
 
 @router.get("/contagem")
@@ -281,3 +338,21 @@ async def count_alertas(
         stmt = stmt.where(Alerta.condominio_id.in_(allowed_condo_ids))
     result = await db.execute(stmt)
     return {"nao_lidos": result.scalar_one()}
+
+
+@router.get("/audit-log", response_model=list[AlertaAuditLogResponse])
+async def list_audit_logs(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, le=500),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    """Lista o histórico de ações em alertas (apenas admin)."""
+    stmt = (
+        select(AlertaAuditLog)
+        .order_by(AlertaAuditLog.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    return result.scalars().all()
