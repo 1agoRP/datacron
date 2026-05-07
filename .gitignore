@@ -82,3 +82,12 @@ datacron-landing.html
 
 # Local PDF storage
 pdfs_storage/
+
+# Cache and generated files
+graphify-out/
+.cache/
+.pytest_cache/
+.ruff_cache/
+.graphify_*/
+.graphify_*.json
+.obsidian/

@@ -104,6 +104,9 @@ async def dashboard_stats(
     result = await db.execute(alerta_list_stmt)
     recent_alertas = result.scalars().all()
 
+    # Serialization using schemas
+    from app.schemas import FaturaResponse, AlertaResponse
+
     return {
         "kpis": {
             "condominios_count": condominios_count,
@@ -111,8 +114,8 @@ async def dashboard_stats(
             "active_alerts": active_alerts,
             "total_faturado": round(float(total_faturado), 2),
             "condos_sem_ata": condos_sem_ata,
-            "faturas": recent_faturas,
-            "alertas": recent_alertas,
+            "faturas": [FaturaResponse.model_validate(f) for f in recent_faturas],
+            "alertas": [AlertaResponse.model_validate(a) for a in recent_alertas],
         }
     }
 
