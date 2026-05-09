@@ -740,6 +740,10 @@ class ApiClient {
     if (data.pdf_file) formData.append('pdf_file', data.pdf_file);
     return this.requestMultipart<Fatura>('/faturas/manual', formData, { method: 'POST' });
   }
+
+  async deleteFatura(id: string) {
+    return this.request(`/faturas/${id}`, { method: 'DELETE' });
+  }
 }
 
 export const api = new ApiClient();

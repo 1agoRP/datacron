@@ -21,6 +21,7 @@ export default function CondominiosPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const readOnly = isReadOnly(user);
+  const canDeleteFatura = user?.role === 'admin' || user?.role === 'gerencia' || user?.role === 'assistente';
 
   const monthsList = [
     { value: '01', label: 'Janeiro' }, { value: '02', label: 'Fevereiro' }, { value: '03', label: 'Março' },
@@ -291,6 +292,19 @@ export default function CondominiosPage() {
       setStatusError(msg.includes('fetch') ? 'Servidor indisponível. Tente novamente em alguns segundos.' : msg || 'Falha ao carregar dados');
     } finally {
       setLoadingStatus(false);
+    }
+  };
+
+  const handleDeleteFatura = async (faturaId: string) => {
+    if (!confirm('Deseja realmente excluir esta fatura? Esta ação não pode ser desfeita.')) return;
+    try {
+      await api.deleteFatura(faturaId);
+      // Refresh the status items
+      if (statusModalCondo) {
+        handleOpenStatus(statusModalCondo);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Erro ao excluir fatura');
     }
   };
 
@@ -1353,6 +1367,27 @@ export default function CondominiosPage() {
                             >
                               <Download size={18} />
                             </button>
+                            {canDeleteFatura && (
+                              <button
+                                className="dc-btn"
+                                style={{
+                                  height: 40,
+                                  width: 40,
+                                  padding: 0,
+                                  borderRadius: 10,
+                                  background: '#fff',
+                                  border: '1px solid #fee2e2',
+                                  color: '#ef4444',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                                onClick={() => handleDeleteFatura(item.fatura.id)}
+                                title="Excluir Fatura"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <button
@@ -1400,13 +1435,26 @@ export default function CondominiosPage() {
                                 </div>
                               </div>
                             </div>
-                            <button
-                              className="dc-icon-action"
-                              style={{ width: 32, height: 32, padding: 0, background: '#fff' }}
-                              onClick={() => handleDownloadFatura(item.fatura, item.fatura.pdf_nome_original || 'fatura.pdf')}
-                            >
-                              <Download size={14} />
-                            </button>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                className="dc-icon-action"
+                                style={{ width: 32, height: 32, padding: 0, background: '#fff' }}
+                                onClick={() => handleDownloadFatura(item.fatura, item.fatura.pdf_nome_original || 'fatura.pdf')}
+                                title="Baixar Fatura"
+                              >
+                                <Download size={14} />
+                              </button>
+                              {canDeleteFatura && (
+                                <button
+                                  className="dc-icon-action"
+                                  style={{ width: 32, height: 32, padding: 0, background: '#fff', color: '#ef4444', borderColor: '#fee2e2' }}
+                                  onClick={() => handleDeleteFatura(item.fatura.id)}
+                                  title="Excluir Fatura"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>

@@ -136,3 +136,28 @@ async def create_fatura_manual(
     nova_fatura.concessionaria = conc
 
     return FaturaResponse.model_validate(nova_fatura)
+
+
+@router.delete("/{fatura_id}")
+async def delete_fatura(
+    fatura_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
+):
+    """Exclui uma fatura. Apenas usuários admin, assistente ou gerencia podem excluir."""
+    if user.role not in ["admin", "assistente", "gerencia"]:
+        raise HTTPException(status_code=403, detail="Acesso negado para excluir faturas")
+
+    result = await db.execute(select(Fatura).where(Fatura.id == fatura_id))
+    fatura = result.scalar_one_or_none()
+    if not fatura:
+        raise HTTPException(status_code=404, detail="Fatura não encontrada")
+
+    # Verify access to the condominio
+    if allowed_condo_ids is not None and fatura.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
+
+    await db.delete(fatura)
+    await db.commit()
+    return {"message": "Fatura excluída com sucesso"}
