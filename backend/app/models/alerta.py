@@ -22,7 +22,7 @@ class Alerta(Base):
         UUID(as_uuid=True), ForeignKey("condominios.id"), nullable=True
     )
     fatura_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("faturas.id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("faturas.id", ondelete="SET NULL"), nullable=True
     )
 
     # variacao_valor | conta_nao_recebida | pdf_erro | email_nao_identificado
@@ -67,7 +67,7 @@ class EmailLog(Base):
     )
     codigo_identificacao: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     fatura_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("faturas.id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("faturas.id", ondelete="SET NULL"), nullable=True
     )
     erro_msg: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     dados_extraidos: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True) # Stored as JSON

@@ -162,6 +162,7 @@ async def delete_fatura(
     from app.models.alerta import Alerta, EmailLog
     await db.execute(update(Alerta).where(Alerta.fatura_id == fatura_id).values(fatura_id=None))
     await db.execute(update(EmailLog).where(EmailLog.fatura_id == fatura_id).values(fatura_id=None))
+    await db.flush() # Ensure updates are processed before delete
 
     await db.delete(fatura)
     await db.commit()

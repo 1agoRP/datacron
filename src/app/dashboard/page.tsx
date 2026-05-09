@@ -76,6 +76,7 @@ export default function Dashboard() {
   );
 
   const { data: chartData, isLoading: chartLoading } = useSWR<ChartData[]>(
+    ['dashboard/chart', chartMonths, chartGroup],
     () => api.getDashboardChart(chartMonths, chartGroup).catch(() => [])
   );
 
