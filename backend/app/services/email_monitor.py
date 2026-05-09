@@ -85,54 +85,7 @@ def get_imap_connection():
         return None
 
 
-import unicodedata
 
-def ensure_gmail_label(mail: imaplib.IMAP4_SSL, label_name: str) -> bool:
-    """Creates a Gmail label via IMAP if it doesn't exist."""
-    try:
-        # Normaliza para remover acentos e caracteres especiais que quebram o imaplib (que usa ascii por padrão)
-        normalized = unicodedata.normalize('NFKD', label_name)
-        safe_label = "".join([c for c in normalized if not unicodedata.combining(c)])
-        
-        # Substitui outros caracteres não-ascii por espaço ou remove
-        safe_label = safe_label.encode('ascii', 'ignore').decode('ascii')
-        
-        # Check if label already exists
-        status, labels = mail.list('""', f'"{safe_label}"')
-        if status == "OK" and labels and labels[0] is not None and labels[0] != b'()':
-            return True  # already exists
-
-        # Create the label
-        status, _ = mail.create(f'"{safe_label}"')
-        if status == "OK":
-            logger.info(f"Label '{safe_label}' verificado/criado com sucesso no Gmail.")
-            return True
-        else:
-            logger.warning(f"Falha ao criar label '{safe_label}': status={status}")
-            return False
-    except Exception as e:
-        logger.error(f"Erro ao criar label '{label_name}': {e}")
-        return False
-
-
-def move_email_to_label(mail: imaplib.IMAP4_SSL, msg_num: bytes, label_name: str) -> bool:
-    """Moves an email from Inbox to the specified Gmail label."""
-    try:
-        # Ensure label exists
-        ensure_gmail_label(mail, label_name)
-
-        # Copy to destination label
-        status, _ = mail.copy(msg_num, f'"{label_name}"')
-        if status != "OK":
-            logger.error(f"Falha ao copiar e-mail para '{label_name}'")
-            return False
-
-        # Mark as deleted in Inbox
-        mail.store(msg_num, '+FLAGS', '(\\Deleted)')
-        return True
-    except Exception as e:
-        logger.error(f"Erro ao mover e-mail para '{label_name}': {e}")
-        return False
 
 
 def get_inbox_count() -> int:
@@ -726,8 +679,6 @@ async def run_email_scan():
                 logger.info("No messages found in inbox")
                 return
 
-            # Ensure the "not identified" label exists
-            ensure_gmail_label(mail, "Datacron/E-mails nao identificados")
 
             # Process in reverse order (newest first) to handle EXPUNGE correctly
             # We collect results first, then move in reverse
