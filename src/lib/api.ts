@@ -84,6 +84,8 @@ class ApiClient {
         msg = errorData.detail.map((e: any) => e.msg).join(', ');
       } else if (errorData.message) {
         msg = errorData.message;
+      } else {
+        msg = `Erro ${response.status}: ${response.statusText || 'Falha na requisição'}`;
       }
       
       throw new Error(msg);

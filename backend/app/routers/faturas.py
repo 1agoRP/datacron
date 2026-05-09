@@ -4,7 +4,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Form, UploadFile, File as FastAPIFile
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -157,6 +157,11 @@ async def delete_fatura(
     # Verify access to the condominio
     if allowed_condo_ids is not None and fatura.condominio_id not in allowed_condo_ids:
         raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
+
+    # Set references to NULL before deleting to avoid FK violation (FK alertas.fatura_id, email_logs.fatura_id)
+    from app.models.alerta import Alerta, EmailLog
+    await db.execute(update(Alerta).where(Alerta.fatura_id == fatura_id).values(fatura_id=None))
+    await db.execute(update(EmailLog).where(EmailLog.fatura_id == fatura_id).values(fatura_id=None))
 
     await db.delete(fatura)
     await db.commit()
