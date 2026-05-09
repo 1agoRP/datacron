@@ -218,7 +218,7 @@ class ApiClient {
   }
 
   async getStatusContas(condominioId: string) {
-    return this.request<any[]>(`/condominios/${condominioId}/status-contas`);
+    return this.request<any>(`/condominios/${condominioId}/status-contas`);
   }
 
   // Document Management Methods (Base64)
