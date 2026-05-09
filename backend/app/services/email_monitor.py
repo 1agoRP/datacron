@@ -669,7 +669,7 @@ async def run_email_scan():
 
         try:
             mail.select("inbox")
-            status, messages = mail.search(None, "ALL")
+            status, messages = mail.search(None, "UNSEEN")
             if status != "OK":
                 logger.error("Erro ao buscar emails no IMAP: " + str(status))
                 return
@@ -708,15 +708,12 @@ async def run_email_scan():
                         results.append((m_id, None))
                         continue
 
-            # Exclui todos os e-mails processados (vão para a lixeira do Gmail)
+            # Marca todos os e-mails processados como lidos (removendo da fila de processamento sem apagar)
             for m_id, _ in reversed(results):
                 try:
-                    mail.store(m_id, '+FLAGS', '(\\Deleted)')
+                    mail.store(m_id, '+FLAGS', '\\Seen')
                 except Exception as e:
-                    logger.error(f"Erro ao excluir e-mail processado {m_id}: {e}")
-
-            # Expunge all deleted messages at once
-            mail.expunge()
+                    logger.error(f"Erro ao marcar e-mail como lido {m_id}: {e}")
 
             logger.info(f"Scan complete. Processed and moved {len(results)} message(s)")
 
