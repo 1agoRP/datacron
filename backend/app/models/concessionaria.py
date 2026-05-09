@@ -56,7 +56,8 @@ class Concessionaria(Base):
         Generates the PDF unlock password based on the configured rule.
 
         Rules:
-        - "5_primeiros_cnpj": 5 first digits of CNPJ (Enel)
+        - "5_primeiros_cnpj": 5 first digits of CNPJ (Enel, Claro)
+        - "4_primeiros_cnpj": 4 first digits of CNPJ (Vivo)
         - "3_primeiros_cnpj": 3 first digits of CNPJ (Sabesp, Comgás)
         - "cnpj_completo": all CNPJ digits
         - "manual": use senha_manual field
@@ -65,6 +66,8 @@ class Concessionaria(Base):
             return self.senha_manual or ""
         elif self.regra_senha == "3_primeiros_cnpj":
             return cnpj_digits[:3]
+        elif self.regra_senha == "4_primeiros_cnpj":
+            return cnpj_digits[:4]
         elif self.regra_senha == "cnpj_completo":
             return cnpj_digits
         else:  # default: 5_primeiros_cnpj

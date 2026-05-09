@@ -147,17 +147,25 @@ async def get_status_contas(
     )
     faturas = fat_result.scalars().all()
 
-    # 3. Build a map: concessionaria_id -> first matching fatura
-    fatura_map = {}
+    # 3. Group faturas by concessionaria_id
+    faturas_by_conc = {}
     for f in faturas:
-        if f.concessionaria_id and f.concessionaria_id not in fatura_map:
-            fatura_map[f.concessionaria_id] = f
+        if f.concessionaria_id:
+            if f.concessionaria_id not in faturas_by_conc:
+                faturas_by_conc[f.concessionaria_id] = []
+            faturas_by_conc[f.concessionaria_id].append(f)
 
     # 4. Build response
-    items = []
+    main_items = []
+    extra_items = []
+    
     for c in concs:
-        fat = fatura_map.get(c.id)
-        items.append({
+        c_faturas = faturas_by_conc.get(c.id, [])
+        
+        # Primary fatura (if any)
+        primary_fat = c_faturas[0] if c_faturas else None
+        
+        main_items.append({
             "concessionaria": {
                 "id": str(c.id),
                 "tipo": c.tipo,
@@ -167,19 +175,42 @@ async def get_status_contas(
                 "debito_automatico": c.debito_automatico,
             },
             "fatura": {
-                "id": str(fat.id),
-                "valor": fat.valor,
-                "vencimento": fat.vencimento.isoformat() if fat.vencimento else None,
-                "created_at": fat.created_at.isoformat() if fat.created_at else None,
-                "pdf_nome_original": fat.pdf_nome_original,
-                "storage_path": fat.storage_path,
-                "concessionaria_id": str(fat.concessionaria_id) if fat.concessionaria_id else None,
-            } if fat else None,
+                "id": str(primary_fat.id),
+                "valor": primary_fat.valor,
+                "vencimento": primary_fat.vencimento.isoformat() if primary_fat.vencimento else None,
+                "created_at": primary_fat.created_at.isoformat() if primary_fat.created_at else None,
+                "pdf_nome_original": primary_fat.pdf_nome_original,
+                "storage_path": primary_fat.storage_path,
+                "concessionaria_id": str(primary_fat.concessionaria_id) if primary_fat.concessionaria_id else None,
+            } if primary_fat else None,
         })
+        
+        # Extra billings (2nd, 3rd... in the same month)
+        if len(c_faturas) > 1:
+            for extra_fat in c_faturas[1:]:
+                extra_items.append({
+                    "concessionaria": {
+                        "id": str(c.id),
+                        "tipo": c.tipo,
+                        "nome_personalizado": getattr(c, "nome_personalizado", None),
+                        "instalacao": c.instalacao,
+                    },
+                    "fatura": {
+                        "id": str(extra_fat.id),
+                        "valor": extra_fat.valor,
+                        "vencimento": extra_fat.vencimento.isoformat() if extra_fat.vencimento else None,
+                        "pdf_nome_original": extra_fat.pdf_nome_original,
+                    }
+                })
 
-    # Sort: received first, then by tipo
-    items.sort(key=lambda x: (0 if x["fatura"] else 1, x["concessionaria"]["tipo"] or ""))
-    return items
+    # Sort main: received first, then by tipo
+    main_items.sort(key=lambda x: (0 if x["fatura"] else 1, x["concessionaria"]["tipo"] or ""))
+    
+    return {
+        "items": main_items,
+        "extras": extra_items,
+        "referencia": now.strftime("%Y-%m")
+    }
 
 
 @router.post("", response_model=CondominioResponse, status_code=201)

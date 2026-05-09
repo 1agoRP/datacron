@@ -492,12 +492,38 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         return condo_name
     saved_paths = []
     for filename, pdf_bytes in attachments:
-        unlocked_bytes = unlock_pdf(pdf_bytes, password)
+        unlocked_bytes = None
+        extracted_from_bf = None
+        
+        # 1º Passo: Se não identificou o condomínio inicialmente, tenta Força Bruta
+        if not conc:
+            condo_bf, conc_bf, unlocked_bf, ext_bf = await try_brute_force_unlock(subject, pdf_bytes, db)
+            if unlocked_bf:
+                condo = condo_bf
+                conc = conc_bf
+                unlocked_bytes = unlocked_bf
+                extracted_from_bf = ext_bf
+                
+                # Vincula o log ao condomínio encontrado
+                email_log.condominio_id = condo.id
+                email_log.status = "identificado"
+                if conc:
+                    email_log.codigo_identificacao = conc.instalacao
+                
+                # Atualiza nome do condomínio para retorno/log
+                numero_pad = str(condo.numero).zfill(4)
+                condo_name = f"{numero_pad} - {condo.nome}"
+
+        # 2º Passo: Se não foi via força bruta, tenta com a senha padrão (se houver)
+        if not unlocked_bytes:
+            unlocked_bytes = unlock_pdf(pdf_bytes, password)
+            
         pdf_unlocked = unlocked_bytes is not None
         final_bytes = unlocked_bytes or pdf_bytes
 
-        if codigo_encontrado:
-            safe_filename = f"fatura_{codigo_encontrado}_{filename}".replace("/", "_")
+        if codigo_encontrado or (conc and conc.instalacao):
+            cid = codigo_encontrado or conc.instalacao
+            safe_filename = f"fatura_{cid}_{filename}".replace("/", "_")
         else:
             safe_filename = f"{msg_id.replace('<', '').replace('>', '')}_{filename}".replace("/", "_")
 
@@ -512,7 +538,9 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         local_path = save_pdf(final_bytes, safe_filename)
         saved_paths.append(local_path)
 
-        extracted = extract_data(final_bytes)
+        # 3º Passo: Extração de Dados (OCR se necessário)
+        # Se veio da força bruta, já temos os dados extraídos
+        extracted = extracted_from_bf or extract_data(final_bytes)
         for k, v in body_data.items():
             if v:
                 extracted[k] = v
@@ -831,3 +859,89 @@ def get_gmail_history(label_name: str, filter_text: str) -> list[dict]:
         item.pop("_parsed_date", None)
 
     return history
+
+
+async def try_brute_force_unlock(subject: str, pdf_bytes: bytes, db: AsyncSession):
+    """
+    Attempts to identify a condominium by brute-forcing PDF passwords
+    based on the concessionaire type detected in the subject.
+    """
+    from app.models.condominio import Condominio
+    from app.models.concessionaria import Concessionaria
+    from app.services.pdf_processor import unlock_pdf, extract_data
+
+    # 1. Detect Type from Subject
+    tipo_detectado = None
+    rule = "5_primeiros_cnpj" # Default
+
+    subject_lower = subject.lower()
+    if "claro" in subject_lower:
+        tipo_detectado = "Claro"
+        rule = "5_primeiros_cnpj"
+    elif "comgas" in subject_lower or "comgás" in subject_lower:
+        tipo_detectado = "Comgás"
+        rule = "3_primeiros_cnpj"
+    elif "enel" in subject_lower:
+        tipo_detectado = "Enel"
+        rule = "5_primeiros_cnpj"
+    elif "vivo" in subject_lower:
+        tipo_detectado = "Vivo"
+        rule = "4_primeiros_cnpj"
+    elif "sabesp" in subject_lower:
+        tipo_detectado = "Sabesp"
+        rule = "3_primeiros_cnpj"
+
+    if not tipo_detectado:
+        return None, None, None, None
+
+    logger.info(f"Tentando Identificação por Força Bruta para {tipo_detectado}...")
+
+    # 2. Try all condos
+    result = await db.execute(select(Condominio))
+    condos = result.scalars().all()
+    
+    for condo in condos:
+        cnpj = condo.cnpj_digits
+        if not cnpj: continue
+
+        # Calculate password based on rule
+        password = ""
+        if rule == "5_primeiros_cnpj": password = cnpj[:5]
+        elif rule == "4_primeiros_cnpj": password = cnpj[:4]
+        elif rule == "3_primeiros_cnpj": password = cnpj[:3]
+        elif rule == "cnpj_completo": password = cnpj
+        
+        if not password: continue
+        
+        unlocked = unlock_pdf(pdf_bytes, password)
+        if unlocked:
+            logger.info(f"SUCESSO! PDF desbloqueado para o condomínio {condo.nome} (CNPJ: {cnpj[:5]}...)")
+            
+            # Use OCR to confirm and extract data
+            extracted = extract_data(unlocked)
+            codigo_ocr = extracted.get("codigo_identificacao")
+
+            # Try to find the exact concessionaria record
+            conc = None
+            if codigo_ocr:
+                conc_result = await db.execute(
+                    select(Concessionaria).where(
+                        Concessionaria.condominio_id == condo.id,
+                        Concessionaria.instalacao == codigo_ocr
+                    )
+                )
+                conc = conc_result.scalar_one_or_none()
+            
+            if not conc:
+                # Fallback: find by type
+                conc_result = await db.execute(
+                    select(Concessionaria).where(
+                        Concessionaria.condominio_id == condo.id,
+                        Concessionaria.tipo.ilike(f"%{tipo_detectado}%")
+                    )
+                )
+                conc = conc_result.scalar_one_or_none()
+
+            return condo, conc, unlocked, extracted
+            
+    return None, None, None, None

@@ -83,6 +83,7 @@ export default function CondominiosPage() {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusModalCondo, setStatusModalCondo] = useState<any>(null);
   const [statusItems, setStatusItems] = useState<any[]>([]);
+  const [extraStatusItems, setExtraStatusItems] = useState<any[]>([]);
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
@@ -273,10 +274,17 @@ export default function CondominiosPage() {
     setLoadingStatus(true);
     setStatusError(null);
     setStatusItems([]);
+    setExtraStatusItems([]);
 
     try {
-      const items = await api.getStatusContas(String(condo.id));
-      setStatusItems(items);
+      const data = await api.getStatusContas(String(condo.id));
+      if (data && data.items) {
+        setStatusItems(data.items);
+        setExtraStatusItems(data.extras || []);
+      } else {
+        // Fallback for old API format if it returns just an array
+        setStatusItems(Array.isArray(data) ? data : []);
+      }
     } catch (err: any) {
       console.error('Error loading status details:', err);
       const msg = err.message || '';
@@ -1227,7 +1235,9 @@ export default function CondominiosPage() {
                     className="dc-btn dc-btn-secondary"
                     style={{ height: 36, fontSize: '0.8rem', gap: 8, background: '#f8fafc' }}
                     onClick={async () => {
-                      const ids = statusItems.filter(i => i.fatura).map(i => i.fatura.id);
+                      const mainIds = statusItems.filter(i => i.fatura).map(i => i.fatura.id);
+                      const extraIds = extraStatusItems.map(i => i.fatura.id);
+                      const ids = [...mainIds, ...extraIds];
                       if (ids.length > 0) {
                         try {
                           await api.downloadLoteFaturas(ids);
@@ -1358,6 +1368,50 @@ export default function CondominiosPage() {
                       </div>
                     </div>
                   ))}
+                  {extraStatusItems.length > 0 && (
+                    <div style={{ marginTop: 24, borderTop: '1px solid #f1f5f9', paddingTop: 24 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, color: '#64748b' }}>
+                        <Paperclip size={16} />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.025em' }}>
+                          Segundo faturamento para o mês de {format(new Date(), 'MMMM', { locale: ptBR })}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {extraStatusItems.map((item, idx) => (
+                          <div key={`extra-${idx}`} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            borderRadius: 12,
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                                <FileText size={18} />
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1e293b' }}>
+                                  {item.concessionaria.tipo}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                  Vencimento: {item.fatura.vencimento ? format(new Date(item.fatura.vencimento), 'dd/MM/yyyy') : 'N/D'} • R$ {item.fatura.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              className="dc-icon-action"
+                              style={{ width: 32, height: 32, padding: 0, background: '#fff' }}
+                              onClick={() => handleDownloadFatura(item.fatura, item.fatura.pdf_nome_original || 'fatura.pdf')}
+                            >
+                              <Download size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
