@@ -178,7 +178,7 @@ async def resolve_alerta(
     return a
 
 
-def process_alert_resolution_emails(
+async def process_alert_resolution_emails(
     alerta_tipo: str,
     alerta_mensagem: str,
     manager_email: str,
