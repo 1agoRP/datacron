@@ -245,7 +245,7 @@ async def save_notifications(prefs: NotificationPrefs, current_user: User = Depe
     )
     
     # Try sending via Gmail integration if available
-    success = send_notification_email(current_user.email, "Datacron - Preferências Atualizadas", body)
+    success = await send_notification_email(current_user.email, "Datacron - Preferências Atualizadas", body)
     
     return {
         "message": "Preferências salvas com sucesso.",

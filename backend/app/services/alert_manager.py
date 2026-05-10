@@ -179,25 +179,38 @@ async def check_missing_bills(db: AsyncSession) -> None:
             continue  # Alert already exists
 
         # Create alert
-        condo_nome = conc.condominio.nome if conc.condominio else "Desconhecido"
         mensagem = (
-            f"Conta da {conc.tipo} do {condo_nome} ainda não foi recebida. "
+            f"Conta da {conc.tipo} do {conc.condominio.nome} ainda não foi recebida. "
             f"Vencimento esperado: dia {conc.dia_vencimento}. "
             f"(UC: {conc.instalacao})"
         )
+
         alert = Alerta(
             condominio_id=conc.condominio_id,
             tipo="conta_nao_recebida",
             gravidade="alta",
             mensagem=mensagem,
         )
-        db.add(alert)
-        await db.flush() # Get ID
-        await notify_alert(db, alert, conc=conc)
         
-        logger.info(f"Alert created: missing bill for concessionaria {conc.id}")
+        try:
+            db.add(alert)
+            # Commit IMMEDIATELY so the alert is saved even if notify fails
+            # This also ensures the 'existing alert' check works in future runs
+            await db.commit()
+            await db.refresh(alert)
+            
+            # 6. Notify (Side-effect)
+            try:
+                await notify_alert(db, alert, conc=conc)
+                logger.info(f"Alert created and notified: missing bill for conc {conc.id}")
+            except Exception as notify_err:
+                logger.error(f"Alert saved but notification failed for conc {conc.id}: {notify_err}")
+                
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Failed to create alert for concessionaria {conc.id}: {e}")
 
-    await db.commit()
+    logger.info("Finished check_missing_bills.")
 
 
 # Roles authorized to receive alert email notifications
@@ -400,7 +413,7 @@ async def notify_alert(
 
     # 7. Enviar
     for email in recipients:
-        success = send_notification_email(
+        success = await send_notification_email(
             to=email,
             subject=subject,
             message_text=message_text,
@@ -454,34 +467,45 @@ async def check_mandate_expirations(db: AsyncSession) -> None:
                 gravidade="media" if days_left > 15 else "alta",
                 mensagem=msg
             )
-            db.add(alert)
-            await db.flush()
-            await notify_alert(db, alert)
             
-            # Send Email to all concessionaire contacts
-            # Fetch email recipients from related concessionaires
-            conc_result = await db.execute(
-                select(Concessionaria.email_esperado)
-                .where(Concessionaria.condominio_id == condo.id, Concessionaria.email_esperado.is_not(None))
-            )
-            recipients = set(conc_result.scalars().all())
-            
-            if recipients:
-                subject = f"ALERTA: Vencimento de Mandato - {condo.nome}"
-                email_body = (
-                    f"Olá,\n\n"
-                    f"Este é um lembrete automático sobre o vencimento do mandato no condomínio {condo.nome}.\n\n"
-                    f"Mensagem: {msg}\n"
-                    f"Data de Vencimento: {condo.mandato_fim.strftime('%d/%m/%Y')}\n\n"
-                    "Por favor, providencie a documentação necessária para a nova eleição ou renovação.\n\n"
-                    "Atenciosamente,\n"
-                    "Equipe Datacron"
-                )
-                for rcpt in recipients:
-                    send_notification_email(to=rcpt, subject=subject, message_text=email_body)
-                    logger.info(f"Mandate alert ({days_left} days) sent to {rcpt} for condo {condo.id}")
+            try:
+                db.add(alert)
+                await db.commit()
+                await db.refresh(alert)
+                
+                # Notify authorized users
+                try:
+                    await notify_alert(db, alert)
+                except Exception as ne:
+                    logger.error(f"Mandate alert saved but notification failed for condo {condo.id}: {ne}")
 
-    await db.commit()
+                # Send Email to all concessionaire contacts (Legacy/Specific logic)
+                # Fetch email recipients from related concessionaires
+                conc_result = await db.execute(
+                    select(Concessionaria.email_esperado)
+                    .where(Concessionaria.condominio_id == condo.id, Concessionaria.email_esperado.is_not(None))
+                )
+                recipients = set(conc_result.scalars().all())
+                
+                if recipients:
+                    subject = f"ALERTA: Vencimento de Mandato - {condo.nome}"
+                    email_body = (
+                        f"Olá,\n\n"
+                        f"Este é um lembrete automático sobre o vencimento do mandato no condomínio {condo.nome}.\n\n"
+                        f"Mensagem: {msg}\n"
+                        f"Data de Vencimento: {condo.mandato_fim.strftime('%d/%m/%Y')}\n\n"
+                        "Por favor, providencie a documentação necessária para a nova eleição ou renovação.\n\n"
+                        "Atenciosamente,\n"
+                        "Equipe Datacron"
+                    )
+                    for rcpt in recipients:
+                        await send_notification_email(to=rcpt, subject=subject, message_text=email_body)
+                        logger.info(f"Mandate alert ({days_left} days) sent to {rcpt} for condo {condo.id}")
+            except Exception as e:
+                await db.rollback()
+                logger.error(f"Failed to create mandate alert for condo {condo.id}: {e}")
+
+    logger.info("Finished check_mandate_expirations.")
 
 async def check_document_expirations_and_clean(db: AsyncSession) -> None:
     """

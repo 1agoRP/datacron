@@ -397,7 +397,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
                 codigo_sugerido=codigo_sug,
                 tipo_sugerido=tipo_sug
             )
-            send_notification_email(
+            await send_notification_email(
                 to=sender,
                 subject=f"Datacron: {tipo_sug} não identificada",
                 message_text=(
@@ -590,7 +590,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
                     f"Valor: {valor_str}\n\n"
                     "Arquivo da conta desbloqueada em anexo para emissão."
                 )
-                success_fwd = send_notification_email(
+                success_fwd = await send_notification_email(
                     to=forward_to,
                     subject=subject_fwd,
                     message_text=body_fwd,
@@ -603,7 +603,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
                     logger.error(f"Falha ao encaminhar fatura individualizada para {forward_to}")
 
     # Sempre encaminha para o backup após o processamento
-    send_notification_email(
+    await send_notification_email(
         to="datacroncompany1@gmail.com",
         subject=f"FWD: {subject}",
         message_text=f"E-mail processado pelo Datacron.\nRemetente: {sender}\nStatus: Identificado ({condo_name})" if condo_name else f"E-mail não identificado processado.\nRemetente: {sender}",

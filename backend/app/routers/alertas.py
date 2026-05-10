@@ -202,10 +202,10 @@ def process_alert_resolution_emails(
             )
 
             if sender:
-                _send_reply_to_sender(sender, subject)
+                await _send_reply_to_sender(sender, subject)
 
         # 2. Notify the manager
-        _send_manager_confirmation(
+        await _send_manager_confirmation(
             manager_email, alerta_tipo, alerta_mensagem, condo_nome, email_remetente, email_assunto
         )
     except Exception as e:
@@ -214,8 +214,9 @@ def process_alert_resolution_emails(
         logging.error(f"Error in background alert emails: {e}")
 
 
-def _send_reply_to_sender(recipient: str, original_subject: str):
+async def _send_reply_to_sender(recipient: str, original_subject: str):
     import re
+    from app.services.email_sender import send_notification_email, render_unidentified_sender_email
 
     # Extract code from subject
     code_match = re.search(r"(\d{5,15})", original_subject)
@@ -245,7 +246,7 @@ def _send_reply_to_sender(recipient: str, original_subject: str):
         codigo_valor=code
     )
 
-    send_notification_email(
+    await send_notification_email(
         to=recipient,
         subject=subject,
         message_text=f"E-mail ({original_subject}) não identificado. Verifique seu cadastro no Datacron.",
@@ -253,7 +254,7 @@ def _send_reply_to_sender(recipient: str, original_subject: str):
     )
 
 
-def _send_manager_confirmation(
+async def _send_manager_confirmation(
     recipient: str,
     alerta_tipo: str,
     alerta_mensagem: str,
@@ -262,6 +263,7 @@ def _send_manager_confirmation(
     email_assunto: str = None,
 ):
     import re
+    from app.services.email_sender import send_notification_email, render_resolution_email
     # Extract code from message if possible (e.g. UC: 123456)
     cod_match = re.search(r"\(UC:\s*([^\)]+)\)", alerta_mensagem)
     instalacao = cod_match.group(1) if cod_match else None
@@ -277,7 +279,7 @@ def _send_manager_confirmation(
         instalacao=instalacao
     )
 
-    send_notification_email(
+    await send_notification_email(
         to=recipient,
         subject=subject,
         message_text=f"Alerta resolvido com sucesso: {alerta_mensagem}",

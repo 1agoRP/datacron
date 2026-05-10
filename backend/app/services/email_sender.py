@@ -392,7 +392,7 @@ def render_unidentified_sender_email(
 # SEND FUNCTION (VIA n8n WEBHOOK)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def send_notification_email(
+async def send_notification_email(
     to: str,
     subject: str,
     message_text: str,
@@ -437,8 +437,9 @@ def send_notification_email(
         payload["anexos"] = anexos_list
 
     try:
-        response = httpx.post(url, json=payload, timeout=15.0)
-        response.raise_for_status()
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, timeout=15.0)
+            response.raise_for_status()
         logger.info(f"Successfully triggered n8n email webhook for {to} (Tipo: {tipo})")
         return True
     except Exception as e:
