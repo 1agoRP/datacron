@@ -15,7 +15,8 @@ from app.services.email_monitor import (
 from app.services.pdf_processor import (
     unlock_pdf,
     save_pdf,
-    extract_data
+    extract_data,
+    generate_standard_filename
 )
 from app.models.alerta import EmailLog
 from app.models.condominio import Condominio
@@ -117,14 +118,6 @@ async def n8n_email_invoice(
         pdf_unlocked = unlocked_bytes is not None
         final_bytes = unlocked_bytes or pdf_bytes
 
-        if codigo_encontrado:
-            safe_filename = f"fatura_{codigo_encontrado}_{filename}".replace("/", "_")
-        else:
-            safe_filename = f"{msg_id}_{filename}".replace("/", "_")
-
-        pdf_b64 = base64.b64encode(final_bytes).decode('utf-8')
-        local_path = save_pdf(final_bytes, safe_filename)
-
         extracted = extract_data(final_bytes)
         for k, v in body_data.items():
             if v:
@@ -139,6 +132,19 @@ async def n8n_email_invoice(
                 vencimento = date.fromisoformat(vencimento_str)
             except ValueError:
                 pass
+
+        # Generate standardized filename
+        safe_filename = generate_standard_filename(
+            condo_numero=condo.numero if condo else 0,
+            condo_nome=condo.nome if condo else "Não identificado",
+            conc_tipo=conc.tipo if conc else "Desconhecida",
+            conc_codigo=codigo_encontrado or (conc.instalacao if conc else "ND"),
+            vencimento=vencimento,
+            valor=valor
+        )
+
+        pdf_b64 = base64.b64encode(final_bytes).decode('utf-8')
+        local_path = save_pdf(final_bytes, safe_filename)
 
         referencia = _standardize_referencia(extracted.get("referencia"), vencimento)
         

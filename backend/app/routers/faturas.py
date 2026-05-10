@@ -14,6 +14,7 @@ from app.models.fatura import Fatura
 from app.models.condominio import Condominio
 from app.models.concessionaria import Concessionaria
 from app.schemas import FaturaResponse
+from app.services.pdf_processor import generate_standard_filename
 
 
 router = APIRouter(prefix="/faturas", tags=["Faturas"])
@@ -109,7 +110,16 @@ async def create_fatura_manual(
         if len(content) > 10 * 1024 * 1024:  # 10MB limit
             raise HTTPException(status_code=413, detail="Arquivo PDF muito grande (máx. 10MB)")
         pdf_base64 = base64.b64encode(content).decode("utf-8")
-        pdf_nome_original = pdf_file.filename
+        
+        # Generate standardized filename
+        pdf_nome_original = generate_standard_filename(
+            condo_numero=condo.numero,
+            condo_nome=condo.nome,
+            conc_tipo=conc.tipo,
+            conc_codigo=conc.instalacao,
+            vencimento=vencimento,
+            valor=valor
+        )
         pdf_desbloqueado = True
 
     # Create the fatura

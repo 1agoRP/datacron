@@ -35,7 +35,7 @@ from app.models.alerta import Alerta, EmailLog
 from app.models.concessionaria import Concessionaria
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
-from app.services.pdf_processor import unlock_pdf, extract_data, save_pdf
+from app.services.pdf_processor import unlock_pdf, extract_data, save_pdf, generate_standard_filename
 from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -474,23 +474,6 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         pdf_unlocked = unlocked_bytes is not None
         final_bytes = unlocked_bytes or pdf_bytes
 
-        if codigo_encontrado or (conc and conc.instalacao):
-            cid = codigo_encontrado or conc.instalacao
-            safe_filename = f"fatura_{cid}_{filename}".replace("/", "_")
-        else:
-            safe_filename = f"{msg_id.replace('<', '').replace('>', '')}_{filename}".replace("/", "_")
-
-        # ── Handle PDF Storage (Base64) ──
-        if len(final_bytes) > 10 * 1024 * 1024:
-            logger.warning(f"Ignorando anexo '{filename}' pois excede 10MB.")
-            continue
-
-        pdf_b64 = base64.b64encode(final_bytes).decode('utf-8')
-
-        # Also save locally for email forwarding attachments
-        local_path = save_pdf(final_bytes, safe_filename)
-        saved_paths.append(local_path)
-
         # 3º Passo: Extração de Dados (OCR se necessário)
         # Se veio da força bruta, já temos os dados extraídos
         extracted = extracted_from_bf or extract_data(final_bytes)
@@ -507,6 +490,28 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
                 vencimento = date.fromisoformat(vencimento_str)
             except ValueError:
                 pass
+
+        # 4º Passo: Gerar nome padronizado conforme solicitado pelo usuário
+        # numero do Condomínio - Nome do Condomínio - concessionária - código - vencimento - valor
+        safe_filename = generate_standard_filename(
+            condo_numero=condo.numero if condo else 0,
+            condo_nome=condo.nome if condo else "Não Identificado",
+            conc_tipo=conc.tipo if conc else "Desconhecida",
+            conc_codigo=codigo_encontrado or (conc.instalacao if conc else "ND"),
+            vencimento=vencimento,
+            valor=valor
+        )
+
+        # ── Handle PDF Storage (Base64) ──
+        if len(final_bytes) > 10 * 1024 * 1024:
+            logger.warning(f"Ignorando anexo '{filename}' pois excede 10MB.")
+            continue
+
+        pdf_b64 = base64.b64encode(final_bytes).decode('utf-8')
+
+        # Also save locally for email forwarding attachments
+        local_path = save_pdf(final_bytes, safe_filename)
+        saved_paths.append(local_path)
 
         referencia = _standardize_referencia(extracted.get("referencia"), vencimento)
 

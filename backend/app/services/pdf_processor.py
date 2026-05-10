@@ -60,6 +60,55 @@ def save_pdf(pdf_bytes: bytes, filename: str) -> str:
     return str(filepath)
 
 
+def generate_standard_filename(
+    condo_numero: Any, 
+    condo_nome: str, 
+    conc_tipo: str, 
+    conc_codigo: str, 
+    vencimento: Any, 
+    valor: float
+) -> str:
+    """
+    Generates a standardized filename for PDF storage and database records.
+    Format: numero do Condomínio - Nome do Condomínio - concessionária - código - vencimento - valor
+    """
+    from datetime import date
+    if isinstance(vencimento, date):
+        venc_str = vencimento.strftime("%d-%m-%Y")
+    elif isinstance(vencimento, str) and vencimento:
+        try:
+            venc_str = date.fromisoformat(vencimento).strftime("%d-%m-%Y")
+        except:
+            venc_str = vencimento
+    else:
+        venc_str = "00-00-0000"
+        
+    valor_str = f"{valor:.2f}".replace(".", ",")
+    
+    # Remove characters that are invalid in filenames across different OS
+    def clean(text):
+        if not text: return "ND"
+        # Remove common invalid chars and extra whitespace
+        return re.sub(r'[\\/*?:"<>|]', "", str(text)).strip()
+        
+    clean_nome = clean(condo_nome)
+    clean_tipo = clean(conc_tipo)
+    clean_codigo = clean(conc_codigo)
+    
+    # numero do Condomínio (4 digits padding if numeric)
+    try:
+        if str(condo_numero).isdigit():
+            condo_num_str = f"{int(condo_numero):04d}"
+        else:
+            condo_num_str = clean(condo_numero)
+    except:
+        condo_num_str = clean(condo_numero)
+    
+    # Format: numero - Nome - concessionária - código - vencimento - valor
+    filename = f"{condo_num_str} - {clean_nome} - {clean_tipo} - {clean_codigo} - {venc_str} - R$ {valor_str}.pdf"
+    return filename
+
+
 def extract_data(pdf_bytes: bytes) -> Dict[str, Any]:
     """
     Main extraction engine with OCR fallback.
