@@ -304,9 +304,3 @@ export default function AuditoriaPage() {
     </Shell>
   );
 }
-
-        </div>
-      )}
-    </Shell>
-  );
-}
