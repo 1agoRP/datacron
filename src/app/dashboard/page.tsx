@@ -594,6 +594,7 @@ export default function Dashboard() {
       `}</style>
     </Shell>
   );
+}
 
 function StatCard({ title, value, subtitle, icon, gradient, iconColor, badge, positive, danger }: any) {
   return (

@@ -13,7 +13,8 @@ export default function AuditoriaPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  const { data: logs = [], isLoading: loading, error } = useSWR(
+  // Initial load
+  useSWR(
     isAdmin ? 'alertas-audit-log' : null,
     () => api.getAlertasAuditLog(),
     { revalidateOnFocus: false }
@@ -82,7 +83,7 @@ export default function AuditoriaPage() {
     descartados: alertLogs.filter((l: any) => l.acao === 'descartado').length,
   };
 
-  const loading = activeTab === 'alertas' ? loadingAlerts : loadingSystem;
+  const isLoadingLogs = activeTab === 'alertas' ? loadingAlerts : loadingSystem;
   const filtered = activeTab === 'alertas' ? filteredAlerts : filteredSystem;
 
   return (
@@ -190,7 +191,7 @@ export default function AuditoriaPage() {
       </div>
 
       {/* Audit Log List */}
-      {loading ? (
+      {isLoadingLogs ? (
         <div style={{ textAlign: 'center', padding: 60 }}>
           <div className="dc-loading-spinner" style={{ margin: '0 auto' }} />
           <p style={{ marginTop: 16, color: '#64748b', fontSize: '0.9rem' }}>Carregando histórico...</p>
