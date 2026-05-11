@@ -447,6 +447,14 @@ export default function CondominiosPage() {
     />
   );
 
+  const handleDownloadAll = async () => {
+    try {
+      await api.downloadAllInvoices();
+    } catch (err: any) {
+      alert(err.message || 'Erro ao baixar todas as faturas');
+    }
+  };
+
   return (
     <Shell>
       <div className="dc-page-header">
@@ -454,11 +462,16 @@ export default function CondominiosPage() {
           <h1 className="dc-page-title">Condomínios</h1>
           <p className="dc-page-subtitle">Gerencie sua base de clientes e acompanhe o status de cada Condomínio.</p>
         </div>
-        {isAdmin && (
-          <button className="dc-btn dc-btn-primary" onClick={() => setIsModalOpen(true)}>
-            <Plus size={16} /> Adicionar Condomínio
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button className="dc-btn dc-btn-secondary" onClick={handleDownloadAll} title="Baixar todas as faturas do mês em um arquivo ZIP">
+            <Download size={16} /> Baixar Todas as Faturas
           </button>
-        )}
+          {isAdmin && (
+            <button className="dc-btn dc-btn-primary" onClick={() => setIsModalOpen(true)}>
+              <Plus size={16} /> Adicionar Condomínio
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filter bar */}

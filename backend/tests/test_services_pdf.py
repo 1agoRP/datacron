@@ -15,6 +15,7 @@ from app.services.pdf_processor import (
     save_pdf,
     _parse_fields,
     _run_ocr,
+    generate_standard_filename,
 )
 
 
@@ -171,3 +172,36 @@ def test_save_pdf(simple_pdf_bytes, tmp_path):
         assert path.endswith("test_output.pdf")
         assert (tmp_path / "test_output.pdf").exists()
         assert (tmp_path / "test_output.pdf").read_bytes() == simple_pdf_bytes
+
+# ─── generate_standard_filename ──────────────────────────────
+
+def test_generate_standard_filename():
+    from datetime import date
+    # Test normal formatting
+    filename = generate_standard_filename(
+        condo_numero=1,
+        condo_nome="Condomínio Teste",
+        conc_tipo="Enel",
+        conc_codigo="123456",
+        vencimento=date(2026, 5, 10),
+        valor=150.25
+    )
+    assert filename == "0001 - Condomínio Teste - Enel - 123456 - 10-05-2026 - R$ 150,25.pdf"
+    
+    # Test invalid characters in names
+    filename2 = generate_standard_filename(
+        condo_numero="A-1",
+        condo_nome="Condo/With*Invalid<Chars>",
+        conc_tipo="Sabesp?",
+        conc_codigo="ND|12",
+        vencimento=None,
+        valor=0.0
+    )
+    assert "0000" not in filename2
+    assert "A-1" in filename2
+    assert "CondoWithInvalidChars" in filename2
+    assert "Sabesp" in filename2
+    assert "ND12" in filename2
+    assert "00-00-0000" in filename2
+    assert "R$ 0,00" in filename2
+    assert filename2 == "A-1 - CondoWithInvalidChars - Sabesp - ND12 - 00-00-0000 - R$ 0,00.pdf"

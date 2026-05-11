@@ -746,6 +746,47 @@ class ApiClient {
   async deleteFatura(id: string) {
     return this.request(`/faturas/${id}`, { method: 'DELETE' });
   }
+
+  // New Portfolio & Audit Features
+  async getPortfolioStats() {
+    return this.request<any[]>('/dashboard/portfolio-stats');
+  }
+
+  async getAuditLogs(params: Record<string, string | number> = {}) {
+    const safeParams: Record<string, string> = {};
+    for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
+    const query = new URLSearchParams(safeParams).toString();
+    return this.request<any[]>(`/auditoria?${query}`);
+  }
+
+  async downloadAllInvoices() {
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/download-all`, {
+      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+    });
+    
+    if (!response.ok) throw new Error('Falha ao gerar download em massa');
+    
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition');
+    let filename = 'Faturas.zip';
+    
+    if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="?([^"]+)"?/);
+        if (matches && matches.length > 1) {
+            filename = matches[1];
+        }
+    }
+    
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
 }
 
 export const api = new ApiClient();

@@ -15,6 +15,7 @@ from app.dependencies import get_current_user, require_write, get_user_condo_ids
 from app.models.user import User
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
+from app.models.audit_log import AuditLog
 from app.schemas import CondominioCreate, CondominioUpdate, CondominioResponse, FaturaResponse
 from app.config import settings
 from app.storage import save_file, get_file_content
@@ -232,10 +233,91 @@ async def create_condominio(
 
     condominio = Condominio(**body.model_dump())
     db.add(condominio)
+    
+    # Audit Log
+    log = AuditLog(
+        usuario_id=current_user.id,
+        usuario_nome=current_user.nome,
+        usuario_email=current_user.email,
+        acao="inclusao",
+        entidade_tipo="condominio",
+        entidade_id=condominio.id,
+        detalhes={"nome": condominio.nome, "numero": condominio.numero}
+    )
+    db.add(log)
+    
     await db.commit()
     await db.refresh(condominio)
 
     return condominio
+
+
+@router.get("/download-all", status_code=200)
+async def download_all_faturas(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
+):
+    """Generates a ZIP file with all faturas for the current month, organized by Condominio."""
+    import zipfile
+    from app.storage import LOCAL_STORAGE_DIR
+    import os
+    
+    now = datetime.now()
+    month_name = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+                  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"][now.month - 1]
+    
+    # Get all faturas for current month
+    stmt = (
+        select(Fatura, Condominio.nome.label("condo_nome"))
+        .join(Condominio, Fatura.condominio_id == Condominio.id)
+        .where(
+            extract("year", Fatura.vencimento) == now.year,
+            extract("month", Fatura.vencimento) == now.month,
+        )
+    )
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
+    
+    result = await db.execute(stmt)
+    faturas_rows = result.all()
+    
+    if not faturas_rows:
+        raise HTTPException(status_code=404, detail="Nenhuma fatura encontrada para este mês")
+
+    # Create an in-memory ZIP file
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for fatura, condo_name in faturas_rows:
+            # Determine file content and name
+            content = None
+            filename = fatura.pdf_nome_original or f"fatura_{fatura.id}.pdf"
+            
+            # Sanitizar nome do condomínio para pasta
+            safe_condo_name = "".join(c for c in condo_name if c.isalnum() or c in (" ", "-", "_")).strip()
+            zip_path = f"{safe_condo_name}/{filename}"
+
+            if fatura.storage_path:
+                full_path = os.path.join(LOCAL_STORAGE_DIR, fatura.storage_path)
+                if os.path.exists(full_path):
+                    zip_file.write(full_path, zip_path)
+                    continue
+            
+            if fatura.pdf_base64:
+                try:
+                    b64 = fatura.pdf_base64
+                    if "," in b64: b64 = b64.split(",")[1]
+                    pdf_bytes = base64.b64decode(b64)
+                    zip_file.writestr(zip_path, pdf_bytes)
+                except Exception as e:
+                    logger.warning(f"Error decoding base64 for fatura {fatura.id}: {e}")
+
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/x-zip-compressed",
+        headers={"Content-Disposition": f'attachment; filename="Faturas {month_name}.zip"'},
+    )
 
 
 @router.get("/{id}", response_model=CondominioResponse)
@@ -314,6 +396,19 @@ async def delete_condominio(
     if not c:
         raise HTTPException(status_code=404, detail="Condomínio não encontrado")
     c.ativo = False
+    
+    # Audit Log
+    log = AuditLog(
+        usuario_id=current_user.id,
+        usuario_nome=current_user.nome,
+        usuario_email=current_user.email,
+        acao="exclusao",
+        entidade_tipo="condominio",
+        entidade_id=c.id,
+        detalhes={"nome": c.nome, "numero": c.numero}
+    )
+    db.add(log)
+    
     await db.commit()
 
 

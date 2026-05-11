@@ -339,3 +339,102 @@ async def chart_data(
             {"name": row.name, "valor": round(float(row.total or 0), 2)}
             for row in result.all()
         ]
+
+
+@router.get("/portfolio-stats")
+async def portfolio_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns progress statistics for the 11 portfolios.
+    Only for admin and supervisor.
+    """
+    if current_user.role not in ("admin", "supervisor"):
+        return {"error": "Acesso restrito"}
+
+    now = datetime.now()
+    
+    # Portfolio names mapping (based on provided list)
+    PORTFOLIO_NAMES = {
+        1: "Leonardo Pecoraro / Suellen",
+        2: "Fabiana Fernandes / Eduardo P.",
+        3: "Danilo Sanjuan / Rodrigo C.",
+        4: "Gabriel Vieira / Natalia M.",
+        5: "Pedro Xavier / Patricia F.",
+        6: "Pedro Henrique / Juliana F.",
+        7: "Iago R. Prado / Mauro Jr.",
+        8: "Silvia Macedo / Marlei L.",
+        9: "Jenifer Barros / Aline B.",
+        10: "Fernando Fernandes / Diogo A.",
+        11: "Victor Bakaneski"
+    }
+
+    # 1. Expected accounts per portfolio
+    expected_stmt = (
+        select(Condominio.carteira, func.count(Concessionaria.id))
+        .join(Concessionaria, Condominio.id == Concessionaria.condominio_id)
+        .where(Condominio.ativo == True, Concessionaria.ativo == True, Condominio.carteira != None)
+        .group_by(Condominio.carteira)
+    )
+    expected_res = await db.execute(expected_stmt)
+    expected_counts = dict(expected_res.all())
+
+    # 2. Received accounts per portfolio (this month)
+    received_stmt = (
+        select(Condominio.carteira, func.count(func.distinct(Fatura.concessionaria_id)))
+        .join(Fatura, Condominio.id == Fatura.condominio_id)
+        .join(Concessionaria, Fatura.concessionaria_id == Concessionaria.id)
+        .where(
+            Condominio.ativo == True,
+            Concessionaria.ativo == True,
+            extract("year", Fatura.vencimento) == now.year,
+            extract("month", Fatura.vencimento) == now.month,
+            Condominio.carteira != None
+        )
+        .group_by(Condominio.carteira)
+    )
+    received_res = await db.execute(received_stmt)
+    received_counts = dict(received_res.all())
+
+    # 3. Pending alerts per portfolio
+    alerts_stmt = (
+        select(Condominio.carteira, func.count(Alerta.id))
+        .join(Alerta, Condominio.id == Alerta.condominio_id)
+        .where(Condominio.ativo == True, Alerta.resolvido == False, Condominio.carteira != None)
+        .group_by(Condominio.carteira)
+    )
+    alerts_res = await db.execute(alerts_stmt)
+    alerts_counts = dict(alerts_res.all())
+
+    # 4. Condos without ATA per portfolio
+    missing_ata_stmt = (
+        select(Condominio.carteira, func.count(Condominio.id))
+        .where(
+            Condominio.ativo == True, 
+            (Condominio.ata_eleicao_nome == None) | (Condominio.ata_eleicao_nome == ""),
+            Condominio.carteira != None
+        )
+        .group_by(Condominio.carteira)
+    )
+    missing_ata_res = await db.execute(missing_ata_stmt)
+    missing_ata_counts = dict(missing_ata_res.all())
+
+    # Assemble data for 11 portfolios
+    results = []
+    for i in range(1, 12):
+        expected = expected_counts.get(i, 0)
+        received = received_counts.get(i, 0)
+        progress = round((received / expected * 100), 1) if expected > 0 else 0.0
+        
+        results.append({
+            "carteira": i,
+            "nome": PORTFOLIO_NAMES.get(i, f"Carteira {i}"),
+            "contas_esperadas": expected,
+            "contas_recebidas": received,
+            "progresso": progress,
+            "alertas_pendentes": alerts_counts.get(i, 0),
+            "condos_sem_ata": missing_ata_counts.get(i, 0)
+        })
+
+    return results

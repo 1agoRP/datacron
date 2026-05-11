@@ -12,6 +12,7 @@ from app.models.user import User
 from app.models.concessionaria import Concessionaria
 from app.models.condominio import Condominio
 from app.models.reajuste_concessionaria import ReajusteConcessionaria
+from app.models.audit_log import AuditLog
 from app.schemas import (
     ConcessionariaCreate, ConcessionariaUpdate, ConcessionariaResponse,
     ReajusteConcessionariaCreate, ReajusteConcessionariaResponse
@@ -69,6 +70,19 @@ async def create_concessionaria(
         created_by_id=current_user.id
     )
     db.add(conc)
+    
+    # Audit Log
+    log = AuditLog(
+        usuario_id=current_user.id,
+        usuario_nome=current_user.nome,
+        usuario_email=current_user.email,
+        acao="inclusao",
+        entidade_tipo="conta",
+        entidade_id=conc.id,
+        detalhes={"tipo": conc.tipo, "instalacao": conc.instalacao, "condominio": condo.nome}
+    )
+    db.add(log)
+    
     await db.commit()
     await db.refresh(conc)
     
@@ -121,7 +135,18 @@ async def update_concessionaria(
     if allowed_condo_ids is not None and c.condominio_id not in allowed_condo_ids:
         raise HTTPException(status_code=403, detail="Acesso negado a esta concessionária")
 
-    for field, value in body.model_dump(exclude_none=True).items():
+    update_data = body.model_dump(exclude_none=True)
+    
+    # RBAC: Only coordination levels (admin/supervisor) or management/assistant can edit installation
+    if "instalacao" in update_data:
+        allowed_roles = {"admin", "supervisor", "gerencia", "assistente"}
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=403, 
+                detail="Seu perfil não permite editar o número de instalação. Contate o administrador."
+            )
+
+    for field, value in update_data.items():
         setattr(c, field, value)
         
     await db.commit()
@@ -149,6 +174,19 @@ async def delete_concessionaria(
     if allowed_condo_ids is not None and c.condominio_id not in allowed_condo_ids:
         raise HTTPException(status_code=403, detail="Acesso negado a esta concessionária")
     c.ativo = False
+    
+    # Audit Log
+    log = AuditLog(
+        usuario_id=current_user.id,
+        usuario_nome=current_user.nome,
+        usuario_email=current_user.email,
+        acao="exclusao",
+        entidade_tipo="conta",
+        entidade_id=c.id,
+        detalhes={"tipo": c.tipo, "instalacao": c.instalacao}
+    )
+    db.add(log)
+    
     await db.commit()
 
 

@@ -40,6 +40,7 @@ class Condominio(Base):
     apolice_seguro_fim: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     gerente_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     assistente_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    carteira: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     administradora: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     mandato_inicio: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     mandato_fim: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

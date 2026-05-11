@@ -31,14 +31,63 @@ from app.routers import (
     webhooks,
     cron,
     faturas,
+    auditoria,
 )
 
 # ─── Logging ────────────────────────────────────────────────
+import traceback
+import asyncio
+import httpx
+import logging
+
+WEBHOOK_ERROR_URL = "https://n8n-n8n.7vjfup.easypanel.host/webhook/74119710-e3ca-44af-ab61-b7e5189e48d2"
+
+async def _send_log_webhook(data: dict):
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.post(WEBHOOK_ERROR_URL, json=data)
+        except Exception:
+            pass
+
+class WebhookLoggingHandler(logging.Handler):
+    def emit(self, record):
+        if record.levelno >= logging.ERROR:
+            # We don't want to get stuck in an infinite loop if the webhook itself fails
+            if "Failed to forward error to webhook" in record.getMessage():
+                return
+            
+            try:
+                msg = self.format(record)
+                error_data = {
+                    "type": "ApplicationLog",
+                    "level": record.levelname,
+                    "logger_name": record.name,
+                    "message": record.getMessage(),
+                    "formatted_log": msg,
+                }
+                if record.exc_info:
+                    error_data["traceback"] = "".join(traceback.format_exception(*record.exc_info))
+                
+                # Try to get the running loop to create a task
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.create_task(_send_log_webhook(error_data))
+                except RuntimeError:
+                    # No running event loop (e.g., during startup/shutdown)
+                    pass
+            except Exception:
+                pass
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger("datacron")
+# Attach the webhook handler
+webhook_handler = WebhookLoggingHandler()
+webhook_handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s"))
+logger.addHandler(webhook_handler)
+
 
 # Ensure PDF storage directory exists
 os.makedirs(settings.PDF_STORAGE_PATH, exist_ok=True)
@@ -95,6 +144,65 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─── Webhook Error Forwarding ───────────────────────────────
+import asyncio
+import httpx
+import traceback
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.responses import JSONResponse
+
+WEBHOOK_ERROR_URL = "https://n8n-n8n.7vjfup.easypanel.host/webhook/74119710-e3ca-44af-ab61-b7e5189e48d2"
+
+async def _send_error_webhook(data: dict):
+    async with httpx.AsyncClient() as client:
+        try:
+            await client.post(WEBHOOK_ERROR_URL, json=data)
+        except Exception as e:
+            logger.error(f"Failed to forward error to webhook: {e}")
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code >= 400:
+        asyncio.create_task(_send_error_webhook({
+            "type": "HTTPException",
+            "status_code": exc.status_code,
+            "method": request.method,
+            "url": str(request.url),
+            "detail": exc.detail,
+            "headers": dict(request.headers),
+            "client_ip": request.client.host if request.client else "unknown"
+        }))
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    asyncio.create_task(_send_error_webhook({
+        "type": "ValidationError",
+        "status_code": 422,
+        "method": request.method,
+        "url": str(request.url),
+        "errors": exc.errors(),
+        "headers": dict(request.headers),
+        "client_ip": request.client.host if request.client else "unknown"
+    }))
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    asyncio.create_task(_send_error_webhook({
+        "type": "UnhandledException",
+        "status_code": 500,
+        "method": request.method,
+        "url": str(request.url),
+        "exception": str(exc),
+        "traceback": traceback.format_exc(),
+        "headers": dict(request.headers),
+        "client_ip": request.client.host if request.client else "unknown"
+    }))
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+
+
 # ─── Routers ────────────────────────────────────────────────
 API_PREFIX = "/api"
 
@@ -111,6 +219,7 @@ app.include_router(historico.router, prefix=API_PREFIX)
 app.include_router(webhooks.router, prefix=API_PREFIX)
 app.include_router(cron.router, prefix=API_PREFIX)
 app.include_router(faturas.router, prefix=API_PREFIX)
+app.include_router(auditoria.router, prefix=API_PREFIX)
 
 
 # ─── Health check ───────────────────────────────────────────
