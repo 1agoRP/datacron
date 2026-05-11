@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Shield, CheckCircle2, XCircle, Clock, AlertCircle, Search, FileText } from 'lucide-react';
+import { Shield, CheckCircle2, XCircle, Clock, AlertCircle, Search, FileText, Trash2, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
