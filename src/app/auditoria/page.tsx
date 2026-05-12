@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Shield, CheckCircle2, XCircle, Clock, AlertCircle, Search, FileText, Trash2, Plus } from 'lucide-react';
+import { Shield, CheckCircle2, XCircle, Clock, AlertCircle, Search, FileText, Trash2, Plus, Edit2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -263,11 +263,14 @@ export default function AuditoriaPage() {
                 }}>
                   <div style={{
                     width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                    background: isDelete ? '#fee2e2' : '#dbeafe',
+                    background: log.acao?.toLowerCase().includes('exclusao') || log.acao?.toLowerCase().includes('delete') ? '#fee2e2' : 
+                                log.acao?.toLowerCase().includes('edicao') || log.acao?.toLowerCase().includes('update') ? '#fef3c7' : '#dbeafe',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: isDelete ? '#dc2626' : '#2563eb',
+                    color: log.acao?.toLowerCase().includes('exclusao') || log.acao?.toLowerCase().includes('delete') ? '#dc2626' : 
+                           log.acao?.toLowerCase().includes('edicao') || log.acao?.toLowerCase().includes('update') ? '#d97706' : '#2563eb',
                   }}>
-                    {isDelete ? <Trash2 size={22} /> : <Plus size={22} />}
+                    {log.acao?.toLowerCase().includes('exclusao') || log.acao?.toLowerCase().includes('delete') ? <Trash2 size={22} /> : 
+                     log.acao?.toLowerCase().includes('edicao') || log.acao?.toLowerCase().includes('update') ? <Edit2 size={22} /> : <Plus size={22} />}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
@@ -279,11 +282,11 @@ export default function AuditoriaPage() {
                       </span>
                     </div>
                     <div style={{ fontSize: '0.92rem', color: '#1e293b', fontWeight: 700, marginBottom: 4 }}>
-                      {log.entidade_nome || 'Entidade ID: ' + log.entidade_id}
+                      {log.entidade_nome || (log.entidade_tipo + ' ID: ' + log.entidade_id)}
                     </div>
                     {log.detalhes && (
-                      <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: 8, whiteSpace: 'pre-wrap' }}>
-                        {log.detalhes}
+                      <div style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 8, whiteSpace: 'pre-wrap', background: '#f8fafc', padding: '6px 10px', borderRadius: 6, border: '1px solid #f1f5f9' }}>
+                        {typeof log.detalhes === 'object' ? JSON.stringify(log.detalhes, null, 2) : log.detalhes}
                       </div>
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: '0.78rem', color: '#94a3b8' }}>

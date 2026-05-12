@@ -60,7 +60,7 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
       
       const restrictedRoles = ['concessionarias', 'contabilidade', 'orçamento', 'emissao', 'financeiro', 'providencias', 'geral'];
       if (restrictedRoles.includes(role)) {
-         const restrictedLinks = ['/reajustes', '/alertas'];
+         const restrictedLinks = ['/dashboard', '/reajustes', '/alertas'];
          if (restrictedLinks.includes(item.href)) return false;
       }
       

@@ -126,6 +126,8 @@ export default function ConcessionariasPage() {
     nome_personalizado: '',
     leitura_individualizada: false,
     debito_automatico: true,
+    senha_portal: '',
+    email_emissao: '',
   };
 
   const [formConc, setFormConc] = useState<any>({ ...defaultConc });
@@ -160,24 +162,37 @@ export default function ConcessionariasPage() {
     if (e) e.preventDefault();
     try {
       setCreating(true);
+      
       const payload: any = { ...formConc };
 
-      // Clean email
-      if (!payload.email_esperado || !payload.email_esperado.includes('@')) {
-        payload.email_esperado = undefined;
+      // Clean email fields
+      if (!payload.email_esperado || !payload.email_esperado.trim() || !payload.email_esperado.includes('@')) {
+        payload.email_esperado = null;
+      }
+      
+      if (!payload.email_emissao || !payload.email_emissao.trim() || !payload.email_emissao.includes('@')) {
+        payload.email_emissao = null;
       }
 
-      // Always keep senha_manual if rule is manual; otherwise send undefined to not overwrite
+      // Handle password rule
       if (payload.regra_senha !== 'manual') {
-        payload.senha_manual = undefined;
+        payload.senha_manual = null;
       }
 
-      if (!payload.valor_medio) payload.valor_medio = 0;
+      if (payload.valor_medio === undefined || payload.valor_medio === null || isNaN(payload.valor_medio)) {
+        payload.valor_medio = 0;
+      }
 
-      // Remove fields not in ConcessionariaUpdate schema for editing
       if (editingId) {
+        // Remove fields not in ConcessionariaUpdate schema
         delete payload.condominio_id;
-        delete payload.instalacao;
+        
+        // RBAC: Only allowed roles can update instalacao (matched with backend)
+        const allowedRoles = ['admin', 'supervisor', 'gerencia', 'assistente'];
+        if (!allowedRoles.includes(user?.role || '')) {
+          delete payload.instalacao;
+        }
+
         await api.updateConcessionaria(editingId, payload);
       } else {
         await api.createConcessionaria(payload);
@@ -259,7 +274,8 @@ export default function ConcessionariasPage() {
       nome_personalizado: conc.nome_personalizado || '',
       leitura_individualizada: conc.leitura_individualizada || false,
       debito_automatico: conc.debito_automatico || false,
-      email_emissao: conc.email_emissao || ''
+      email_emissao: conc.email_emissao || '',
+      senha_portal: conc.senha_portal || ''
     });
     setEditingId(conc.id);
     setShowPassword(false);
@@ -600,14 +616,15 @@ export default function ConcessionariasPage() {
                   ) : null}
                   <div className="dc-form-group">
                     <label>{getCodigoLabel(formConc.tipo)}</label>
-                    <input className="dc-form-input" required value={formConc.instalacao} onChange={e => setFormConc({ ...formConc, instalacao: e.target.value })} placeholder="Ex: 82736412" disabled={!!editingId || readOnly} />
+                    <input className="dc-form-input" required value={formConc.instalacao || ''} onChange={e => setFormConc({ ...formConc, instalacao: e.target.value })} placeholder="Ex: 82736412" disabled={readOnly || (!!editingId && !['admin', 'supervisor', 'gerencia', 'assistente'].includes(user?.role || ''))} />
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>Regra de Senha PDF</label>
                     <select disabled={readOnly} value={formConc.regra_senha} onChange={e => setFormConc({ ...formConc, regra_senha: e.target.value })} className="dc-input dc-form-select">
-                      <option value="5_primeiros_cnpj">5 Primeiros CNPJ (Enel)</option>
+                      <option value="5_primeiros_cnpj">5 Primeiros CNPJ (Enel/Claro)</option>
+                      <option value="4_primeiros_cnpj">4 Primeiros CNPJ (Vivo)</option>
                       <option value="3_primeiros_cnpj">3 Primeiros CNPJ (Sabesp/Comgas)</option>
                       <option value="cnpj_completo">CNPJ Completo</option>
                       <option value="manual">Senha Manual</option>
@@ -629,7 +646,7 @@ export default function ConcessionariasPage() {
                         type={showPassword ? 'text' : 'password'}
                         required
                         disabled={readOnly}
-                        value={formConc.senha_manual}
+                        value={formConc.senha_manual || ''}
                         onChange={e => setFormConc({ ...formConc, senha_manual: e.target.value })}
                         placeholder="Digite a senha do arquivo"
                         style={{ paddingRight: 40 }}
@@ -647,6 +664,21 @@ export default function ConcessionariasPage() {
                     </div>
                   </div>
                 )}
+
+                <div className="dc-form-group">
+                  <label>Senha do Portal (Opcional)</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      className="dc-form-input"
+                      type={showPassword ? 'text' : 'password'}
+                      disabled={readOnly}
+                      value={formConc.senha_portal || ''}
+                      onChange={e => setFormConc({ ...formConc, senha_portal: e.target.value })}
+                      placeholder="Senha de acesso ao site da concessionária"
+                      style={{ paddingRight: 40 }}
+                    />
+                  </div>
+                </div>
 
                 {/* Password Preview */}
                 <div style={{
@@ -672,7 +704,7 @@ export default function ConcessionariasPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
                     <label>E-mail do Remetente (Opcional)</label>
-                    <input className="dc-form-input" disabled={readOnly} value={formConc.email_esperado} onChange={e => setFormConc({ ...formConc, email_esperado: e.target.value })} placeholder="Ex: fatura@enel.com.br" />
+                    <input className="dc-form-input" disabled={readOnly} value={formConc.email_esperado || ''} onChange={e => setFormConc({ ...formConc, email_esperado: e.target.value })} placeholder="Ex: fatura@enel.com.br" />
                   </div>
                   <div className="dc-form-group">
                     <label>Valor Médio Mensal (R$)</label>

@@ -119,7 +119,7 @@ async def update_concessionaria(
     id: uuid.UUID,
     body: ConcessionariaUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_write()),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(
@@ -135,7 +135,7 @@ async def update_concessionaria(
     if allowed_condo_ids is not None and c.condominio_id not in allowed_condo_ids:
         raise HTTPException(status_code=403, detail="Acesso negado a esta concessionária")
 
-    update_data = body.model_dump(exclude_none=True)
+    update_data = body.model_dump(exclude_unset=True)
     
     # RBAC: Only coordination levels (admin/supervisor) or management/assistant can edit installation
     if "instalacao" in update_data:
@@ -149,6 +149,18 @@ async def update_concessionaria(
     for field, value in update_data.items():
         setattr(c, field, value)
         
+    # Audit Log
+    log = AuditLog(
+        usuario_id=current_user.id,
+        usuario_nome=current_user.nome,
+        usuario_email=current_user.email,
+        acao="edicao",
+        entidade_tipo="concessionaria",
+        entidade_id=c.id,
+        detalhes={"tipo": c.tipo, "instalacao": c.instalacao, "campos_alterados": list(update_data.keys())}
+    )
+    db.add(log)
+    
     await db.commit()
     await db.refresh(c)
     
@@ -162,7 +174,7 @@ async def update_concessionaria(
 async def delete_concessionaria(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_write()),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     result = await db.execute(select(Concessionaria).where(Concessionaria.id == id))
@@ -195,7 +207,7 @@ async def test_password_rule(
     id: uuid.UUID,
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Tests the password rule against an uploaded PDF."""
@@ -230,7 +242,7 @@ async def test_password_rule(
 async def extrair_dados_fatura(
     pdf_file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Parses an uploaded PDF invoice to suggest fields for the concessionária."""
     pdf_bytes = await pdf_file.read()

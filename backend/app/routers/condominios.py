@@ -254,69 +254,80 @@ async def create_condominio(
 
 @router.get("/download-all", status_code=200)
 async def download_all_faturas(
+    referencia: Optional[str] = Query(None, description="Referência (ex: Maio/2026)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Generates a ZIP file with all faturas for the current month, organized by Condominio."""
+    """Generates a ZIP file with all faturas for the month, organized by Condominio."""
     import zipfile
-    from app.storage import LOCAL_STORAGE_DIR
-    import os
+    from app.storage import get_file_content
+    from sqlalchemy.orm import joinedload
     
-    now = datetime.now()
-    month_name = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
-                  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"][now.month - 1]
+    # 1. Base Query
+    stmt = select(Fatura).options(
+        joinedload(Fatura.condominio),
+        joinedload(Fatura.concessionaria)
+    )
     
-    # Get all faturas for current month
-    stmt = (
-        select(Fatura, Condominio.nome.label("condo_nome"))
-        .join(Condominio, Fatura.condominio_id == Condominio.id)
-        .where(
+    # 2. Filtering
+    if referencia:
+        stmt = stmt.where(Fatura.referencia == referencia)
+    else:
+        # Fallback to current month if no reference provided
+        now = datetime.now()
+        stmt = stmt.where(
             extract("year", Fatura.vencimento) == now.year,
             extract("month", Fatura.vencimento) == now.month,
         )
-    )
+    
     if allowed_condo_ids is not None:
         stmt = stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
     
     result = await db.execute(stmt)
-    faturas_rows = result.all()
+    faturas = result.scalars().all()
     
-    if not faturas_rows:
-        raise HTTPException(status_code=404, detail="Nenhuma fatura encontrada para este mês")
+    if not faturas:
+        raise HTTPException(status_code=404, detail="Nenhuma fatura encontrada")
 
-    # Create an in-memory ZIP file
+    # 3. Create ZIP in memory
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for fatura, condo_name in faturas_rows:
-            # Determine file content and name
+        for fatura in faturas:
             content = None
-            filename = fatura.pdf_nome_original or f"fatura_{fatura.id}.pdf"
             
-            # Sanitizar nome do condomínio para pasta
-            safe_condo_name = "".join(c for c in condo_name if c.isalnum() or c in (" ", "-", "_")).strip()
-            zip_path = f"{safe_condo_name}/{filename}"
-
-            if fatura.storage_path:
-                full_path = os.path.join(LOCAL_STORAGE_DIR, fatura.storage_path)
-                if os.path.exists(full_path):
-                    zip_file.write(full_path, zip_path)
-                    continue
-            
+            # Try Base64 first (Legacy/Small files)
             if fatura.pdf_base64:
                 try:
                     b64 = fatura.pdf_base64
                     if "," in b64: b64 = b64.split(",")[1]
-                    pdf_bytes = base64.b64decode(b64)
-                    zip_file.writestr(zip_path, pdf_bytes)
-                except Exception as e:
-                    logger.warning(f"Error decoding base64 for fatura {fatura.id}: {e}")
+                    content = base64.b64decode(b64)
+                except Exception:
+                    pass
+            
+            # Try Storage Path second
+            if not content and (fatura.storage_path or fatura.pdf_path):
+                path = fatura.storage_path or fatura.pdf_path
+                content = await get_file_content(path)
+                
+            if not content:
+                continue # Skip faturas without file
+                
+            # Organize by Condominio
+            condo_name = fatura.condominio.nome if fatura.condominio else "Desconhecido"
+            safe_condo_name = "".join(c for c in condo_name if c.isalnum() or c in (" ", "-", "_")).strip()
+            
+            filename = fatura.pdf_nome_original or f"fatura_{fatura.id.hex[:8]}.pdf"
+            zip_path = f"{safe_condo_name}/{filename}"
+            
+            zip_file.writestr(zip_path, content)
 
     buffer.seek(0)
+    ref_label = referencia.replace("/", "_") if referencia else datetime.now().strftime("%m_%Y")
     return StreamingResponse(
         buffer,
         media_type="application/x-zip-compressed",
-        headers={"Content-Disposition": f'attachment; filename="Faturas {month_name}.zip"'},
+        headers={"Content-Disposition": f'attachment; filename="Faturas_{ref_label}.zip"'},
     )
 
 

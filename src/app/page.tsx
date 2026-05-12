@@ -859,8 +859,20 @@ export default function LandingPage() {
     setError(null);
     setIsLoading(true);
     try {
-      await login({ email, senha: password });
-      const redirectPath = new URL(window.location.href).searchParams.get('redirect') || '/dashboard';
+      const user = await login({ email, senha: password });
+      
+      let redirectPath = new URL(window.location.href).searchParams.get('redirect');
+      
+      if (!redirectPath) {
+        // Redirecionamento baseado em cargo
+        const operacaoRoles = ['concessionarias', 'contabilidade', 'emissao', 'orçamento'];
+        if (operacaoRoles.includes(user.role)) {
+          redirectPath = '/condominios';
+        } else {
+          redirectPath = '/dashboard';
+        }
+      }
+      
       window.location.href = redirectPath;
     } catch (err: any) {
       setError(err.message || 'Falha na autenticação');

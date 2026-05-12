@@ -95,6 +95,9 @@ export default function CondominiosPage() {
   const [manualFaturaPdf, setManualFaturaPdf] = useState<File | null>(null);
   const [savingManualFatura, setSavingManualFatura] = useState(false);
 
+  const [refMonth, setRefMonth] = useState(monthsList[new Date().getMonth()].value);
+  const [refYear, setRefYear] = useState(new Date().getFullYear().toString());
+
   // Removed manual fetchData in favor of useSWR
 
   const handleCreate = async (e?: React.FormEvent) => {
@@ -449,7 +452,9 @@ export default function CondominiosPage() {
 
   const handleDownloadAll = async () => {
     try {
-      await api.downloadAllInvoices();
+      const monthLabel = monthsList.find(m => m.value === refMonth)?.label || '';
+      const referencia = `${monthLabel}/${refYear}`;
+      await api.downloadAllInvoices(referencia);
     } catch (err: any) {
       alert(err.message || 'Erro ao baixar todas as faturas');
     }
@@ -462,8 +467,27 @@ export default function CondominiosPage() {
           <h1 className="dc-page-title">Condomínios</h1>
           <p className="dc-page-subtitle">Gerencie sua base de clientes e acompanhe o status de cada Condomínio.</p>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button className="dc-btn dc-btn-secondary" onClick={handleDownloadAll} title="Baixar todas as faturas do mês em um arquivo ZIP">
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div className="dc-ref-selector" style={{ display: 'flex', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '2px 8px', gap: 8, alignItems: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+            <Calendar size={16} style={{ color: '#64748b' }} />
+            <select 
+              value={refMonth} 
+              onChange={e => setRefMonth(e.target.value)}
+              style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', color: '#1e293b', padding: '4px 0', cursor: 'pointer', outline: 'none' }}
+            >
+              {monthsList.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+            <div style={{ width: 1, height: 16, background: '#e2e8f0' }} />
+            <select 
+              value={refYear} 
+              onChange={e => setRefYear(e.target.value)}
+              style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', color: '#1e293b', padding: '4px 0', cursor: 'pointer', outline: 'none' }}
+            >
+              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y.toString()}>{y}</option>)}
+            </select>
+          </div>
+
+          <button className="dc-btn dc-btn-secondary" onClick={handleDownloadAll} title="Baixar todas as faturas do mês em um arquivo ZIP" style={{ gap: 8 }}>
             <Download size={16} /> Baixar Todas as Faturas
           </button>
           {isAdmin && (

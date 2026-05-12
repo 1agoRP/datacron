@@ -168,7 +168,8 @@ class ConcessionariaUpdate(BaseModel):
     leitura_individualizada: Optional[bool] = None
     debito_automatico: Optional[bool] = None
     senha_portal: Optional[str] = None
-    email_emissao: Optional[Optional[str]] = None
+    email_emissao: Optional[str] = None
+    instalacao: Optional[str] = None
     ativo: Optional[bool] = None
 
 

@@ -759,13 +759,17 @@ class ApiClient {
     return this.request<any[]>(`/auditoria?${query}`);
   }
 
-  async downloadAllInvoices() {
+  async downloadAllInvoices(referencia?: string) {
     const token = this.getToken();
-    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/download-all`, {
+    const params = referencia ? `?referencia=${encodeURIComponent(referencia)}` : '';
+    const response = await fetchWithRetry(`${API_BASE_URL}/condominios/download-all${params}`, {
       headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
     });
     
-    if (!response.ok) throw new Error('Falha ao gerar download em massa');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Falha ao gerar download em massa');
+    }
     
     const blob = await response.blob();
     const disposition = response.headers.get('Content-Disposition');

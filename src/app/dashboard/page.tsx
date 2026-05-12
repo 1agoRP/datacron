@@ -49,7 +49,7 @@ export default function Dashboard() {
   // Redirection logic for restricted roles
   useEffect(() => {
     if (user) {
-      const restrictedRoles = ['concessionaria', 'contabilidade', 'emissao', 'orcamento'];
+      const restrictedRoles = ['concessionarias', 'contabilidade', 'emissao', 'orçamento'];
       if (restrictedRoles.includes(user.role)) {
         router.replace('/condominios');
       }

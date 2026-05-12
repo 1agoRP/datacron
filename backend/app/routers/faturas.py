@@ -3,16 +3,18 @@ import base64
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Form, UploadFile, File as FastAPIFile
+from fastapi import APIRouter, Depends, HTTPException, Form, UploadFile, File as FastAPIFile, Query
+from fastapi.responses import StreamingResponse
+import zipfile
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.database import get_db
 from app.dependencies import get_current_user, get_user_condo_ids
 from app.models.user import User
 from app.models.fatura import Fatura
 from app.models.condominio import Condominio
 from app.models.concessionaria import Concessionaria
+from app.models.audit_log import AuditLog
 from app.schemas import FaturaResponse
 from app.services.pdf_processor import generate_standard_filename
 
@@ -138,6 +140,19 @@ async def create_fatura_manual(
     )
 
     db.add(nova_fatura)
+    
+    # Audit Log
+    log = AuditLog(
+        usuario_id=user.id,
+        usuario_nome=user.nome,
+        usuario_email=user.email,
+        acao="inclusao",
+        entidade_tipo="fatura",
+        entidade_id=nova_fatura.id,
+        detalhes={"valor": valor, "vencimento": str(vencimento), "referencia": referencia, "metodo": "manual"}
+    )
+    db.add(log)
+    
     await db.commit()
     await db.refresh(nova_fatura)
 
@@ -175,5 +190,17 @@ async def delete_fatura(
     await db.flush() # Ensure updates are processed before delete
 
     await db.delete(fatura)
+    
+    # Audit Log
+    log = AuditLog(
+        usuario_id=user.id,
+        usuario_nome=user.nome,
+        usuario_email=user.email,
+        acao="exclusao",
+        entidade_tipo="fatura",
+        entidade_id=fatura_id,
+        detalhes={"valor": fatura.valor, "vencimento": str(fatura.vencimento), "referencia": fatura.referencia}
+    )
+    db.add(log)
     await db.commit()
-    return {"message": "Fatura excluída com sucesso"}
+    return {"status": "success"}
