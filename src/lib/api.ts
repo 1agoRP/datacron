@@ -65,11 +65,20 @@ class ApiClient {
     });
 
     if (response.status === 401) {
-      // Clear token and redirect if unauthorized
+      // Só desloga se NÃO for a rota de login e o token não existir mais
       if (typeof window !== 'undefined' && !endpoint.includes('/auth/login')) {
-        localStorage.removeItem('datacron_token');
-        document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
-        window.location.href = '/';
+        const currentToken = localStorage.getItem('datacron_token');
+        // Aguarda brevemente para evitar logout por erro transiente (race condition)
+        await new Promise(r => setTimeout(r, 300));
+        // Verifica se o token ainda existe após a espera
+        const tokenAfterWait = localStorage.getItem('datacron_token');
+        if (tokenAfterWait) {
+          // Token presente mas rejeitado → realmente expirou ou inválido → desloga
+          localStorage.removeItem('datacron_token');
+          document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+          window.location.href = '/';
+        }
+        // Se não há token, a requisição foi feita sem auth → não deslogamos (endpoint público sendo acessado)
       }
     }
 
@@ -154,9 +163,9 @@ class ApiClient {
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('datacron_token', data.access_token);
-      // Ensure session persistence: 48 hours expiry (2880 minutes)
-      const fortyEightHours = 60 * 60 * 48;
-      document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Lax; max-age=${fortyEightHours}`;
+      // Cookie expiry alinhado ao JWT: 30 dias (ACCESS_TOKEN_EXPIRE_MINUTES = 43200)
+      const thirtyDays = 60 * 60 * 24 * 30;
+      document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Lax; max-age=${thirtyDays}`;
     }
     return data;
   }

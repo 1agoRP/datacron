@@ -50,24 +50,35 @@ async def _send_log_webhook(data: dict):
             pass
 
 class WebhookLoggingHandler(logging.Handler):
+    # Mensagens de autenticação são eventos operacionais esperados, não erros do servidor
+    _AUTH_NOISE_PATTERNS = (
+        "Token inválido",
+        "Token inv",
+        "JWTError",
+        "jose",
+        "Failed to forward error to webhook",
+    )
+
     def emit(self, record):
         if record.levelno >= logging.ERROR:
-            # We don't want to get stuck in an infinite loop if the webhook itself fails
-            if "Failed to forward error to webhook" in record.getMessage():
-                return
-            
+            msg_text = record.getMessage()
+            # Filtra mensagens de auth e loop-back do próprio webhook
+            for pattern in self._AUTH_NOISE_PATTERNS:
+                if pattern in msg_text:
+                    return
+
             try:
                 msg = self.format(record)
                 error_data = {
                     "type": "ApplicationLog",
                     "level": record.levelname,
                     "logger_name": record.name,
-                    "message": record.getMessage(),
+                    "message": msg_text,
                     "formatted_log": msg,
                 }
                 if record.exc_info:
                     error_data["traceback"] = "".join(traceback.format_exception(*record.exc_info))
-                
+
                 # Try to get the running loop to create a task
                 try:
                     loop = asyncio.get_running_loop()
@@ -163,7 +174,9 @@ async def _send_error_webhook(data: dict):
 
 @app.exception_handler(StarletteHTTPException)
 async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
-    if exc.status_code >= 400:
+    # Só envia ao webhook erros genuinamente inesperados (5xx)
+    # 401/403 são respostas normais de autenticação/autorização — não são falhas do servidor
+    if exc.status_code >= 500:
         asyncio.create_task(_send_error_webhook({
             "type": "HTTPException",
             "status_code": exc.status_code,
