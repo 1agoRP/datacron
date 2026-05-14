@@ -1,7 +1,8 @@
-from datetime import timedelta
+import secrets
+from datetime import timedelta, datetime, timezone
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,7 @@ from app.schemas import LoginRequest, TokenResponse, UserResponse, UserInToken, 
 from app.config import settings
 from app.limiter import limiter
 from app.models.user_condominio import UserCondominio
+from app.models.refresh_token import RefreshToken
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -44,7 +46,7 @@ def _validate_password(senha: str) -> None:
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("5/minute")
-async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(request: Request, response: Response, body: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Authenticates the user and returns a JWT access token + user data in a single roundtrip."""
     result = await db.execute(select(User).where(User.email == body.email))
     user: User | None = result.scalar_one_or_none()
@@ -71,11 +73,35 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
             "role": user.role, 
             "nome": user.nome, 
         },
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        expires_delta=timedelta(minutes=30),
     )
+    
+    # Gerar Refresh Token
+    refresh_token_str = secrets.token_urlsafe(32)
+    refresh_expires = datetime.now(timezone.utc) + timedelta(days=30)
+    
+    new_rt = RefreshToken(
+        token=refresh_token_str,
+        user_id=user.id,
+        expires_at=refresh_expires
+    )
+    db.add(new_rt)
+    await db.commit()
+    
+    # Definir cookie HttpOnly
+    response.set_cookie(
+        key="datacron_refresh_token",
+        value=refresh_token_str,
+        httponly=True,
+        max_age=30 * 24 * 60 * 60,
+        expires=refresh_expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
+        samesite="lax",
+        secure=settings.ENVIRONMENT == "production",
+    )
+
     return TokenResponse(
         access_token=token,
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires_in=1800,
         user=UserInToken(
             id=str(user.id),
             nome=user.nome,
@@ -86,6 +112,103 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
             codigo_condominio=user.codigo_condominio,
         ),
     )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    """Refreshes the access token using a valid HttpOnly refresh token cookie."""
+    token_str = request.cookies.get("datacron_refresh_token")
+    if not token_str:
+        raise HTTPException(status_code=401, detail="Refresh token não encontrado")
+        
+    result = await db.execute(select(RefreshToken).where(RefreshToken.token == token_str))
+    rt = result.scalar_one_or_none()
+    
+    if not rt:
+        response.delete_cookie("datacron_refresh_token")
+        raise HTTPException(status_code=401, detail="Refresh token inválido")
+        
+    # Ensure timezone info is present (SQLite often drops it)
+    rt_expires = rt.expires_at
+    if rt_expires.tzinfo is None:
+        rt_expires = rt_expires.replace(tzinfo=timezone.utc)
+        
+    if rt_expires < datetime.now(timezone.utc):
+        await db.delete(rt)
+        await db.commit()
+        response.delete_cookie("datacron_refresh_token")
+        raise HTTPException(status_code=401, detail="Refresh token expirado")
+        
+    user_result = await db.execute(select(User).where(User.id == rt.user_id))
+    user = user_result.scalar_one_or_none()
+    
+    if not user or not user.ativo:
+        raise HTTPException(status_code=401, detail="Usuário inativo")
+        
+    # Rotacionar o refresh token (consumir o atual e gerar um novo)
+    await db.delete(rt)
+    
+    new_refresh_str = secrets.token_urlsafe(32)
+    new_refresh_expires = datetime.now(timezone.utc) + timedelta(days=30)
+    new_rt = RefreshToken(
+        token=new_refresh_str,
+        user_id=user.id,
+        expires_at=new_refresh_expires
+    )
+    db.add(new_rt)
+    await db.commit()
+    
+    response.set_cookie(
+        key="datacron_refresh_token",
+        value=new_refresh_str,
+        httponly=True,
+        max_age=30 * 24 * 60 * 60,
+        expires=new_refresh_expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
+        samesite="lax",
+        secure=settings.ENVIRONMENT == "production",
+    )
+    
+    condo_uuid_list = await get_user_condo_ids(user, db)
+    condo_ids = [str(cid) for cid in condo_uuid_list] if condo_uuid_list is not None else []
+    
+    access_token = create_access_token(
+        data={
+            "sub": str(user.id), 
+            "email": user.email, 
+            "role": user.role, 
+            "nome": user.nome, 
+        },
+        expires_delta=timedelta(minutes=30),
+    )
+    
+    return TokenResponse(
+        access_token=access_token,
+        expires_in=1800,
+        user=UserInToken(
+            id=str(user.id),
+            nome=user.nome,
+            email=user.email,
+            role=user.role,
+            administradora=user.administradora,
+            condominios_ids=condo_ids,
+            codigo_condominio=user.codigo_condominio,
+        ),
+    )
+
+
+@router.post("/logout")
+async def logout(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    """Logs out the user and invalidates their refresh token."""
+    token_str = request.cookies.get("datacron_refresh_token")
+    if token_str:
+        result = await db.execute(select(RefreshToken).where(RefreshToken.token == token_str))
+        rt = result.scalar_one_or_none()
+        if rt:
+            await db.delete(rt)
+            await db.commit()
+            
+    response.delete_cookie("datacron_refresh_token")
+    return {"message": "Logout realizado com sucesso"}
 
 
 @router.get("/me", response_model=UserResponse)

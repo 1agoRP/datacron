@@ -161,7 +161,7 @@ async def check_missing_bills(db: AsyncSession) -> None:
                 Fatura.status.in_(["processada", "revisao", "pendente"]),
             )
         )
-        fatura = fatura_result.scalar_one_or_none()
+        fatura = fatura_result.scalars().first()
         if fatura:
             continue  # Bill arrived
 

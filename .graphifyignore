@@ -1,9 +1,54 @@
-# .graphifyignore
+# .graphifyignore — controla o que o graphify indexa
+# Sintaxe: igual ao .gitignore (globs, negação com !)
+
+# ── Dependências e geração automática ─────────────────────
 node_modules/
+.next/
 dist/
 *.generated.py
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
 
-# only index src/, ignore everything else
-*
+# ── Dados e storage ────────────────────────────────────────
+pdfs_storage/
+*.pdf
+Users.tsv
+*.zip
+*.csv
+
+# ── Artefatos do graphify em si ────────────────────────────
+graphify-out/
+
+# ── Configs e locks ────────────────────────────────────────
+package-lock.json
+*.lock
+tsconfig.tsbuildinfo
+.graphify_ast.json
+.graphify_detect.json
+
+# ── Arquivos de teste temporários ─────────────────────────
+scratch/
+test_dialects.py
+test_kw.py
+test_kw2.py
+scratch_*.py
+
+# ── O que QUEREMOS indexar ─────────────────────────────────
+# Frontend (Next.js)
 !src/
 !src/**
+
+# Backend (FastAPI / Python)
+!backend/
+!backend/app/
+!backend/app/**
+!backend/tests/
+!backend/tests/**
+
+# Docs e configs raiz
+!README.md
+!middleware.ts
+!next.config.mjs

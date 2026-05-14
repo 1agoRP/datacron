@@ -10,9 +10,10 @@ from app.models.relatorio import RelatorioGerado
 from app.models.reajuste_concessionaria import ReajusteConcessionaria
 from app.models.historico_fatura import HistoricoFatura
 from app.models.audit_log import AuditLog
+from app.models.refresh_token import RefreshToken
 
 __all__ = [
     "User", "UserCondominio", "Condominio", "Concessionaria", "Fatura", "Alerta",
     "RelatorioGerado", "Contrato", "ContractFile",
-    "ReajusteConcessionaria", "HistoricoFatura", "AuditLog",
+    "ReajusteConcessionaria", "HistoricoFatura", "AuditLog", "RefreshToken"
 ]

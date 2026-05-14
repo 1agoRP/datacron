@@ -282,25 +282,10 @@ def _decode_header_value(header_val):
     return result
 
 
-async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[str]:
-    """
-    Full pipeline for processing a single IMAP message:
-    1. Parse headers to get sender, subject, date
-    2. Check if already processed (email_logs)
-    3. Find matching concessionaria
-    4. Download and unlock PDF
-    5. Extract invoice data
-    6. Save Fatura to DB
-    7. Generate alerts if needed
-
-    Returns:
-        The condominio name if identified, or None if not identified.
-    """
-
+def _parse_email_metadata(msg) -> tuple[str, str, datetime, str]:
     sender = _decode_header_value(msg.get("From", "")).split("<")[-1].replace(">", "").strip()
     subject = _decode_header_value(msg.get("Subject", ""))
     date_str = msg.get("Date", "")
-
     try:
         received_at = parsedate_to_datetime(date_str)
     except Exception:
@@ -322,128 +307,48 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
 
     body_text = re.sub(r'<[^>]+>', ' ', raw_body)
     body_text = re.sub(r'\s+', ' ', body_text)
-    
-    # ── GATE: verificar se o remetente é conhecido ─────────────────────
-    is_known_user = await _is_known_user_sender(sender, db)
-    is_conc_domain = await _is_concessionaria_domain(sender, db)
+    return sender, subject, received_at, body_text
 
-    if not is_known_user and not is_conc_domain:
-        logger.info(
-            f"[IGNORE] E-mail de remetente desconhecido ignorado silenciosamente: '{sender}' "
-            f"(assunto: '{subject}'). Não consta em users nem em concessionárias cadastradas."
-        )
-        return None  # Para aqui — sem EmailLog, sem alerta, sem nada
-    # ──────────────────────────────────────────────────────────────────────
+async def _handle_unidentified_sender(sender: str, subject: str, body_text: str, received_at: datetime, codigo_encontrado: Optional[str], conc: Optional[Concessionaria]):
+    from app.services.email_sender import send_notification_email, render_not_identified_email
+    tipo_sug = "Concessionária"
+    codigo_sug = codigo_encontrado or "N/D"
+    if not codigo_encontrado:
+        for t in ['Enel', 'Sabesp', 'Comgás']:
+            if t.lower() in subject.lower():
+                tipo_sug = t
+                break
+    elif conc:
+        tipo_sug = conc.tipo
 
-    existing_log = await db.execute(
-        select(EmailLog).where(EmailLog.gmail_message_id == msg_id)
+    html = render_not_identified_email(
+        sender_name=sender,
+        original_subject=subject,
+        original_body=body_text,
+        received_at=received_at,
+        codigo_sugerido=codigo_sug,
+        tipo_sugerido=tipo_sug
     )
-    email_log_record = existing_log.scalar_one_or_none()
-    if email_log_record:
-        logger.info(f"Email {msg_id} already processed, skipping processing but determining label")
-        if email_log_record.condominio_id:
-            condo_result = await db.execute(
-                select(Condominio).where(Condominio.id == email_log_record.condominio_id)
-            )
-            condo = condo_result.scalar_one_or_none()
-            if condo:
-                numero_pad = str(condo.numero).zfill(4)
-                return f"{numero_pad} - {condo.nome}"
-        return None  # already processed, no condo -> goes to unidentified
-
-    email_log = EmailLog(
-        gmail_message_id=msg_id,
-        remetente=sender,
-        assunto=subject,
-        recebido_em=received_at,
-        status="nao_identificado",
+    await send_notification_email(
+        to=sender,
+        subject=f"Datacron: {tipo_sug} não identificada",
+        message_text=(
+            f"Olá,\n\nRecebemos o e-mail que você encaminhou mas não conseguimos "
+            f"identificar o condomínio automaticamente.\n\n"
+            f"Assunto original: {subject}\n"
+            f"Acesse o painel para vincular manualmente.\n\nEquipe Datacron"
+        ),
+        html_body=html,
     )
-    db.add(email_log)
-    await db.flush()
+    logger.info(f"'Não identificado' reply sent to known user: {sender}")
 
-    conc, codigo_encontrado = await find_concessionaria(sender, subject, body_text, db)
+async def _process_pdf_attachments(attachments, password, conc, condo, db, body_data, email_log, sender, subject, msg_id, condo_name, codigo_encontrado):
+    from app.services.alert_manager import check_and_create_alerts
+    from app.models.historico_fatura import HistoricoFatura
+    from app.services.pdf_processor import try_brute_force_unlock
     
-    if codigo_encontrado:
-        email_log.codigo_identificacao = codigo_encontrado
-
-    condo_name: Optional[str] = None
-
-    if conc:
-        email_log.status = "identificado"
-        email_log.condominio_id = conc.condominio_id
-    else:
-        logger.warning(f"Sender '{sender}' not matched to any concessionaria")
-
-        # Somente notifica o próprio remetente se ele for usuário cadastrado
-        if is_known_user:
-            from app.services.email_sender import send_notification_email, render_not_identified_email
-            
-            # Try to find some identification even if not matched
-            tipo_sug = "Concessionária"
-            codigo_sug = codigo_encontrado or "N/D"
-            if not codigo_encontrado:
-                for t in ['Enel', 'Sabesp', 'Comgás']:
-                    if t.lower() in subject.lower():
-                        tipo_sug = t
-                        break
-            elif conc:
-                tipo_sug = conc.tipo
-
-            html = render_not_identified_email(
-                sender_name=sender,
-                original_subject=subject,
-                original_body=body_text,
-                received_at=received_at,
-                codigo_sugerido=codigo_sug,
-                tipo_sugerido=tipo_sug
-            )
-            await send_notification_email(
-                to=sender,
-                subject=f"Datacron: {tipo_sug} não identificada",
-                message_text=(
-                    f"Olá,\n\nRecebemos o e-mail que você encaminhou mas não conseguimos "
-                    f"identificar o condomínio automaticamente.\n\n"
-                    f"Assunto original: {subject}\n"
-                    f"Acesse o painel para vincular manualmente.\n\nEquipe Datacron"
-                ),
-                html_body=html,
-            )
-            logger.info(f"'Não identificado' reply sent to known user: {sender}")
-
-    password = ""
-    condo: Optional[Condominio] = None
-    
-    if conc:
-        condo_result = await db.execute(
-            select(Condominio).where(Condominio.id == conc.condominio_id)
-        )
-        condo = condo_result.scalar_one_or_none()
-        if condo:
-            # Padding length exactly 4 digits
-            numero_pad = str(condo.numero).zfill(4)
-            condo_name = f"{numero_pad} - {condo.nome}"
-        password = conc.gerar_senha_pdf(condo.cnpj_digits if condo else "")
-    
-    body_data = {}
-    if conc:
-        body_data = extract_data_from_body(body_text, conc.tipo)
-    else:
-        for t in ['Enel', 'Comgás', 'Sabesp']:
-            candidate = extract_data_from_body(body_text, t)
-            if len(candidate) > len(body_data):
-                body_data = candidate
-    
-    # Save extracted data to log for traceability (manual JSON serialization if needed)
-    if body_data:
-        email_log.dados_extraidos = body_data
-
-    attachments = get_pdf_attachments(msg)
-    if not attachments:
-        logger.info(f"No PDF attachments in message {msg_id}")
-        email_log.status = "processado"
-        await db.commit()
-        return condo_name
     saved_paths = []
+    
     for filename, pdf_bytes in attachments:
         unlocked_bytes = None
         extracted_from_bf = None
@@ -457,15 +362,11 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
                 unlocked_bytes = unlocked_bf
                 extracted_from_bf = ext_bf
                 
-                # Vincula o log ao condomínio encontrado
                 email_log.condominio_id = condo.id
                 email_log.status = "identificado"
                 if conc:
                     email_log.codigo_identificacao = conc.instalacao
-                
-                # Atualiza nome do condomínio para retorno/log
-                numero_pad = str(condo.numero).zfill(4)
-                condo_name = f"{numero_pad} - {condo.nome}"
+                condo_name = f"{str(condo.numero).zfill(4)} - {condo.nome}"
 
         # 2º Passo: Se não foi via força bruta, tenta com a senha padrão (se houver)
         if not unlocked_bytes:
@@ -475,7 +376,6 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         final_bytes = unlocked_bytes or pdf_bytes
 
         # 3º Passo: Extração de Dados (OCR se necessário)
-        # Se veio da força bruta, já temos os dados extraídos
         extracted = extracted_from_bf or extract_data(final_bytes)
         for k, v in body_data.items():
             if v:
@@ -483,7 +383,6 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
 
         valor = extracted.get("valor") or 0.0
         vencimento_str = extracted.get("vencimento")
-        from datetime import date
         vencimento: Optional[date] = None
         if vencimento_str:
             try:
@@ -491,8 +390,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             except ValueError:
                 pass
 
-        # 4º Passo: Gerar nome padronizado conforme solicitado pelo usuário
-        # numero do Condomínio - Nome do Condomínio - concessionária - código - vencimento - valor
+        # 4º Passo: Gerar nome padronizado
         safe_filename = generate_standard_filename(
             condo_numero=condo.numero if condo else 0,
             condo_nome=condo.nome if condo else "Não Identificado",
@@ -502,22 +400,17 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
             valor=valor
         )
 
-        # ── Handle PDF Storage (Base64) ──
         if len(final_bytes) > 10 * 1024 * 1024:
             logger.warning(f"Ignorando anexo '{filename}' pois excede 10MB.")
             continue
 
         pdf_b64 = base64.b64encode(final_bytes).decode('utf-8')
-
-        # Also save locally for email forwarding attachments
         local_path = save_pdf(final_bytes, safe_filename)
         saved_paths.append(local_path)
 
         referencia = _standardize_referencia(extracted.get("referencia"), vencimento)
 
-        # ── Check for existing duplicate Fatura ──
         if conc:
-            # Duplicate criteria: mesmo valor, mesmo Condomínio, mesmo vencimento e mesma concessionária
             existing_fatura = await db.execute(
                 select(Fatura).where(
                     Fatura.condominio_id == conc.condominio_id,
@@ -551,9 +444,7 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         db.add(fatura)
         await db.flush()
 
-        # Se desbloqueada, salva também no histórico conforme solicitado
         if pdf_unlocked:
-            from app.models.historico_fatura import HistoricoFatura
             hist = HistoricoFatura(
                 condominio_id=fatura.condominio_id,
                 concessionaria_id=fatura.concessionaria_id,
@@ -573,10 +464,8 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
         email_log.status = "processado"
 
         if conc:
-            from app.services.alert_manager import check_and_create_alerts
             await check_and_create_alerts(fatura, conc, db)
             
-            # Forward if individualized reading is active
             if conc.leitura_individualizada and conc.email_emissao:
                 forward_to = conc.email_emissao
                 condo_num_str = str(condo.numero).zfill(4) if condo else "0000"
@@ -600,19 +489,115 @@ async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[
                     subject=subject_fwd,
                     message_text=body_fwd,
                     in_reply_to=msg_id,
-                    attachments=saved_paths
+                    attachments=[local_path]
                 )
                 if success_fwd:
                     logger.info(f"Fatura individualizada encaminhada para {forward_to}")
                 else:
                     logger.error(f"Falha ao encaminhar fatura individualizada para {forward_to}")
 
+    return saved_paths, condo_name
+
+async def process_email_message(msg_id: str, msg, db: AsyncSession) -> Optional[str]:
+    """
+    Full pipeline for processing a single IMAP message:
+    1. Parse headers to get sender, subject, date
+    2. Check if already processed (email_logs)
+    3. Find matching concessionaria
+    4. Download and unlock PDF
+    5. Extract invoice data
+    6. Save Fatura to DB
+    7. Generate alerts if needed
+    """
+    sender, subject, received_at, body_text = _parse_email_metadata(msg)
+    
+    # ── GATE: verificar se o remetente é conhecido ─────────────────────
+    is_known_user = await _is_known_user_sender(sender, db)
+    is_conc_domain = await _is_concessionaria_domain(sender, db)
+
+    if not is_known_user and not is_conc_domain:
+        logger.info(
+            f"[IGNORE] E-mail de remetente desconhecido ignorado silenciosamente: '{sender}' "
+            f"(assunto: '{subject}'). Não consta em users nem em concessionárias cadastradas."
+        )
+        return None  # Para aqui — sem EmailLog, sem alerta, sem nada
+    # ──────────────────────────────────────────────────────────────────────
+
+    existing_log = await db.execute(select(EmailLog).where(EmailLog.gmail_message_id == msg_id))
+    email_log_record = existing_log.scalar_one_or_none()
+    if email_log_record:
+        logger.info(f"Email {msg_id} already processed, skipping processing but determining label")
+        if email_log_record.condominio_id:
+            condo_result = await db.execute(select(Condominio).where(Condominio.id == email_log_record.condominio_id))
+            condo = condo_result.scalar_one_or_none()
+            if condo:
+                return f"{str(condo.numero).zfill(4)} - {condo.nome}"
+        return None
+
+    email_log = EmailLog(
+        gmail_message_id=msg_id,
+        remetente=sender,
+        assunto=subject,
+        recebido_em=received_at,
+        status="nao_identificado",
+    )
+    db.add(email_log)
+    await db.flush()
+
+    conc, codigo_encontrado = await find_concessionaria(sender, subject, body_text, db)
+    
+    if codigo_encontrado:
+        email_log.codigo_identificacao = codigo_encontrado
+
+    condo_name: Optional[str] = None
+
+    if conc:
+        email_log.status = "identificado"
+        email_log.condominio_id = conc.condominio_id
+    else:
+        logger.warning(f"Sender '{sender}' not matched to any concessionaria")
+        if is_known_user:
+            await _handle_unidentified_sender(sender, subject, body_text, received_at, codigo_encontrado, conc)
+
+    password = ""
+    condo: Optional[Condominio] = None
+    
+    if conc:
+        condo_result = await db.execute(select(Condominio).where(Condominio.id == conc.condominio_id))
+        condo = condo_result.scalar_one_or_none()
+        if condo:
+            condo_name = f"{str(condo.numero).zfill(4)} - {condo.nome}"
+        password = conc.gerar_senha_pdf(condo.cnpj_digits if condo else "")
+    
+    body_data = {}
+    if conc:
+        body_data = extract_data_from_body(body_text, conc.tipo)
+    else:
+        for t in ['Enel', 'Comgás', 'Sabesp']:
+            candidate = extract_data_from_body(body_text, t)
+            if len(candidate) > len(body_data):
+                body_data = candidate
+    
+    if body_data:
+        email_log.dados_extraidos = body_data
+
+    attachments = get_pdf_attachments(msg)
+    if not attachments:
+        logger.info(f"No PDF attachments in message {msg_id}")
+        email_log.status = "processado"
+        await db.commit()
+        return condo_name
+
+    saved_paths, condo_name = await _process_pdf_attachments(
+        attachments, password, conc, condo, db, body_data, email_log, sender, subject, msg_id, condo_name, codigo_encontrado
+    )
+
     # Sempre encaminha para o backup após o processamento
     await send_notification_email(
         to="datacroncompany1@gmail.com",
         subject=f"FWD: {subject}",
         message_text=f"E-mail processado pelo Datacron.\nRemetente: {sender}\nStatus: Identificado ({condo_name})" if condo_name else f"E-mail não identificado processado.\nRemetente: {sender}",
-        attachments=saved_paths if 'saved_paths' in locals() else []
+        attachments=saved_paths if saved_paths else []
     )
 
     await db.commit()

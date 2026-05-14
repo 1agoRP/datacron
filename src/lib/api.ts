@@ -40,6 +40,47 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
 }
 
 class ApiClient {
+  private refreshTokenPromise: Promise<string> | null = null;
+
+  private async attemptRefresh(): Promise<string> {
+    if (this.refreshTokenPromise) {
+      return this.refreshTokenPromise;
+    }
+
+    this.refreshTokenPromise = (async () => {
+      try {
+        const refreshUrl = `${API_BASE_URL}/auth/refresh`.replace(/([^:])\/\//g, '$1/');
+        const res = await fetch(refreshUrl, {
+          method: 'POST',
+          credentials: 'include'
+        });
+        
+        if (!res.ok) throw new Error('Refresh failed');
+        
+        const data = await res.json();
+        const newToken = data.access_token;
+        
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('datacron_token', newToken);
+          document.cookie = `datacron_token=${newToken}; path=/; max-age=2592000; SameSite=Lax`;
+        }
+        return newToken;
+      } catch (e) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('datacron_token');
+          document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+          document.cookie = 'datacron_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+          window.location.href = '/';
+        }
+        throw e;
+      } finally {
+        this.refreshTokenPromise = null;
+      }
+    })();
+
+    return this.refreshTokenPromise;
+  }
+
   private getToken(): string | null {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('datacron_token');
@@ -58,27 +99,26 @@ class ApiClient {
 
     const finalUrl = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`.replace(/([^:])\/\//g, '$1/');
 
-    const response = await fetchWithRetry(finalUrl, {
+    let response = await fetchWithRetry(finalUrl, {
       ...options,
       mode: 'cors',
+      credentials: 'include',
       headers,
     });
 
-    if (response.status === 401) {
-      // Só desloga se NÃO for a rota de login e o token não existir mais
-      if (typeof window !== 'undefined' && !endpoint.includes('/auth/login')) {
-        const currentToken = localStorage.getItem('datacron_token');
-        // Aguarda brevemente para evitar logout por erro transiente (race condition)
-        await new Promise(r => setTimeout(r, 300));
-        // Verifica se o token ainda existe após a espera
-        const tokenAfterWait = localStorage.getItem('datacron_token');
-        if (tokenAfterWait) {
-          // Token presente mas rejeitado → realmente expirou ou inválido → desloga
-          localStorage.removeItem('datacron_token');
-          document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
-          window.location.href = '/';
-        }
-        // Se não há token, a requisição foi feita sem auth → não deslogamos (endpoint público sendo acessado)
+    if (response.status === 401 && typeof window !== 'undefined' && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh')) {
+      try {
+        const newToken = await this.attemptRefresh();
+        headers['Authorization'] = `Bearer ${newToken}`;
+        response = await fetchWithRetry(finalUrl, {
+          ...options,
+          mode: 'cors',
+          credentials: 'include',
+          headers,
+        });
+      } catch (refreshError) {
+        // attemptRefresh will handle logout on failure
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
     }
 
@@ -119,20 +159,28 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(finalUrl, {
+    let response = await fetch(finalUrl, {
       ...options,
       method: options.method || 'POST',
       headers,
+      credentials: 'include',
       body: formData,
     });
 
-    if (response.status === 401) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('datacron_token');
-        document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
-        window.location.href = '/';
+    if (response.status === 401 && typeof window !== 'undefined' && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh')) {
+      try {
+        const newToken = await this.attemptRefresh();
+        headers['Authorization'] = `Bearer ${newToken}`;
+        response = await fetch(finalUrl, {
+          ...options,
+          method: options.method || 'POST',
+          headers,
+          credentials: 'include',
+          body: formData,
+        });
+      } catch (refreshError) {
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
-      throw new Error('Sessão expirada. Por favor, faça login novamente.');
     }
 
     if (!response.ok) {
@@ -171,10 +219,17 @@ class ApiClient {
   }
 
   async logout() {
-    localStorage.removeItem('datacron_token');
-    // Consistently clear the cookie
-    document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
-    window.location.href = '/';
+    try {
+      await this.request('/auth/logout', { method: 'POST' });
+    } catch (e) {
+      console.warn('Backend logout failed or ignored', e);
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('datacron_token');
+      document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+      document.cookie = 'datacron_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+      window.location.href = '/';
+    }
   }
 
   async updatePassword(data: { senha_atual: string; nova_senha: string }) {

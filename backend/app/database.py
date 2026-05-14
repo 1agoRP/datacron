@@ -2,7 +2,6 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
@@ -39,7 +38,8 @@ def _get_unnamed_statement():
 
 engine = create_async_engine(
     db_url,
-    poolclass=NullPool,
+    pool_size=5,
+    max_overflow=10,
     connect_args={
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
@@ -71,6 +71,7 @@ async def get_db() -> AsyncSession:  # type: ignore
     async with AsyncSessionLocal() as session:
         try:
             yield session
+            await session.commit()
         except Exception:
             await session.rollback()
             raise

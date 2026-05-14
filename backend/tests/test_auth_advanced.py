@@ -174,3 +174,82 @@ async def test_duplicate_email_rejected(auth_client: AsyncClient):
     resp2 = await auth_client.post("/api/auth/register", json=payload)
     assert resp2.status_code == 409
     assert "já cadastrado" in resp2.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_flow(client: AsyncClient, auth_client: AsyncClient, db_session):
+    """Test that login returns a refresh token cookie and /refresh works."""
+    # 0. Register user using auth_client (Admin)
+    await auth_client.post("/api/auth/register", json={
+        "nome": "Refresh Tester",
+        "email": "refresh@test.com",
+        "senha": "securepassword123",
+        "role": "admin"
+    })
+    
+    # 1. Login to get tokens using unauthenticated client
+    resp = await client.post("/api/auth/login", json={
+        "email": "refresh@test.com",
+        "senha": "securepassword123"
+    })
+    assert resp.status_code == 200
+    
+    # Ensure refresh token is in cookies
+    cookies = resp.cookies
+    assert "datacron_refresh_token" in cookies
+    
+    # 2. Use refresh token to get a new access token
+    client.cookies.update({"datacron_refresh_token": cookies["datacron_refresh_token"]})
+    refresh_resp = await client.post("/api/auth/refresh")
+    
+    assert refresh_resp.status_code == 200
+    assert "access_token" in refresh_resp.json()
+    assert refresh_resp.json()["token_type"] == "bearer"
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_invalid_or_missing(client: AsyncClient):
+    """Test that /refresh fails when cookie is missing or invalid."""
+    # No cookie
+    resp = await client.post("/api/auth/refresh")
+    assert resp.status_code == 401
+    
+    # Invalid cookie
+    client.cookies.update({"datacron_refresh_token": "invalid_refresh_token"})
+    resp2 = await client.post("/api/auth/refresh")
+    assert resp2.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_logout_clears_refresh_token(client: AsyncClient, auth_client: AsyncClient, db_session):
+    """Test that /logout clears the refresh token cookie and DB record."""
+    # 0. Register user using auth_client (Admin)
+    await auth_client.post("/api/auth/register", json={
+        "nome": "Logout Tester",
+        "email": "logout@test.com",
+        "senha": "securepassword123",
+        "role": "admin"
+    })
+
+    # 1. Login using unauthenticated client
+    login_resp = await client.post("/api/auth/login", json={
+        "email": "logout@test.com",
+        "senha": "securepassword123"
+    })
+    access_token = login_resp.json()["access_token"]
+    client.cookies.update({"datacron_refresh_token": login_resp.cookies.get("datacron_refresh_token")})
+    
+    # 2. Logout
+    logout_resp = await client.post(
+        "/api/auth/logout",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert logout_resp.status_code == 200
+    
+    # Cookie should be cleared
+    assert not logout_resp.cookies.get("datacron_refresh_token")
+    
+    # 3. Refresh should now fail
+    refresh_resp = await client.post("/api/auth/refresh")
+    assert refresh_resp.status_code == 401
+

@@ -27,15 +27,44 @@ export function middleware(request: NextRequest) {
 
   // Check for auth token in cookies (set by api.ts on login)
   const token = request.cookies.get('datacron_token')?.value;
+  const refreshToken = request.cookies.get('datacron_refresh_token')?.value;
 
-  if (!token) {
+  if (!token && !refreshToken) {
     // Build redirect URL back to landing page, preserving where they wanted to go
     const loginUrl = new URL('/', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Token present — allow the request through
+  // Basic validation of the JWT structure and expiration
+  try {
+    if (token) {
+      const parts = token.split('.');
+      if (parts.length !== 3) throw new Error('Invalid token structure');
+      
+      // Decode base64url payload safely
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const payloadStr = atob(base64);
+      const payload = JSON.parse(payloadStr);
+      
+      // Check expiration
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        if (!refreshToken) {
+           throw new Error('Token expired and no refresh token available');
+        }
+        // If expired but refresh token is present, let it pass so the client can refresh it
+      }
+    }
+  } catch (error) {
+    const loginUrl = new URL('/', request.url);
+    loginUrl.searchParams.set('redirect', pathname);
+    const response = NextResponse.redirect(loginUrl);
+    response.cookies.delete('datacron_token');
+    return response;
+  }
+
+  // Token present and valid (or refreshable) — allow the request through
   return NextResponse.next();
 }
 
