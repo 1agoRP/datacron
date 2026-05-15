@@ -37,6 +37,9 @@ function formatChartLabel(name: string): string {
 
 type ChartGroup = 'mes' | 'concessionaria' | 'condominio';
 
+// Roles that cannot see the billing analysis chart
+const BILLING_HIDDEN_ROLES = ['assistente', 'concessionarias', 'contabilidade', 'emissao', 'gerencia', 'orcamento', 'orçamento'];
+
 export default function Dashboard() {
   const { user } = useAuth();
   const router = useRouter();
@@ -128,6 +131,7 @@ export default function Dashboard() {
   }
 
   const isCoordinator = user?.role === 'admin' || user?.role === 'supervisor';
+  const canSeeBillingChart = !BILLING_HIDDEN_ROLES.includes(user?.role || '');
 
   return (
     <Shell>
@@ -263,114 +267,117 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {/* Analytics Section - Standard/Gerencia Only */}
-            <div className="dc-card dc-card-vibrant dc-glass-card" style={{ gridColumn: '1 / -1' }}>
-              <div className="dc-card-header" style={{ border: 'none', paddingBottom: 0 }}>
-                <div>
-                  <span className="dc-card-title">Análise de Faturamento</span>
-                  <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
-                    Distribuição financeira por {chartGroup === 'mes' ? 'período' : chartGroup === 'concessionaria' ? 'categoria' : 'unidade'}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <div className="dc-btn-group" style={{ background: '#f1f5f9', padding: 4, borderRadius: 10, display: 'flex' }}>
-                    <button
-                      className={`dc-btn-mini ${chartGroup === 'mes' ? 'active' : ''}`}
-                      onClick={() => handleChartFilterChange(chartMonths, 'mes')}
-                    >Mês</button>
-                    <button
-                      className={`dc-btn-mini ${chartGroup === 'concessionaria' ? 'active' : ''}`}
-                      onClick={() => handleChartFilterChange(chartMonths, 'concessionaria')}
-                    >Tipo</button>
-                    <button
-                      className={`dc-btn-mini ${chartGroup === 'condominio' ? 'active' : ''}`}
-                      onClick={() => handleChartFilterChange(chartMonths, 'condominio')}
-                    >Condomínio</button>
+            {/* Analytics Section — hidden for restricted roles */}
+            {canSeeBillingChart && (
+              <div className="dc-card dc-card-vibrant dc-glass-card" style={{ gridColumn: '1 / -1' }}>
+                <div className="dc-card-header" style={{ border: 'none', paddingBottom: 0 }}>
+                  <div>
+                    <span className="dc-card-title">Análise de Faturamento</span>
+                    <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
+                      Distribuição financeira por {chartGroup === 'mes' ? 'período' : chartGroup === 'concessionaria' ? 'categoria' : 'unidade'}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div className="dc-btn-group" style={{ background: '#f1f5f9', padding: 4, borderRadius: 10, display: 'flex' }}>
+                      <button
+                        className={`dc-btn-mini ${chartGroup === 'mes' ? 'active' : ''}`}
+                        onClick={() => handleChartFilterChange(chartMonths, 'mes')}
+                      >Mês</button>
+                      <button
+                        className={`dc-btn-mini ${chartGroup === 'concessionaria' ? 'active' : ''}`}
+                        onClick={() => handleChartFilterChange(chartMonths, 'concessionaria')}
+                      >Tipo</button>
+                      <button
+                        className={`dc-btn-mini ${chartGroup === 'condominio' ? 'active' : ''}`}
+                        onClick={() => handleChartFilterChange(chartMonths, 'condominio')}
+                      >Condomínio</button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div style={{ padding: '24px', height: 320, position: 'relative' }}>
-                {chartLoading && (
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-                    <div className="dc-loading-spinner" />
-                  </div>
-                )}
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartGroup === 'mes' ? (
-                    <AreaChart data={chartData || []}>
-                      <defs>
-                        <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#2563eb" stopOpacity={0.15} />
-                          <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis
-                        dataKey="name"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
-                        dy={10}
-                        tickFormatter={formatChartLabel}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
-                        tickFormatter={(v: any) => `R$ ${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`}
-                      />
-                      <Tooltip
-                        contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', padding: '12px' }}
-                        itemStyle={{ fontWeight: 700, fontSize: '0.85rem' }}
-                        labelStyle={{ marginBottom: 4, color: '#64748b', fontSize: '0.75rem', fontWeight: 600 }}
-                        formatter={(v: any) => [formatCurrency(Number(v)), 'Volume']}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="valor"
-                        stroke="#2563eb"
-                        strokeWidth={3}
-                        fillOpacity={1}
-                        fill="url(#colorVal)"
-                        dot={{ r: 4, fill: '#fff', stroke: '#2563eb', strokeWidth: 2 }}
-                        activeDot={{ r: 6, strokeWidth: 0 }}
-                      />
-                    </AreaChart>
-                  ) : (
-                    <BarChart data={chartData || []} layout="horizontal">
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis
-                        dataKey="name"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
-                        dy={10}
-                        interval={0}
-                        angle={(chartData || []).length > 6 ? -30 : 0}
-                        textAnchor={(chartData || []).length > 6 ? "end" : "middle"}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
-                        tickFormatter={(v: any) => `R$ ${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`}
-                      />
-                      <Tooltip
-                        cursor={{ fill: '#f8fafc' }}
-                        contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
-                        formatter={(v: any) => [formatCurrency(Number(v)), 'Total']}
-                      />
-                      <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={24}>
-                        {(chartData || []).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'][index % 5]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
+                <div style={{ padding: '24px', height: 320, position: 'relative' }}>
+                  {chartLoading && (
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                      <div className="dc-loading-spinner" />
+                    </div>
                   )}
-                </ResponsiveContainer>
+                  <ResponsiveContainer width="100%" height="100%">
+                    {chartGroup === 'mes' ? (
+                      <AreaChart data={chartData || []}>
+                        <defs>
+                          <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#2563eb" stopOpacity={0.15} />
+                            <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
+                          dy={10}
+                          tickFormatter={formatChartLabel}
+                        />
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
+                          tickFormatter={(v: any) => `R$ ${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`}
+                        />
+                        <Tooltip
+                          contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', padding: '12px' }}
+                          itemStyle={{ fontWeight: 700, fontSize: '0.85rem' }}
+                          labelStyle={{ marginBottom: 4, color: '#64748b', fontSize: '0.75rem', fontWeight: 600 }}
+                          formatter={(v: any) => [formatCurrency(Number(v)), 'Volume']}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="valor"
+                          stroke="#2563eb"
+                          strokeWidth={3}
+                          fillOpacity={1}
+                          fill="url(#colorVal)"
+                          dot={{ r: 4, fill: '#fff', stroke: '#2563eb', strokeWidth: 2 }}
+                          activeDot={{ r: 6, strokeWidth: 0 }}
+                        />
+                      </AreaChart>
+                    ) : (
+                      <BarChart data={chartData || []} layout="horizontal">
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                          dy={10}
+                          interval={0}
+                          angle={(chartData || []).length > 6 ? -30 : 0}
+                          textAnchor={(chartData || []).length > 6 ? "end" : "middle"}
+                          tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 16) + '…' : v}
+                        />
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
+                          tickFormatter={(v: any) => `R$ ${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`}
+                        />
+                        <Tooltip
+                          cursor={{ fill: '#f8fafc' }}
+                          contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+                          formatter={(v: any) => [formatCurrency(Number(v)), 'Total']}
+                        />
+                        <Bar dataKey="valor" radius={[6, 6, 0, 0]} barSize={24}>
+                          {(chartData || []).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'][index % 5]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Performance by Condominium Chart */}
             <div className="dc-card" style={{ gridColumn: '1 / -1' }}>
@@ -385,14 +392,14 @@ export default function Dashboard() {
                   {format(new Date(), 'MMMM', { locale: ptBR }).toUpperCase()}
                 </div>
               </div>
-              <div style={{ padding: '24px 24px 0 24px', height: 350, position: 'relative' }}>
+              <div style={{ padding: '24px 24px 0 24px', height: 350, position: 'relative', overflow: 'hidden' }}>
                 {loadingPorCondo && (
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
                     <div className="dc-loading-spinner" />
                   </div>
                 )}
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={contasPorCondo || []} margin={{ bottom: 70 }}>
+                  <BarChart data={contasPorCondo || []} margin={{ bottom: 80, left: 8, right: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis
                       dataKey="displayName"
@@ -400,9 +407,10 @@ export default function Dashboard() {
                       tickLine={false}
                       tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
                       interval={0}
-                      angle={-45}
+                      angle={-40}
                       textAnchor="end"
-                      height={80}
+                      height={90}
+                      tickFormatter={(v: string) => v.length > 22 ? v.slice(0, 20) + '…' : v}
                     />
                     <YAxis
                       axisLine={false}

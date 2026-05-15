@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     # ─── App ──────────────────────────────────────────────────
     ENVIRONMENT: str = "development"
-    ALERT_VARIATION_THRESHOLD: float = 0.20
+    ALERT_VARIATION_THRESHOLD: float = 0.15
 
     @property
     def allowed_origins_list(self) -> list[str]:

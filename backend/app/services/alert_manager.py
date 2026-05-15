@@ -87,7 +87,7 @@ async def _check_value_variation(
     fatura.variacao_percentual = round(variation * 100, 2)
 
     if variation > settings.ALERT_VARIATION_THRESHOLD:
-        direction = "acima" if fatura.valor > avg_valor else "abaixo"
+        direction = "a maior" if fatura.valor > avg_valor else "a menor"
         pct = round(variation * 100, 1)
         gravidade = "alta" if variation > 0.35 else "media"
 
@@ -97,8 +97,8 @@ async def _check_value_variation(
             tipo="variacao_valor",
             gravidade=gravidade,
             mensagem=(
-                f"Variação de {pct}% no valor da {conc.tipo} "
-                f"— R$ {fatura.valor:,.2f} ({direction} da média de R$ {avg_valor:,.2f})"
+                f"{conc.tipo} — valor {direction} em {pct}% em relação à média histórica "
+                f"(R$ {fatura.valor:,.2f} recebido vs. média de R$ {avg_valor:,.2f})"
             ),
         )
         db.add(alert)

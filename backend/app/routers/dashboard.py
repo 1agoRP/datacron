@@ -49,8 +49,8 @@ async def dashboard_stats(
     result = await db.execute(fatura_count_stmt)
     recebidas_mes = result.scalar_one()
 
-    # Active (unresolved) alerts count
-    alert_stmt = select(func.count(Alerta.id)).where(Alerta.resolvido == False)
+    # Active (unresolved and unread) alerts count
+    alert_stmt = select(func.count(Alerta.id)).where(Alerta.resolvido == False, Alerta.lido == False)
     if allowed_condo_ids is not None:
         alert_stmt = alert_stmt.where(Alerta.condominio_id.in_(allowed_condo_ids))
     result = await db.execute(alert_stmt)

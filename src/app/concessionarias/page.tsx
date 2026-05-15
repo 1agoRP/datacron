@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2, Search, Filter, Key, Eye, EyeOff, ArrowUpDown, TrendingUp, History, Copy, Check, Power } from 'lucide-react';
+import { Plus, Building2, Mail, ShieldCheck, Calendar, Zap, ArrowUpRight, X, Trash2, Search, Filter, Key, Eye, EyeOff, ArrowUpDown, TrendingUp, History, Copy, Check, Power, Upload } from 'lucide-react';
 import { api } from '@/lib/api';
 import Select from 'react-select';
 import useSWR from 'swr';
@@ -71,6 +71,20 @@ function getCodigoLabel(tipo: string): string {
 }
 
 /**
+ * Returns the expected digit count for the installation code by type.
+ * CLARO: 12, SABESP: 11, ENEL: 10, VIVO: 12
+ */
+function getInstalacaoLength(tipo: string): { length: number; label: string } | null {
+  switch (tipo.toLowerCase()) {
+    case 'enel':   return { length: 10, label: '10 dígitos' };
+    case 'sabesp': return { length: 11, label: '11 dígitos' };
+    case 'claro':  return { length: 12, label: '12 dígitos' };
+    case 'vivo':   return { length: 12, label: '12 dígitos' };
+    default: return null;
+  }
+}
+
+/**
  * Extracts only digits from a CNPJ string (no dots, dashes, slashes).
  * Leading zeros are preserved.
  */
@@ -126,7 +140,6 @@ export default function ConcessionariasPage() {
     nome_personalizado: '',
     leitura_individualizada: false,
     debito_automatico: true,
-    senha_portal: '',
     email_emissao: '',
   };
 
@@ -141,6 +154,7 @@ export default function ConcessionariasPage() {
   const [formReajuste, setFormReajuste] = useState({ tipo_concessionaria: 'Enel', percentual: 0, mes_aplicacao: '' });
   const [pdfReajuste, setPdfReajuste] = useState<File | null>(null);
   const [aplicandoReajuste, setAplicandoReajuste] = useState(false);
+  const [isDragOverReajuste, setIsDragOverReajuste] = useState(false);
   const { data: historicoReajustes = [], mutate: mutateHistorico } = useSWR(
     'historicoReajustes',
     () => api.getReajustesConcessionariaHistorico()
@@ -616,7 +630,28 @@ export default function ConcessionariasPage() {
                   ) : null}
                   <div className="dc-form-group">
                     <label>{getCodigoLabel(formConc.tipo)}</label>
-                    <input className="dc-form-input" required value={formConc.instalacao || ''} onChange={e => setFormConc({ ...formConc, instalacao: e.target.value })} placeholder="Ex: 82736412" disabled={readOnly || (!!editingId && !['admin', 'supervisor', 'gerencia', 'assistente'].includes(user?.role || ''))} />
+                    <input
+                      className="dc-form-input"
+                      required
+                      value={formConc.instalacao || ''}
+                      onChange={e => setFormConc({ ...formConc, instalacao: e.target.value })}
+                      placeholder={(() => {
+                        const info = getInstalacaoLength(formConc.tipo);
+                        return info ? `Ex: ${Array(info.length + 1).join('0')} (${info.label})` : 'Ex: 82736412';
+                      })()}
+                      disabled={readOnly || (!!editingId && !['admin', 'supervisor', 'gerencia', 'assistente'].includes(user?.role || ''))}
+                    />
+                    {(() => {
+                      const info = getInstalacaoLength(formConc.tipo);
+                      const digits = (formConc.instalacao || '').replace(/\D/g, '');
+                      if (!info || !formConc.instalacao) return null;
+                      const isOk = digits.length === info.length;
+                      return (
+                        <p style={{ fontSize: '0.72rem', marginTop: 4, fontWeight: 600, color: isOk ? '#10b981' : '#f59e0b' }}>
+                          {isOk ? `✓ ${info.label} válido` : `⚠️ Esperado: ${info.length} dígitos (atual: ${digits.length})`}
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -665,20 +700,6 @@ export default function ConcessionariasPage() {
                   </div>
                 )}
 
-                <div className="dc-form-group">
-                  <label>Senha do Portal (Opcional)</label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      className="dc-form-input"
-                      type={showPassword ? 'text' : 'password'}
-                      disabled={readOnly}
-                      value={formConc.senha_portal || ''}
-                      onChange={e => setFormConc({ ...formConc, senha_portal: e.target.value })}
-                      placeholder="Senha de acesso ao site da concessionária"
-                      style={{ paddingRight: 40 }}
-                    />
-                  </div>
-                </div>
 
                 {/* Password Preview */}
                 <div style={{
@@ -809,7 +830,54 @@ export default function ConcessionariasPage() {
 
               <div className="dc-form-group">
                 <label>Documento Comprobatório (Opcional)</label>
-                <input type="file" accept="application/pdf" className="dc-form-input" onChange={e => setPdfReajuste(e.target.files?.[0] || null)} />
+                <div
+                  onDragOver={e => { e.preventDefault(); setIsDragOverReajuste(true); }}
+                  onDragLeave={() => setIsDragOverReajuste(false)}
+                  onDrop={e => {
+                    e.preventDefault();
+                    setIsDragOverReajuste(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && file.type === 'application/pdf') setPdfReajuste(file);
+                    else if (file) alert('Por favor, envie apenas arquivos PDF.');
+                  }}
+                  style={{
+                    border: `2px dashed ${isDragOverReajuste ? '#2563eb' : '#e2e8f0'}`,
+                    borderRadius: 10,
+                    padding: '20px 16px',
+                    textAlign: 'center',
+                    background: isDragOverReajuste ? '#eff6ff' : '#f8fafc',
+                    transition: 'all 0.2s',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => document.getElementById('reajuste-pdf-input')?.click()}
+                >
+                  <input
+                    id="reajuste-pdf-input"
+                    type="file"
+                    accept="application/pdf"
+                    style={{ display: 'none' }}
+                    onChange={e => setPdfReajuste(e.target.files?.[0] || null)}
+                  />
+                  {pdfReajuste ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                      <ShieldCheck size={20} style={{ color: '#10b981' }} />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981' }}>{pdfReajuste.name}</span>
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setPdfReajuste(null); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 0, display: 'flex' }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload size={24} style={{ color: '#94a3b8', margin: '0 auto 8px' }} />
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Arraste um PDF ou clique para selecionar</div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 }}>Apenas arquivos PDF</div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 10 }}>

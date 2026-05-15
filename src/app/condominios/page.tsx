@@ -452,8 +452,11 @@ export default function CondominiosPage() {
 
   const handleDownloadAll = async () => {
     try {
-      const monthLabel = monthsList.find(m => m.value === refMonth)?.label || '';
-      const referencia = `${monthLabel}/${refYear}`;
+      // Use current month automatically
+      const now = new Date();
+      const month = monthsList[now.getMonth()].label;
+      const year = now.getFullYear().toString();
+      const referencia = `${month}/${year}`;
       await api.downloadAllInvoices(referencia);
     } catch (err: any) {
       alert(err.message || 'Erro ao baixar todas as faturas');
@@ -468,27 +471,8 @@ export default function CondominiosPage() {
           <p className="dc-page-subtitle">Gerencie sua base de clientes e acompanhe o status de cada Condomínio.</p>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div className="dc-ref-selector" style={{ display: 'flex', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '2px 8px', gap: 8, alignItems: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-            <Calendar size={16} style={{ color: '#64748b' }} />
-            <select 
-              value={refMonth} 
-              onChange={e => setRefMonth(e.target.value)}
-              style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', color: '#1e293b', padding: '4px 0', cursor: 'pointer', outline: 'none' }}
-            >
-              {monthsList.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-            <div style={{ width: 1, height: 16, background: '#e2e8f0' }} />
-            <select 
-              value={refYear} 
-              onChange={e => setRefYear(e.target.value)}
-              style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', color: '#1e293b', padding: '4px 0', cursor: 'pointer', outline: 'none' }}
-            >
-              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y.toString()}>{y}</option>)}
-            </select>
-          </div>
-
-          <button className="dc-btn dc-btn-secondary" onClick={handleDownloadAll} title="Baixar todas as faturas do mês em um arquivo ZIP" style={{ gap: 8 }}>
-            <Download size={16} /> Baixar Todas as Faturas
+          <button className="dc-btn dc-btn-secondary" onClick={handleDownloadAll} title="Baixar todas as faturas do mês atual em um arquivo ZIP" style={{ gap: 8 }}>
+            <Download size={16} /> Baixar Faturas do Mês
           </button>
           {isAdmin && (
             <button className="dc-btn dc-btn-primary" onClick={() => setIsModalOpen(true)}>
@@ -859,40 +843,20 @@ export default function CondominiosPage() {
                         fontWeight: 700,
                         cursor: 'pointer',
                         transition: 'all 0.2s',
-                        background: activeHistoryTab === 'sistema' ? '#fff' : 'transparent',
-                        color: activeHistoryTab === 'sistema' ? '#0f172a' : '#64748b',
-                        boxShadow: activeHistoryTab === 'sistema' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                        background: '#fff',
+                        color: '#0f172a',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                       }}
                     >
-                      Sistema
-                    </button>
-                    <button
-                      onClick={() => setActiveHistoryTab('gmail')}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        border: 'none',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        background: activeHistoryTab === 'gmail' ? '#fff' : 'transparent',
-                        color: activeHistoryTab === 'gmail' ? '#0f172a' : '#64748b',
-                        boxShadow: activeHistoryTab === 'gmail' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                      }}
-                    >
-                      Arquivo Gmail
+                      Faturas Registradas
                     </button>
                   </div>
 
-                  {/* Toolbar de Ações Rápidas (only for Sistema) */}
-                  {activeHistoryTab === 'sistema' && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                      <h5 style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e293b', margin: 0 }}>Faturas Registradas</h5>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{historyFaturas.length} documento(s) encontrado(s)</div>
-                    </div>
-                  )}
+                  {/* Toolbar de Ações Rápidas */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                    <h5 style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e293b', margin: 0 }}>Faturas Registradas</h5>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{historyFaturas.length} documento(s) encontrado(s)</div>
+                  </div>
 
                   {loadingHistory ? (
                     <div style={{ padding: 80, textAlign: 'center' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
@@ -1016,33 +980,6 @@ export default function CondominiosPage() {
                         </div>
                       )}
                     </>
-                  ) : activeHistoryTab === 'gmail' ? (
-                    /* ARCHIVE VIEW */
-                    <div style={{ padding: 16, background: '#fff', border: '1px solid #f3f4f6', borderRadius: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                        <h5 style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1f2937', margin: 0 }}>Arquivo do Gmail</h5>
-                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{gmailHistory.length} documento(s) encontrado(s)</div>
-                      </div>
-                      <div className="dc-space-y-3">
-                        {gmailHistory.map((g, idx) => (
-                          <div key={idx} style={{
-                            padding: 14, background: '#f9fafb', borderRadius: 10, border: '1px solid #e5e7eb',
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <Mail size={18} color="#ef4444" />
-                              <div>
-                                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#111827' }}>{g.referencia}</div>
-                                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Recebido: {new Date(g.created_at).toLocaleString('pt-BR')}</div>
-                              </div>
-                            </div>
-                            <button onClick={() => handleDownloadFatura(g, g.pdf_nome_original || 'fatura_gmail.pdf', 'gmail')} className="dc-btn dc-btn-secondary" style={{ height: 32, fontSize: '0.72rem', background: '#fff' }}>
-                              <Download size={14} /> Baixar
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   ) : null}
 
 

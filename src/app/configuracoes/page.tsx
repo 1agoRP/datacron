@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
-  User, Shield, Bell, Globe, Database, Mail, Smartphone, ArrowRight, Check, Key, Link as LinkIcon, LogOut, Trash2, Copy, Plus, Activity, RefreshCw, AlertTriangle, Pencil
+  User, Shield, Bell, Globe, Database, Mail, Smartphone, ArrowRight, Check, Key, Link as LinkIcon, LogOut, Trash2, Copy, Plus, Activity, RefreshCw, AlertTriangle, Pencil, Lock
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
@@ -149,13 +149,14 @@ export default function ConfiguracoesPage() {
                     <div style={{ position: 'relative' }}>
                       <input 
                         className="dc-form-input" 
-                        style={{ width: '100%', paddingRight: '44px', fontWeight: 600 }}
+                        style={{ width: '100%', paddingRight: '44px', fontWeight: 600, ...(isAdmin ? {} : { background: '#f1f5f9', color: '#64748b' }) }}
                         type="text" 
+                        disabled={!isAdmin}
                         value={form.nome}
                         onChange={(e) => setForm({ ...form, nome: e.target.value })} 
                       />
-                      <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>
-                        <Pencil size={16} />
+                      <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: isAdmin ? '#94a3b8' : '#cbd5e1' }}>
+                        {isAdmin ? <Pencil size={16} /> : <Lock size={16} />}
                       </div>
                     </div>
                   </div>
@@ -176,14 +177,15 @@ export default function ConfiguracoesPage() {
                     <div style={{ position: 'relative' }}>
                       <input 
                         className="dc-form-input" 
-                        style={{ width: '100%', paddingRight: '44px' }}
+                        style={{ width: '100%', paddingRight: '44px', ...(isAdmin ? {} : { background: '#f1f5f9', color: '#64748b' }) }}
                         type="text" 
                         placeholder="(00) 00000-0000"
+                        disabled={!isAdmin}
                         value={form.whatsapp}
                         onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
                       />
-                      <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}>
-                        <Pencil size={16} />
+                      <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: isAdmin ? '#94a3b8' : '#cbd5e1' }}>
+                        {isAdmin ? <Pencil size={16} /> : <Lock size={16} />}
                       </div>
                     </div>
                   </div>
