@@ -98,6 +98,7 @@ export const isReadOnly = (user: User | null): boolean => {
 export interface DashboardStats {
   condominiosCount: number;
   activeAlerts: number;
+  critical_alerts?: number;
   recebidasHoje: number;
   totalFaturado: number;
   condosSemAta?: number;
