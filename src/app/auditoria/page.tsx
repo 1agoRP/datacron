@@ -64,18 +64,20 @@ export default function AuditoriaPage() {
     return true;
   });
 
-  const filteredSystem = systemLogs.filter((log: any) => {
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      return (
-        log.acao?.toLowerCase().includes(term) ||
-        log.detalhes?.toLowerCase().includes(term) ||
-        log.entidade_nome?.toLowerCase().includes(term) ||
-        log.usuario_nome?.toLowerCase().includes(term)
-      );
-    }
-    return true;
-  });
+    const filteredSystem = systemLogs.filter((log: any) => {
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        return (
+          log.acao?.toLowerCase().includes(term) ||
+          (log.detalhes ? JSON.stringify(log.detalhes).toLowerCase().includes(term) : false) ||
+          log.entidade_nome?.toLowerCase().includes(term) ||
+          log.usuario_nome?.toLowerCase().includes(term) ||
+          // Fallback if user is null but search is 'sistema'
+          (term === 'sistema' && (!log.usuario_nome || log.usuario_nome.toLowerCase().includes('sistema')))
+        );
+      }
+      return true;
+    });
 
   const stats = {
     total: alertLogs.length,
@@ -285,8 +287,34 @@ export default function AuditoriaPage() {
                       {log.entidade_nome || (log.entidade_tipo + ' ID: ' + log.entidade_id)}
                     </div>
                     {log.detalhes && (
-                      <div style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 8, whiteSpace: 'pre-wrap', background: '#f8fafc', padding: '6px 10px', borderRadius: 6, border: '1px solid #f1f5f9' }}>
-                        {typeof log.detalhes === 'object' ? JSON.stringify(log.detalhes, null, 2) : log.detalhes}
+                      <div style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: 8, whiteSpace: 'pre-wrap', background: '#f8fafc', padding: '10px 14px', borderRadius: 10, border: '1px solid #f1f5f9' }}>
+                        {typeof log.detalhes === 'object' ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px 16px' }}>
+                             {log.detalhes.condominio_nome && (
+                               <div><strong style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', display: 'block' }}>Condomínio</strong> <span style={{ color: '#334155', fontWeight: 600 }}>{log.detalhes.condominio_nome}</span></div>
+                             )}
+                             {log.detalhes.concessionaria_tipo && (
+                               <div><strong style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', display: 'block' }}>Concessionária</strong> <span style={{ color: '#334155', fontWeight: 600 }}>{log.detalhes.concessionaria_tipo} {log.detalhes.concessionaria_codigo ? `(${log.detalhes.concessionaria_codigo})` : ''}</span></div>
+                             )}
+                             {log.detalhes.valor !== undefined && (
+                               <div><strong style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', display: 'block' }}>Valor</strong> <span style={{ color: '#7c3aed', fontWeight: 800 }}>R$ {Number(log.detalhes.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                             )}
+                             {log.detalhes.vencimento && (
+                               <div><strong style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', display: 'block' }}>Vencimento</strong> <span style={{ color: '#334155', fontWeight: 600 }}>{log.detalhes.vencimento}</span></div>
+                             )}
+                             {log.detalhes.referencia && (
+                               <div><strong style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', display: 'block' }}>Referência</strong> <span style={{ color: '#334155', fontWeight: 600 }}>{log.detalhes.referencia}</span></div>
+                             )}
+                             {log.detalhes.metodo && (
+                               <div><strong style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', display: 'block' }}>Método</strong> <span style={{ color: '#334155', fontWeight: 600 }}>{log.detalhes.metodo}</span></div>
+                             )}
+                             {log.detalhes.origem === 'email' && (
+                               <div><strong style={{ color: '#64748b', fontSize: '0.65rem', textTransform: 'uppercase', display: 'block' }}>Remetente</strong> <span style={{ color: '#334155', fontWeight: 600 }}>{log.detalhes.remetente}</span></div>
+                             )}
+                          </div>
+                        ) : (
+                          <div style={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>{String(log.detalhes)}</div>
+                        )}
                       </div>
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: '0.78rem', color: '#94a3b8' }}>

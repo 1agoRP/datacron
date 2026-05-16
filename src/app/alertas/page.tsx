@@ -12,7 +12,7 @@ import { isReadOnly } from '@/types';
 export default function AlertasPage() {
   const { data: alertas = [], isLoading: loading, mutate } = useSWR(
     'alertas',
-    () => api.getAlertas(),
+    () => api.getAlertas({ limit: 500 }),
     { revalidateOnFocus: true }
   );
   const [activeTab, setActiveTab] = useState('Todos');

@@ -157,7 +157,12 @@ async def update_concessionaria(
         acao="edicao",
         entidade_tipo="concessionaria",
         entidade_id=c.id,
-        detalhes={"tipo": c.tipo, "instalacao": c.instalacao, "campos_alterados": list(update_data.keys())}
+        detalhes={
+            "condominio": c.condominio.nome if c.condominio else "N/A",
+            "tipo": c.tipo, 
+            "instalacao": c.instalacao, 
+            "campos_alterados": list(update_data.keys())
+        }
     )
     db.add(log)
     
@@ -187,6 +192,11 @@ async def delete_concessionaria(
         raise HTTPException(status_code=403, detail="Acesso negado a esta concessionária")
     c.ativo = False
     
+    # Fetch condo name for audit before commit
+    condo_nome = "N/A"
+    c_res = await db.execute(select(Condominio.nome).where(Condominio.id == c.condominio_id))
+    condo_nome = c_res.scalar() or "N/A"
+
     # Audit Log
     log = AuditLog(
         usuario_id=current_user.id,
@@ -195,7 +205,7 @@ async def delete_concessionaria(
         acao="exclusao",
         entidade_tipo="conta",
         entidade_id=c.id,
-        detalhes={"tipo": c.tipo, "instalacao": c.instalacao}
+        detalhes={"tipo": c.tipo, "instalacao": c.instalacao, "condominio": condo_nome}
     )
     db.add(log)
     

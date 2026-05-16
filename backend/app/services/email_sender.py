@@ -417,6 +417,7 @@ async def send_notification_email(
         "remetente_nome": "Datacron Avisos",
         "remetente_email": "avisos@datacron.com.br",
         "corpo_html": html_body if html_body else message_text,
+        "in_reply_to": in_reply_to
     }
 
     if attachments:

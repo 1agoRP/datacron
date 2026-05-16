@@ -21,6 +21,7 @@ from app.services.pdf_processor import (
 from app.models.alerta import EmailLog
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
+from app.models.audit_log import AuditLog
 from sqlalchemy import select
 from datetime import datetime, timezone
 import base64
@@ -244,6 +245,31 @@ async def n8n_email_invoice(
                 f"PDF unlock FAILED for {conc_tipo} | UC: {conc_instalacao} | "
                 f"Condo: {condo_nome} | Sender: {sender} | Subject: {subject}"
             )
+
+        # ── Audit Log (System Action) ────────────────────────────────────
+        audit_detalhes = {
+            "valor": valor, 
+            "vencimento": str(vencimento), 
+            "referencia": referencia, 
+            "origem": "email",
+            "remetente": sender,
+            "pdf_desbloqueado": pdf_unlocked
+        }
+        if conc:
+            audit_detalhes["concessionaria_tipo"] = conc.tipo
+            audit_detalhes["concessionaria_codigo"] = conc.instalacao
+            if condo:
+                audit_detalhes["condominio_nome"] = condo.nome
+        
+        audit = AuditLog(
+            acao="inclusao",
+            entidade_tipo="fatura",
+            entidade_id=fatura.id,
+            usuario_nome="Sistema (n8n)",
+            usuario_email="bot@datacron.com.br",
+            detalhes=audit_detalhes
+        )
+        db.add(audit)
 
         await db.commit()
 

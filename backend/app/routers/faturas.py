@@ -149,7 +149,15 @@ async def create_fatura_manual(
         acao="inclusao",
         entidade_tipo="fatura",
         entidade_id=nova_fatura.id,
-        detalhes={"valor": valor, "vencimento": str(vencimento), "referencia": referencia, "metodo": "manual"}
+        detalhes={
+            "condominio_nome": condo.nome,
+            "concessionaria_tipo": conc.tipo,
+            "concessionaria_codigo": conc.instalacao,
+            "valor": valor, 
+            "vencimento": str(vencimento), 
+            "referencia": referencia, 
+            "metodo": "manual"
+        }
     )
     db.add(log)
     
@@ -191,6 +199,19 @@ async def delete_fatura(
 
     await db.delete(fatura)
     
+    # Fetch context names for audit before committing delete
+    condo_nome = "N/A"
+    conc_tipo = "N/A"
+    conc_codigo = "N/A"
+    if fatura.condominio_id:
+        c_res = await db.execute(select(Condominio.nome).where(Condominio.id == fatura.condominio_id))
+        condo_nome = c_res.scalar() or "N/A"
+    if fatura.concessionaria_id:
+        cc_res = await db.execute(select(Concessionaria.tipo, Concessionaria.instalacao).where(Concessionaria.id == fatura.concessionaria_id))
+        cc_row = cc_res.first()
+        if cc_row:
+            conc_tipo, conc_codigo = cc_row
+
     # Audit Log
     log = AuditLog(
         usuario_id=user.id,
@@ -199,7 +220,14 @@ async def delete_fatura(
         acao="exclusao",
         entidade_tipo="fatura",
         entidade_id=fatura_id,
-        detalhes={"valor": fatura.valor, "vencimento": str(fatura.vencimento), "referencia": fatura.referencia}
+        detalhes={
+            "condominio_nome": condo_nome,
+            "concessionaria_tipo": conc_tipo,
+            "concessionaria_codigo": conc_codigo,
+            "valor": fatura.valor, 
+            "vencimento": str(fatura.vencimento), 
+            "referencia": fatura.referencia
+        }
     )
     db.add(log)
     await db.commit()

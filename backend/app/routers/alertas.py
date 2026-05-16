@@ -48,7 +48,7 @@ async def list_alertas(
     lido: Optional[bool] = None,
     resolvido: bool = False,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, le=1000),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),

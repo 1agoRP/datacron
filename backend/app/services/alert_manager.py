@@ -317,6 +317,10 @@ async def notify_alert(
     for u in carteira_users:
         recipients.add(u.email)
 
+    # NOVO: Se for erro de PDF, encaminhar de volta para o remetente original
+    if alert.tipo == "pdf_erro" and fatura and fatura.email_remetente:
+        recipients.add(fatura.email_remetente)
+
     if not recipients:
         logger.warning(f"No recipients found for alert {alert.id or 'NEW'} on condo {alert.condominio_id}")
         return
@@ -404,7 +408,8 @@ async def notify_alert(
     in_reply_to = None
     if fatura:
         in_reply_to = fatura.gmail_message_id
-        if fatura.pdf_desbloqueado and fatura.pdf_path and os.path.exists(fatura.pdf_path):
+        # Modificado: Anexar PDF se desbloqueado OU se for um erro de PDF (precisamos do anexo para análise)
+        if (fatura.pdf_desbloqueado or alert.tipo == "pdf_erro") and fatura.pdf_path and os.path.exists(fatura.pdf_path):
             try:
                 with open(fatura.pdf_path, "rb") as f:
                     attachments.append((fatura.pdf_nome_original or "fatura.pdf", f.read()))

@@ -1,4 +1,5 @@
 import uuid
+import asyncio
 from typing import Optional
 from datetime import datetime, date
 
@@ -56,14 +57,27 @@ async def dashboard_stats(
     result = await db.execute(alert_stmt)
     active_alerts = result.scalar_one()
 
-    # Total faturado
-    total_faturado_stmt = select(func.sum(Fatura.valor))
+    # Total faturado (Mês vigente apenas)
+    total_faturado_stmt = select(func.sum(Fatura.valor)).where(
+        extract("month", Fatura.vencimento) == today.month,
+        extract("year", Fatura.vencimento) == today.year,
+    )
     if allowed_condo_ids is not None:
         total_faturado_stmt = total_faturado_stmt.where(
             Fatura.condominio_id.in_(allowed_condo_ids)
         )
     result = await db.execute(total_faturado_stmt)
     total_faturado = result.scalar() or 0.0
+
+    # Critical Alerts count (Unresolved + High Gravity)
+    critical_stmt = select(func.count(Alerta.id)).where(
+        Alerta.resolvido == False,
+        Alerta.gravidade == "alta"
+    )
+    if allowed_condo_ids is not None:
+        critical_stmt = critical_stmt.where(Alerta.condominio_id.in_(allowed_condo_ids))
+    result = await db.execute(critical_stmt)
+    critical_alerts = result.scalar_one()
 
     # Condominios without ATA (Active only)
     ata_stmt = select(func.count(Condominio.id)).where(
@@ -112,6 +126,7 @@ async def dashboard_stats(
             "condominios_count": condominios_count,
             "recebidas_hoje": recebidas_mes,
             "active_alerts": active_alerts,
+            "critical_alerts": critical_alerts,
             "total_faturado": round(float(total_faturado), 2),
             "condos_sem_ata": condos_sem_ata,
             "faturas": [FaturaResponse.model_validate(f) for f in recent_faturas],
@@ -377,47 +392,51 @@ async def portfolio_stats(
         .where(Condominio.ativo == True, Concessionaria.ativo == True, Condominio.carteira != None)
         .group_by(Condominio.carteira)
     )
-    expected_res = await db.execute(expected_stmt)
-    expected_counts = dict(expected_res.all())
 
-    # 2. Received accounts per portfolio (this month)
+    # 2. Received in month per portfolio
     received_stmt = (
-        select(Condominio.carteira, func.count(func.distinct(Fatura.concessionaria_id)))
+        select(Condominio.carteira, func.count(Fatura.id))
         .join(Fatura, Condominio.id == Fatura.condominio_id)
-        .join(Concessionaria, Fatura.concessionaria_id == Concessionaria.id)
         .where(
             Condominio.ativo == True,
-            Concessionaria.ativo == True,
+            Condominio.carteira != None,
             extract("year", Fatura.vencimento) == now.year,
-            extract("month", Fatura.vencimento) == now.month,
-            Condominio.carteira != None
+            extract("month", Fatura.vencimento) == now.month
         )
         .group_by(Condominio.carteira)
     )
-    received_res = await db.execute(received_stmt)
-    received_counts = dict(received_res.all())
 
-    # 3. Pending alerts per portfolio
+    # 3. Active alerts per portfolio
+    from app.models.alerta import Alerta
     alerts_stmt = (
         select(Condominio.carteira, func.count(Alerta.id))
         .join(Alerta, Condominio.id == Alerta.condominio_id)
         .where(Condominio.ativo == True, Alerta.resolvido == False, Condominio.carteira != None)
         .group_by(Condominio.carteira)
     )
-    alerts_res = await db.execute(alerts_stmt)
-    alerts_counts = dict(alerts_res.all())
 
-    # 4. Condos without ATA per portfolio
+    # 4. Missing ATA per portfolio
     missing_ata_stmt = (
         select(Condominio.carteira, func.count(Condominio.id))
         .where(
-            Condominio.ativo == True, 
-            (Condominio.ata_eleicao_nome == None) | (Condominio.ata_eleicao_nome == ""),
-            Condominio.carteira != None
+            Condominio.ativo == True,
+            Condominio.carteira != None,
+            (Condominio.ata_eleicao_nome == None) | (Condominio.ata_eleicao_nome == "")
         )
         .group_by(Condominio.carteira)
     )
-    missing_ata_res = await db.execute(missing_ata_stmt)
+
+    # Run all queries in parallel for better performance
+    expected_res, received_res, alerts_res, missing_ata_res = await asyncio.gather(
+        db.execute(expected_stmt),
+        db.execute(received_stmt),
+        db.execute(alerts_stmt),
+        db.execute(missing_ata_stmt)
+    )
+    
+    expected_counts = dict(expected_res.all())
+    received_counts = dict(received_res.all())
+    alerts_counts = dict(alerts_res.all())
     missing_ata_counts = dict(missing_ata_res.all())
 
     # Assemble data for 11 portfolios

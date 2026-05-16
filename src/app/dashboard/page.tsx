@@ -171,13 +171,13 @@ export default function Dashboard() {
         />
         {user?.role === 'admin' ? (
           <StatCard
-            title="Faturamento Total"
+            title="Faturamento"
             value={formatCurrency(stats?.totalFaturado || 0)}
-            subtitle="Volume acumulado"
+            subtitle="Volume no mês vigente"
             icon={<DollarSign size={24} />}
             gradient={['#f0fdf4', '#dcfce7']}
             iconColor="#16a34a"
-            badge="Consolidado"
+            badge={format(new Date(), 'MMMM', { locale: ptBR })}
             positive
           />
         ) : (
@@ -203,13 +203,13 @@ export default function Dashboard() {
         />
         <StatCard
           title="Alertas Críticos"
-          value={String(stats?.activeAlerts || 0)}
-          subtitle="Ações pendentes"
+          value={String(stats?.critical_alerts || 0)}
+          subtitle="Alta prioridade pendente"
           icon={<AlertCircle size={24} />}
           gradient={['#fef2f2', '#fee2e2']}
           iconColor="#dc2626"
-          badge="Prioridade Alta"
-          danger={Number(stats?.activeAlerts) > 0}
+          badge="Ação Imediata"
+          danger={Number(stats?.critical_alerts) > 0}
         />
       </div>
 
