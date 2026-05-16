@@ -48,6 +48,7 @@ export default function Dashboard() {
   // Chart controls
   const [chartMonths, setChartMonths] = useState(6);
   const [chartGroup, setChartGroup] = useState<ChartGroup>('mes');
+  const [isDraggingPdf, setIsDraggingPdf] = useState(false);
 
   // Redirection logic for restricted roles
   useEffect(() => {
@@ -235,12 +236,12 @@ export default function Dashboard() {
                         <span className="dc-portfolio-pct">{p.progresso}%</span>
                       </div>
                       <div className="dc-progress-bar-bg">
-                        <div 
-                          className="dc-progress-bar-fill" 
-                          style={{ 
+                        <div
+                          className="dc-progress-bar-fill"
+                          style={{
                             width: `${p.progresso}%`,
                             background: p.progresso > 90 ? '#10b981' : p.progresso > 50 ? '#3b82f6' : '#f59e0b'
-                          }} 
+                          }}
                         />
                       </div>
                       <div className="dc-portfolio-footer">
@@ -432,9 +433,136 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Alertas e Atividade */}
+      <div className="dc-dashboard-main dc-animate-fade-in" style={{ marginTop: 24 }}>
+        <div className="dc-card">
+          <div className="dc-card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ padding: 8, background: '#fef2f2', borderRadius: 8, color: '#dc2626' }}>
+                <AlertCircle size={20} />
+              </div>
+              <div>
+                <span className="dc-card-title">Alertas Críticos Recentes</span>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>
+                  Pendências que requerem atenção imediata da equipe
+                </p>
+              </div>
+            </div>
+            <button className="dc-btn-mini-ghost" onClick={() => router.push('/alertas')}>Ver todos</button>
+          </div>
+          <div className="dc-table-wrapper" style={{ maxHeight: 400, overflowY: 'auto' }}>
+            <table className="dc-table">
+              <thead>
+                <tr>
+                  <th style={{ paddingLeft: 24 }}>Tipo de Alerta</th>
+                  <th>Condomínio / Info</th>
+                  <th>Mensagem</th>
+                  <th>Data</th>
+                  <th style={{ paddingRight: 24, textAlign: 'right' }}>Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats?.alertas?.map((a: Alerta) => (
+                  <tr key={a.id}>
+                    <td style={{ paddingLeft: 24 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className={`dc-badge ${a.gravidade === 'alta' ? 'dc-badge-red' : a.gravidade === 'media' ? 'dc-badge-amber' : 'dc-badge-blue'}`} style={{ padding: '4px 8px' }}>
+                          {a.tipo}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="dc-cell-primary">{a.condominio?.nome || '—'}</div>
+                      <div className="dc-cell-secondary">ID: {a.condominio?.numero || '—'}</div>
+                    </td>
+                    <td style={{ maxWidth: 300 }}>
+                      <div className="dc-cell-primary" style={{ whiteSpace: 'normal', fontSize: '0.82rem', lineHeight: 1.4 }}>
+                        {a.mensagem}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="dc-cell-secondary" style={{ fontWeight: 600 }}>
+                        {format(new Date(a.created_at), 'dd/MM/yyyy HH:mm')}
+                      </div>
+                    </td>
+                    <td style={{ paddingRight: 24, textAlign: 'right' }}>
+                      <button className="dc-btn-mini" onClick={() => router.push(`/condominios?id=${a.condominio_id}`)}>
+                        Resolver <ChevronRight size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {(!stats?.alertas || stats.alertas.length === 0) && (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '48px', color: '#94a3b8' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                        <CheckCircle2 size={32} strokeWidth={1.5} color="#10b981" />
+                        <span style={{ fontWeight: 600 }}>Tudo em ordem! Nenhum alerta crítico pendente.</span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div
+          onDragOver={(e) => { e.preventDefault(); setIsDraggingPdf(true); }}
+          onDragLeave={() => setIsDraggingPdf(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDraggingPdf(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file && file.type === 'application/pdf') {
+              // Redirect to import page with a "phantom" state if we had a way, 
+              // for now let's just alert and go there.
+              alert(`Arquivo '${file.name}' detectado. Redirecionando para importação...`);
+              router.push('/importacoes');
+            }
+          }}
+          className="dc-card dc-card-vibrant"
+          style={{
+            background: isDraggingPdf ? 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)' : 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)',
+            borderColor: isDraggingPdf ? '#3b82f6' : '#1d4ed8',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            color: '#fff',
+            padding: '32px',
+            transform: isDraggingPdf ? 'scale(1.02)' : 'scale(1)',
+            transition: 'all 0.2s',
+            cursor: 'pointer'
+          }}
+          onClick={() => router.push('/importacoes')}
+        >
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ 
+              width: 56, height: 56, background: 'rgba(255,255,255,0.1)', 
+              borderRadius: 16, display: 'flex', alignItems: 'center', 
+              justifyContent: 'center', margin: '0 auto 20px',
+              color: '#93c5fd'
+            }}>
+              <Upload size={28} />
+            </div>
+            <h3 style={{ fontWeight: 800, fontSize: '1.2rem', marginBottom: 10 }}>Upload Rápido de PDF</h3>
+            <p style={{ fontSize: '0.88rem', color: '#93c5fd', lineHeight: 1.5, marginBottom: 24 }}>
+              Arraste as faturas em PDF aqui para processamento automático via IA.
+            </p>
+            <button 
+              className="dc-btn" 
+              style={{ background: '#fff', color: '#1e40af', width: '100%', fontWeight: 800 }}
+              onClick={() => router.push('/importacoes')}
+            >
+              Ir para Importação
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Faturas Recentes - Only for non-coordinators or if desired */}
       {!isCoordinator && (
-        <div className="dc-animate-fade-in" style={{ marginTop: 20 }}>
+        <div className="dc-animate-fade-in" style={{ marginTop: 24 }}>
           <div className="dc-card">
             <div className="dc-card-header">
               <span className="dc-card-title">Fluxo de Faturas Recentes</span>
@@ -443,8 +571,8 @@ export default function Dashboard() {
               <table className="dc-table">
                 <thead>
                   <tr>
-                    <th style={{ paddingLeft: 24 }}>Unidade / ID</th>
-                    <th>Cód. Instalação</th>
+                    <th style={{ paddingLeft: 24 }}>Condomínio / ID</th>
+                    <th>Cód. Concessionária</th>
                     <th>Vencimento</th>
                     <th>Tipo</th>
                     <th>Valor</th>
@@ -482,14 +610,14 @@ export default function Dashboard() {
                       <td style={{ paddingRight: 24 }}>
                         <span className={`dc-badge ${f.status === 'processada' ? 'dc-badge-green' : f.status === 'erro' ? 'dc-badge-red' : 'dc-badge-amber'}`}>
                           <span className="dc-badge-dot" />
-                          {f.status === 'processada' ? 'Conferida' : f.status === 'erro' ? 'Erro' : 'Em Análise'}
+                          {f.status === 'processada' ? 'Processada Aut.' : f.status === 'erro' ? 'Erro' : 'Vinculo Manual'}
                         </span>
                       </td>
                     </tr>
                   ))}
                   {(!stats?.faturas || stats.faturas.length === 0) && (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '64px', color: '#94a3b8' }}>
+                      <td colSpan={20} style={{ textAlign: 'center', padding: '64px', color: '#94a3b8' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
                           <FileText size={40} strokeWidth={1} />
                           <span>Aguardando recebimento de faturas</span>

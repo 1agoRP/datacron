@@ -76,10 +76,10 @@ function getCodigoLabel(tipo: string): string {
  */
 function getInstalacaoLength(tipo: string): { length: number; label: string } | null {
   switch (tipo.toLowerCase()) {
-    case 'enel':   return { length: 10, label: '10 dígitos' };
+    case 'enel': return { length: 10, label: '10 dígitos' };
     case 'sabesp': return { length: 11, label: '11 dígitos' };
-    case 'claro':  return { length: 12, label: '12 dígitos' };
-    case 'vivo':   return { length: 12, label: '12 dígitos' };
+    case 'claro': return { length: 12, label: '12 dígitos' };
+    case 'vivo': return { length: 12, label: '12 dígitos' };
     default: return null;
   }
 }
@@ -134,9 +134,9 @@ export default function ConcessionariasPage() {
     instalacao: '',
     regra_senha: '5_primeiros_cnpj',
     dia_vencimento: 10,
-    email_esperado: '',
+    email_esperado: user?.email || '',
     senha_manual: '',
-    valor_medio: 0,
+    valor_medio: '' as any,
     nome_personalizado: '',
     leitura_individualizada: false,
     debito_automatico: true,
@@ -176,14 +176,14 @@ export default function ConcessionariasPage() {
     if (e) e.preventDefault();
     try {
       setCreating(true);
-      
+
       const payload: any = { ...formConc };
 
       // Clean email fields
       if (!payload.email_esperado || !payload.email_esperado.trim() || !payload.email_esperado.includes('@')) {
         payload.email_esperado = null;
       }
-      
+
       if (!payload.email_emissao || !payload.email_emissao.trim() || !payload.email_emissao.includes('@')) {
         payload.email_emissao = null;
       }
@@ -193,6 +193,12 @@ export default function ConcessionariasPage() {
         payload.senha_manual = null;
       }
 
+      // Convert valor_medio back to number
+      if (typeof payload.valor_medio === 'string') {
+        const cleanedValue = payload.valor_medio.replace(/[^\d,.-]/g, '').replace(',', '.');
+        payload.valor_medio = parseFloat(cleanedValue) || 0;
+      }
+
       if (payload.valor_medio === undefined || payload.valor_medio === null || isNaN(payload.valor_medio)) {
         payload.valor_medio = 0;
       }
@@ -200,7 +206,7 @@ export default function ConcessionariasPage() {
       if (editingId) {
         // Remove fields not in ConcessionariaUpdate schema
         delete payload.condominio_id;
-        
+
         // RBAC: Only allowed roles can update instalacao (matched with backend)
         const allowedRoles = ['admin', 'supervisor', 'gerencia', 'assistente'];
         if (!allowedRoles.includes(user?.role || '')) {
@@ -667,7 +673,7 @@ export default function ConcessionariasPage() {
                   </div>
                   <div className="dc-form-group">
                     <label>Dia de Vencimento</label>
-                    <input className="dc-form-input" type="number" required disabled={readOnly} value={formConc.dia_vencimento} onChange={e => setFormConc({ ...formConc, dia_vencimento: parseInt(e.target.value) })} placeholder="Ex: 10" />
+                    <input className="dc-form-input" type="number" min="1" max="31" required disabled={readOnly} value={formConc.dia_vencimento} onChange={e => setFormConc({ ...formConc, dia_vencimento: parseInt(e.target.value) })} placeholder="Ex: 10" />
                   </div>
                 </div>
 
@@ -724,12 +730,20 @@ export default function ConcessionariasPage() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="dc-form-group">
-                    <label>E-mail do Remetente (Opcional)</label>
+                    <label>E-mail do Remetente</label>
                     <input className="dc-form-input" disabled={readOnly} value={formConc.email_esperado || ''} onChange={e => setFormConc({ ...formConc, email_esperado: e.target.value })} placeholder="Ex: fatura@enel.com.br" />
                   </div>
                   <div className="dc-form-group">
                     <label>Valor Médio Mensal (R$)</label>
-                    <input className="dc-form-input" type="number" step="0.01" required disabled={readOnly} value={formConc.valor_medio} onChange={e => setFormConc({ ...formConc, valor_medio: parseFloat(e.target.value) || 0 })} placeholder="Ex: 500.50" />
+                    <input
+                      className="dc-form-input"
+                      type="text"
+                      required
+                      disabled={readOnly}
+                      value={formConc.valor_medio}
+                      onChange={e => setFormConc({ ...formConc, valor_medio: e.target.value })}
+                      placeholder="0,00"
+                    />
                   </div>
                 </div>
 

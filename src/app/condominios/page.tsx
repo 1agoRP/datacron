@@ -94,6 +94,7 @@ export default function CondominiosPage() {
   const [manualFaturaData, setManualFaturaData] = useState({ valor: '', vencimento: '' });
   const [manualFaturaPdf, setManualFaturaPdf] = useState<File | null>(null);
   const [savingManualFatura, setSavingManualFatura] = useState(false);
+  const [isDraggingFatura, setIsDraggingFatura] = useState(false);
 
   const [refMonth, setRefMonth] = useState(monthsList[new Date().getMonth()].value);
   const [refYear, setRefYear] = useState(new Date().getFullYear().toString());
@@ -1018,7 +1019,20 @@ export default function CondominiosPage() {
                     <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <FileSignature size={16} color="#3b82f6" /> Documentos Importantes
                     </h4>
-                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div 
+                      onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = '#eff6ff'; }}
+                      onDragLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff'; }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.background = '#fff';
+                        const file = e.dataTransfer.files?.[0];
+                        if (file && file.type === 'application/pdf') {
+                          triggerUploadFlow('ata', detailsCondo.id, { target: { files: [file] } } as any);
+                        }
+                      }}
+                      style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, transition: 'all 0.2s' }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
                           <FileText size={20} />
@@ -1061,7 +1075,20 @@ export default function CondominiosPage() {
                       </div>
                     </div>
 
-                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div 
+                      onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = '#eff6ff'; }}
+                      onDragLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff'; }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.background = '#fff';
+                        const file = e.dataTransfer.files?.[0];
+                        if (file && file.type === 'application/pdf') {
+                          triggerUploadFlow('avcb', detailsCondo.id, { target: { files: [file] } } as any);
+                        }
+                      }}
+                      style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, transition: 'all 0.2s' }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 8, background: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0369a1' }}>
                           <ShieldCheck size={20} />
@@ -1104,7 +1131,20 @@ export default function CondominiosPage() {
                       </div>
                     </div>
 
-                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div 
+                      onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = '#eff6ff'; }}
+                      onDragLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff'; }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                        e.currentTarget.style.background = '#fff';
+                        const file = e.dataTransfer.files?.[0];
+                        if (file && file.type === 'application/pdf') {
+                          triggerUploadFlow('apolice', detailsCondo.id, { target: { files: [file] } } as any);
+                        }
+                      }}
+                      style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all 0.2s' }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                         <div style={{ width: 40, height: 40, borderRadius: 8, background: '#fdf2f8', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#be185d' }}>
                           <HardHat size={20} />
@@ -1497,16 +1537,37 @@ export default function CondominiosPage() {
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Paperclip size={14} color="#64748b" /> Anexar PDF da Fatura
                 </label>
-                <div style={{
-                  position: 'relative',
-                  border: `2px dashed ${manualFaturaPdf ? '#10b981' : '#cbd5e1'}`,
-                  borderRadius: 10,
-                  padding: manualFaturaPdf ? '12px 16px' : '24px 16px',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: manualFaturaPdf ? '#f0fdf4' : '#f8fafc',
-                }}>
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setIsDraggingFatura(true); }}
+                  onDragLeave={() => setIsDraggingFatura(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDraggingFatura(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && file.type === 'application/pdf') {
+                      setManualFaturaPdf(file);
+                    }
+                  }}
+                  onClick={() => document.getElementById('manual-fatura-upload')?.click()}
+                  style={{
+                    position: 'relative',
+                    border: `2px dashed ${manualFaturaPdf ? '#10b981' : isDraggingFatura ? '#3b82f6' : '#cbd5e1'}`,
+                    borderRadius: 10,
+                    padding: manualFaturaPdf ? '12px 16px' : '24px 16px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: manualFaturaPdf ? '#f0fdf4' : isDraggingFatura ? '#eff6ff' : '#f8fafc',
+                    transform: isDraggingFatura ? 'scale(1.02)' : 'scale(1)',
+                  }}
+                >
+                  <input
+                    type="file"
+                    id="manual-fatura-upload"
+                    accept="application/pdf"
+                    style={{ display: 'none' }}
+                    onChange={(e) => setManualFaturaPdf(e.target.files?.[0] || null)}
+                  />
                   {manualFaturaPdf ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
