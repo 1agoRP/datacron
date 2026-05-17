@@ -41,9 +41,12 @@ type ChartGroup = 'mes' | 'concessionaria' | 'condominio';
 const BILLING_HIDDEN_ROLES = ['assistente', 'concessionarias', 'contabilidade', 'emissao', 'gerencia', 'orcamento', 'orçamento'];
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const isCoordinator = user?.role === 'admin' || user?.role === 'supervisor';
+  const canSeeBillingChart = !BILLING_HIDDEN_ROLES.includes(user?.role || '');
 
   // Chart controls
   const [chartMonths, setChartMonths] = useState(6);
@@ -106,8 +109,9 @@ export default function Dashboard() {
     { revalidateOnFocus: false, refreshInterval: 300000 }
   );
 
-  const { data: portfolioStats, isLoading: loadingPortfolio } = useSWR('dashboard/portfolio-stats',
-    () => (user?.role === 'admin' || user?.role === 'supervisor') ? api.getPortfolioStats() : null,
+  const { data: portfolioStats, isLoading: loadingPortfolio } = useSWR(
+    isCoordinator ? 'dashboard/portfolio-stats' : null,
+    () => api.getPortfolioStats(),
     { revalidateOnFocus: false, refreshInterval: 300000 }
   );
 
@@ -139,7 +143,7 @@ export default function Dashboard() {
     return Math.round((contasEsperadas.recebidas / contasEsperadas.total_esperadas) * 100);
   }, [contasEsperadas]);
 
-  if ((loadingStats && !stats) || (loadingPortfolio && !portfolioStats)) {
+  if (authLoading || (loadingStats && !stats) || (loadingPortfolio && !portfolioStats)) {
     return (
       <Shell>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
@@ -148,9 +152,6 @@ export default function Dashboard() {
       </Shell>
     );
   }
-
-  const isCoordinator = user?.role === 'admin' || user?.role === 'supervisor';
-  const canSeeBillingChart = !BILLING_HIDDEN_ROLES.includes(user?.role || '');
 
   return (
     <Shell>
