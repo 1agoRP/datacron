@@ -53,7 +53,11 @@ async def list_alertas(
     _: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    stmt = select(Alerta).where(Alerta.resolvido == resolvido)
+    stmt = (
+        select(Alerta)
+        .options(joinedload(Alerta.condominio))
+        .where(Alerta.resolvido == resolvido)
+    )
     if allowed_condo_ids is not None:
         stmt = stmt.where(Alerta.condominio_id.in_(allowed_condo_ids))
     if tipo:
@@ -92,8 +96,12 @@ async def create_alerta(
     await notify_alert(db, alert, None)
 
     await db.commit()
-    await db.refresh(alert)
-    return alert
+    result = await db.execute(
+        select(Alerta)
+        .options(joinedload(Alerta.condominio))
+        .where(Alerta.id == alert.id)
+    )
+    return result.scalar_one()
 
 
 @router.put("/{id}/ler", response_model=AlertaResponse)
@@ -103,7 +111,11 @@ async def mark_as_read(
     _: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    result = await db.execute(select(Alerta).where(Alerta.id == id))
+    result = await db.execute(
+        select(Alerta)
+        .options(joinedload(Alerta.condominio))
+        .where(Alerta.id == id)
+    )
     a = result.scalar_one_or_none()
     if not a:
         raise HTTPException(status_code=404, detail="Alerta nao encontrado")
@@ -116,8 +128,12 @@ async def mark_as_read(
         raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
     a.lido = True
     await db.commit()
-    await db.refresh(a)
-    return a
+    result = await db.execute(
+        select(Alerta)
+        .options(joinedload(Alerta.condominio))
+        .where(Alerta.id == a.id)
+    )
+    return result.scalar_one()
 
 
 @router.put("/{id}/resolver", response_model=AlertaResponse)
