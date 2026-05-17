@@ -272,7 +272,9 @@ class AlertaResponse(BaseModel):
     lido: bool
     resolvido: bool
     created_at: datetime
+    condominio: Optional[CondominioMini] = None
     model_config = {"from_attributes": True}
+
 
 
 # ─── Email Log ────────────────────────────────────────────────
