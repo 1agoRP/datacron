@@ -250,6 +250,7 @@ async def notify_alert(
     admin_users = res_admins.scalars().all()
 
     # Se não tem condomínio, apenas admins recebem
+    condo = None
     if not alert.condominio_id:
         logger.info(f"Alert {alert.id or 'NEW'} has no condominio_id — sending to admins only.")
         # Segue para o envio abaixo, mas linked_users e carteira_users ficarão vazios
