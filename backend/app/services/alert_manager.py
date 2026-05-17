@@ -91,13 +91,19 @@ async def _check_value_variation(
         pct = round(variation * 100, 1)
         gravidade = "alta" if variation > 0.35 else "media"
 
+        # Fetch condominium to display name
+        from app.models.condominio import Condominio
+        condo = await db.get(Condominio, fatura.condominio_id)
+        condo_name = condo.nome if condo else f"ID {fatura.condominio_id}"
+
         alert = Alerta(
             condominio_id=fatura.condominio_id,
             fatura_id=fatura.id,
             tipo="variacao_valor",
             gravidade=gravidade,
             mensagem=(
-                f"{conc.tipo} — valor {direction} em {pct}% em relação à média histórica "
+                f"{condo_name} | {conc.tipo} (Cód: {conc.instalacao or 'N/A'}) — "
+                f"valor {direction} em {pct}% em relação à média histórica "
                 f"(R$ {fatura.valor:,.2f} recebido vs. média de R$ {avg_valor:,.2f})"
             ),
         )

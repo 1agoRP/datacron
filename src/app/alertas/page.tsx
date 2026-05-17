@@ -84,15 +84,15 @@ export default function AlertasPage() {
   const filtered = alertas.filter(a => {
     if (activeTab === 'Todos') return true;
     if (activeTab === 'Críticos') return a.gravidade === 'alta';
-    if (activeTab === 'Fatura Alta') return a.tipo === 'valor_atípico';
-    return a.tipo !== 'valor_atípico' && a.gravidade !== 'alta';
+    if (activeTab === 'Fatura Alta') return a.tipo === 'variacao_valor';
+    return a.tipo !== 'variacao_valor' && a.gravidade !== 'alta';
   });
 
   const counts = {
     Todos: alertas.length,
     Críticos: alertas.filter(a => a.gravidade === 'alta').length,
-    'Fatura Alta': alertas.filter(a => a.tipo === 'valor_atípico').length,
-    Outros: alertas.filter(a => a.tipo !== 'valor_atípico' && a.gravidade !== 'alta').length
+    'Fatura Alta': alertas.filter(a => a.tipo === 'variacao_valor').length,
+    Outros: alertas.filter(a => a.tipo !== 'variacao_valor' && a.gravidade !== 'alta').length
   };
 
   return (

@@ -58,9 +58,14 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
     return allNav.filter(item => {
       if (item.module && ADMIN_ONLY_MODULES.has(item.module)) return false;
       
+      const adminSupervisorOnly = ['/reajustes', '/configuracoes'];
+      if (adminSupervisorOnly.includes(item.href) && role !== 'supervisor') {
+        return false;
+      }
+      
       const restrictedRoles = ['concessionarias', 'contabilidade', 'orçamento', 'emissao', 'financeiro', 'providencias', 'geral'];
       if (restrictedRoles.includes(role)) {
-         const restrictedLinks = ['/dashboard', '/reajustes', '/alertas'];
+         const restrictedLinks = ['/dashboard', '/alertas'];
          if (restrictedLinks.includes(item.href)) return false;
       }
       

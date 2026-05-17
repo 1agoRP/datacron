@@ -6,7 +6,7 @@ import {
   Building2, FileText, AlertCircle, Zap,
   TrendingUp, Clock, CheckCircle2, ChevronRight,
   Filter, Calendar, DollarSign, Download, Upload, ArrowUpRight,
-  FileSignature
+  FileSignature, X, Paperclip
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
@@ -50,6 +50,23 @@ export default function Dashboard() {
   const [chartGroup, setChartGroup] = useState<ChartGroup>('mes');
   const [isDraggingPdf, setIsDraggingPdf] = useState(false);
 
+  // Quick Upload Modal State
+  const [isQuickUploadOpen, setIsQuickUploadOpen] = useState(false);
+  const [quickUploadPdf, setQuickUploadPdf] = useState<File | null>(null);
+  const [quickUploadCondo, setQuickUploadCondo] = useState<string>('');
+  const [quickUploadConc, setQuickUploadConc] = useState<string>('');
+  const [quickUploadValor, setQuickUploadValor] = useState('');
+  const [quickUploadVencimento, setQuickUploadVencimento] = useState('');
+  const [savingQuickUpload, setSavingQuickUpload] = useState(false);
+
+  const { data: condominios } = useSWR(isQuickUploadOpen ? 'condominios' : null, () => api.getCondominios());
+  const { data: concessionarias } = useSWR(isQuickUploadOpen ? 'concessionarias' : null, () => api.getConcessionarias());
+
+  const filteredConcessionarias = useMemo(() => {
+    if (!concessionarias || !quickUploadCondo) return [];
+    return concessionarias.filter((c: any) => c.condominio_id === quickUploadCondo);
+  }, [concessionarias, quickUploadCondo]);
+
   // Redirection logic for restricted roles
   useEffect(() => {
     if (user) {
@@ -73,6 +90,7 @@ export default function Dashboard() {
         faturas: data.kpis.faturas as Fatura[],
         alertas: data.kpis.alertas as Alerta[],
         activeAlerts: data.kpis.active_alerts,
+        critical_alerts: data.kpis.critical_alerts,
         recebidasHoje: data.kpis.recebidas_hoje,
         totalFaturado: data.kpis.total_faturado,
         condosSemAta: data.kpis.condos_sem_ata,
@@ -486,7 +504,7 @@ export default function Dashboard() {
                       </div>
                     </td>
                     <td style={{ paddingRight: 24, textAlign: 'right' }}>
-                      <button className="dc-btn-mini" onClick={() => router.push(`/condominios?id=${a.condominio_id}`)}>
+                      <button className="dc-btn-mini" onClick={() => router.push(`/alertas`)}>
                         Resolver <ChevronRight size={14} />
                       </button>
                     </td>
@@ -515,10 +533,10 @@ export default function Dashboard() {
             setIsDraggingPdf(false);
             const file = e.dataTransfer.files?.[0];
             if (file && file.type === 'application/pdf') {
-              // Redirect to import page with a "phantom" state if we had a way, 
-              // for now let's just alert and go there.
-              alert(`Arquivo '${file.name}' detectado. Redirecionando para importação...`);
-              router.push('/importacoes');
+              setQuickUploadPdf(file);
+              setIsQuickUploadOpen(true);
+            } else {
+              alert('Apenas arquivos PDF são suportados.');
             }
           }}
           className="dc-card dc-card-vibrant"
@@ -534,12 +552,12 @@ export default function Dashboard() {
             transition: 'all 0.2s',
             cursor: 'pointer'
           }}
-          onClick={() => router.push('/importacoes')}
+          onClick={() => document.getElementById('quick-upload-input')?.click()}
         >
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              width: 56, height: 56, background: 'rgba(255,255,255,0.1)', 
-              borderRadius: 16, display: 'flex', alignItems: 'center', 
+            <div style={{
+              width: 56, height: 56, background: 'rgba(255,255,255,0.1)',
+              borderRadius: 16, display: 'flex', alignItems: 'center',
               justifyContent: 'center', margin: '0 auto 20px',
               color: '#93c5fd'
             }}>
@@ -549,12 +567,26 @@ export default function Dashboard() {
             <p style={{ fontSize: '0.88rem', color: '#93c5fd', lineHeight: 1.5, marginBottom: 24 }}>
               Arraste as faturas em PDF aqui para processamento automático via IA.
             </p>
-            <button 
-              className="dc-btn" 
+            <input
+              type="file"
+              id="quick-upload-input"
+              accept="application/pdf"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setQuickUploadPdf(file);
+                  setIsQuickUploadOpen(true);
+                }
+                e.target.value = '';
+              }}
+            />
+            <button
+              className="dc-btn"
               style={{ background: '#fff', color: '#1e40af', width: '100%', fontWeight: 800 }}
-              onClick={() => router.push('/importacoes')}
+              onClick={(e) => { e.stopPropagation(); document.getElementById('quick-upload-input')?.click(); }}
             >
-              Ir para Importação
+              Selecionar PDF
             </button>
           </div>
         </div>
@@ -627,6 +659,148 @@ export default function Dashboard() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cadastro Manual de Fatura via Upload Rápido */}
+      {isQuickUploadOpen && (
+        <div className="dc-modal-overlay">
+          <div className="dc-modal-content" style={{ maxWidth: 500 }}>
+            <div className="dc-modal-header">
+              <h2 className="dc-modal-title">Cadastrar Fatura Manual</h2>
+              <button className="dc-modal-close" onClick={() => setIsQuickUploadOpen(false)}><X size={20} /></button>
+            </div>
+            <div className="dc-modal-body dc-space-y-4">
+              <div className="dc-form-group">
+                <label>Condomínio</label>
+                <select
+                  className="dc-form-select"
+                  value={quickUploadCondo}
+                  onChange={(e) => {
+                    setQuickUploadCondo(e.target.value);
+                    setQuickUploadConc('');
+                  }}
+                  required
+                >
+                  <option value="">Selecione o Condomínio</option>
+                  {condominios?.map((c: any) => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="dc-form-group">
+                <label>Concessionária</label>
+                <select
+                  className="dc-form-select"
+                  value={quickUploadConc}
+                  onChange={(e) => setQuickUploadConc(e.target.value)}
+                  disabled={!quickUploadCondo}
+                  required
+                >
+                  <option value="">Selecione a Concessionária</option>
+                  {filteredConcessionarias.map((c: any) => (
+                    <option key={c.id} value={c.id}>
+                      {c.tipo === 'Outros' ? c.nome_personalizado : c.tipo} {c.instalacao ? `(${c.instalacao})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="dc-form-group">
+                <label>Valor (R$)</label>
+                <input
+                  type="text"
+                  className="dc-form-input"
+                  value={quickUploadValor}
+                  onChange={(e) => {
+                     let val = e.target.value.replace(/[^0-9.,]/g, '');
+                     setQuickUploadValor(val);
+                  }}
+                  placeholder="0,00"
+                  required
+                />
+              </div>
+
+              <div className="dc-form-group">
+                <label>Data de Vencimento</label>
+                <input
+                  type="date"
+                  className="dc-form-input"
+                  value={quickUploadVencimento}
+                  onChange={(e) => setQuickUploadVencimento(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="dc-form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Paperclip size={14} color="#64748b" /> Arquivo Anexado
+                </label>
+                {quickUploadPdf && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0fdf4', padding: '12px 16px', borderRadius: 10, border: '2px solid #10b981' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 8, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+                        <FileText size={18} />
+                      </div>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a', maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{quickUploadPdf.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{(quickUploadPdf.size / 1024).toFixed(1)} KB</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="dc-modal-footer">
+              <button
+                type="button"
+                className="dc-btn dc-btn-secondary"
+                onClick={() => setIsQuickUploadOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="dc-btn dc-btn-primary"
+                disabled={savingQuickUpload || !quickUploadCondo || !quickUploadConc || !quickUploadValor || !quickUploadVencimento}
+                onClick={async () => {
+                  try {
+                    setSavingQuickUpload(true);
+                    let cleanVal = quickUploadValor.replace(/\./g, '').replace(',', '.');
+                    if (cleanVal.split('.').length > 2) {
+                       // Handle cases where multiple dots are present (e.g., 1.000.000,00)
+                       const parts = quickUploadValor.split(',');
+                       if (parts.length > 1) {
+                           cleanVal = parts[0].replace(/\./g, '') + '.' + parts[1];
+                       }
+                    }
+                    await api.createFaturaManual({
+                      condominio_id: quickUploadCondo,
+                      concessionaria_id: quickUploadConc,
+                      valor: parseFloat(cleanVal),
+                      vencimento: quickUploadVencimento,
+                      pdf_file: quickUploadPdf || undefined,
+                    });
+                    setIsQuickUploadOpen(false);
+                    setQuickUploadPdf(null);
+                    setQuickUploadCondo('');
+                    setQuickUploadConc('');
+                    setQuickUploadValor('');
+                    setQuickUploadVencimento('');
+                    alert('Fatura cadastrada com sucesso!');
+                  } catch (err: any) {
+                    alert(err.message || 'Erro ao cadastrar fatura');
+                  } finally {
+                    setSavingQuickUpload(false);
+                  }
+                }}
+                style={{ minWidth: 140 }}
+              >
+                {savingQuickUpload ? 'Salvando...' : 'Cadastrar'}
+              </button>
             </div>
           </div>
         </div>

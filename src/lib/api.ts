@@ -616,6 +616,7 @@ class ApiClient {
         condominios_count: number; 
         recebidas_hoje: number; 
         active_alerts: number;
+        critical_alerts: number;
         total_faturado: number;
         condos_sem_ata: number;
         faturas: Fatura[];
