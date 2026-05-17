@@ -58,7 +58,7 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
     return allNav.filter(item => {
       if (item.module && ADMIN_ONLY_MODULES.has(item.module)) return false;
       
-      const adminSupervisorOnly = ['/reajustes', '/configuracoes'];
+      const adminSupervisorOnly = ['/reajustes'];
       if (adminSupervisorOnly.includes(item.href) && role !== 'supervisor') {
         return false;
       }

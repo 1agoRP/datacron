@@ -213,8 +213,8 @@ async def n8n_email_invoice(
         else:
             logger.warning(f"Failed to identify concessionaria/condominio for email from {sender} (Subject: {subject})")
 
-        # ── Alert for PDF unlock failure ─────────────────────────────────
-        if not pdf_unlocked:
+        # ── Alert for PDF unlock failure or Missing Condo ────────────────
+        if not pdf_unlocked or not condo:
             from app.models.alerta import Alerta
             from app.services.alert_manager import notify_alert
 
@@ -222,19 +222,30 @@ async def n8n_email_invoice(
             conc_tipo = conc.tipo if conc else "N/A"
             conc_instalacao = conc.instalacao if conc else (codigo_encontrado or "N/A")
 
-            mensagem = (
-                f"Falha no desbloqueio do PDF da {conc_tipo} do {condo_nome}. "
-                f"Verifique a regra de senha configurada. "
-                f"(UC: {conc_instalacao}) "
-                f"Remetente: {sender} | Assunto: {subject}"
-            )
+            if not condo:
+                mensagem = (
+                    f"Condomínio não identificado para fatura da {conc_tipo}. "
+                    f"Verifique as regras de concessionária. (UC: {conc_instalacao}) "
+                    f"Remetente: {sender} | Assunto: {subject}"
+                )
+                tipo_alerta = "email_nao_identificado"
+            else:
+                mensagem = (
+                    f"Falha no desbloqueio do PDF da {conc_tipo} do {condo_nome}. "
+                    f"Verifique a regra de senha configurada. "
+                    f"(UC: {conc_instalacao}) "
+                    f"Remetente: {sender} | Assunto: {subject}"
+                )
+                tipo_alerta = "pdf_erro"
 
             alert = Alerta(
-                condominio_id=conc.condominio_id if conc else None,
+                condominio_id=condo.id if condo else None,
                 fatura_id=fatura.id,
-                tipo="pdf_erro",
+                tipo=tipo_alerta,
                 gravidade="alta",
                 mensagem=mensagem,
+                email_remetente=sender,
+                email_assunto=subject,
             )
             db.add(alert)
             await db.flush()
@@ -242,7 +253,7 @@ async def n8n_email_invoice(
             # Send notification email with full context
             await notify_alert(db, alert, fatura=fatura, conc=conc)
             logger.warning(
-                f"PDF unlock FAILED for {conc_tipo} | UC: {conc_instalacao} | "
+                f"PDF/Condo issue for {conc_tipo} | UC: {conc_instalacao} | "
                 f"Condo: {condo_nome} | Sender: {sender} | Subject: {subject}"
             )
 
@@ -273,6 +284,16 @@ async def n8n_email_invoice(
 
         await db.commit()
 
+        if not condo or not pdf_unlocked:
+            return {
+                "status": "action_required",
+                "reason": "condominio_nao_identificado" if not condo else "pdf_locked",
+                "msg_id": msg_id,
+                "fatura_id": str(fatura.id),
+                "condominio": condo.nome if condo else None,
+                "unlocked": pdf_unlocked
+            }
+
         return {
             "status": "success",
             "fatura_id": str(fatura.id),
@@ -282,8 +303,16 @@ async def n8n_email_invoice(
 
     except Exception as e:
         logger.error(f"Error processing webhook invoice: {str(e)}", exc_info=True)
-        email_log.status = "erro"
-        email_log.erro_msg = str(e)
-        await db.commit()
-        return {"status": "error", "message": str(e)}
+        await db.rollback()
+        try:
+            log_result = await db.execute(select(EmailLog).where(EmailLog.gmail_message_id == msg_id))
+            log = log_result.scalar_one_or_none()
+            if log:
+                log.status = "erro"
+                log.erro_msg = str(e)[:2000]
+                await db.commit()
+        except Exception as inner_e:
+            logger.error(f"Failed to update EmailLog after rollback: {inner_e}")
+            await db.rollback()
+        return {"status": "error", "message": str(e), "msg_id": msg_id}
 

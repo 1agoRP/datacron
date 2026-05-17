@@ -323,9 +323,12 @@ async def notify_alert(
     for u in carteira_users:
         recipients.add(u.email)
 
-    # NOVO: Se for erro de PDF, encaminhar de volta para o remetente original
-    if alert.tipo == "pdf_erro" and fatura and fatura.email_remetente:
-        recipients.add(fatura.email_remetente)
+    # NOVO: Se for erro de PDF ou e-mail não identificado, encaminhar de volta para o remetente original
+    if alert.tipo in ["pdf_erro", "email_nao_identificado"]:
+        if fatura and fatura.email_remetente:
+            recipients.add(fatura.email_remetente)
+        elif getattr(alert, "email_remetente", None):
+            recipients.add(alert.email_remetente)
 
     if not recipients:
         logger.warning(f"No recipients found for alert {alert.id or 'NEW'} on condo {alert.condominio_id}")
