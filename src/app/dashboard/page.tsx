@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import { format, subMonths, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import useSWR from 'swr';
+import Select from 'react-select';
 import { DashboardStats, ChartData, Fatura, Alerta } from '@/types';
 
 const MONTH_NAMES: Record<string, string> = {};
@@ -36,6 +37,39 @@ function formatChartLabel(name: string): string {
 }
 
 type ChartGroup = 'mes' | 'concessionaria' | 'condominio';
+
+const selectStyles = {
+  control: (base: any, state: any) => ({
+    ...base,
+    background: state.isDisabled ? '#f1f5f9' : '#fff',
+    border: `1px solid ${state.isFocused ? '#2563eb' : '#e2e8f0'}`,
+    borderRadius: '8px',
+    boxShadow: state.isFocused ? '0 0 0 1px #2563eb' : 'none',
+    minHeight: '38px',
+    fontSize: '0.85rem',
+    fontWeight: 500,
+    color: '#0f172a',
+    cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+    '&:hover': { borderColor: state.isFocused ? '#2563eb' : '#cbd5e1' }
+  }),
+  menu: (base: any) => ({
+    ...base,
+    borderRadius: '8px',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    zIndex: 9999,
+    fontSize: '0.85rem'
+  }),
+  option: (base: any, state: any) => ({
+    ...base,
+    backgroundColor: state.isSelected ? '#eff6ff' : state.isFocused ? '#f8fafc' : 'white',
+    color: state.isSelected ? '#1d4ed8' : '#334155',
+    cursor: 'pointer',
+    padding: '8px 12px'
+  }),
+  singleValue: (base: any, state: any) => ({ ...base, color: state.isDisabled ? '#94a3b8' : '#0f172a' }),
+  placeholder: (base: any) => ({ ...base, color: '#94a3b8' }),
+  indicatorSeparator: (base: any) => ({ ...base, display: 'none' })
+};
 
 // Roles that cannot see the billing analysis chart
 const BILLING_HIDDEN_ROLES = ['assistente', 'concessionarias', 'contabilidade', 'emissao', 'gerencia', 'orcamento', 'orçamento'];
@@ -69,6 +103,21 @@ export default function Dashboard() {
     if (!concessionarias || !quickUploadCondo) return [];
     return concessionarias.filter((c: any) => c.condominio_id === quickUploadCondo);
   }, [concessionarias, quickUploadCondo]);
+
+  const selectedCondoObj = useMemo(() => {
+    if (!quickUploadCondo || !condominios) return null;
+    const found = condominios.find((c: any) => c.id === quickUploadCondo);
+    return found ? { value: found.id, label: `${found.nome} (Nº ${found.numero || 'S/N'})` } : null;
+  }, [quickUploadCondo, condominios]);
+
+  const selectedConcObj = useMemo(() => {
+    if (!quickUploadConc || !filteredConcessionarias) return null;
+    const found = filteredConcessionarias.find((c: any) => c.id === quickUploadConc);
+    return found ? {
+      value: found.id,
+      label: `${found.tipo === 'Outros' ? found.nome_personalizado : found.tipo} ${found.instalacao ? `(${found.instalacao})` : ''}`
+    } : null;
+  }, [quickUploadConc, filteredConcessionarias]);
 
   // Redirection logic for restricted roles
   useEffect(() => {
@@ -676,38 +725,40 @@ export default function Dashboard() {
             <div className="dc-modal-body dc-space-y-4">
               <div className="dc-form-group">
                 <label>Condomínio</label>
-                <select
-                  className="dc-form-select"
-                  value={quickUploadCondo}
-                  onChange={(e) => {
-                    setQuickUploadCondo(e.target.value);
+                <Select
+                  options={(condominios || []).map((c: any) => ({ value: c.id, label: `${c.nome} (Nº ${c.numero || 'S/N'})` }))}
+                  value={selectedCondoObj}
+                  onChange={(option: any) => {
+                    setQuickUploadCondo(option?.value || '');
                     setQuickUploadConc('');
                   }}
-                  required
-                >
-                  <option value="">Selecione o Condomínio</option>
-                  {condominios?.map((c: any) => (
-                    <option key={c.id} value={c.id}>{c.nome}</option>
-                  ))}
-                </select>
+                  placeholder="Selecione ou busque o Condomínio..."
+                  styles={selectStyles}
+                  noOptionsMessage={() => "Nenhum condomínio encontrado"}
+                  isSearchable
+                  filterOption={(option: any, inputValue: string) => {
+                    if (!inputValue) return true;
+                    const normalize = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    return normalize(option.label).includes(normalize(inputValue));
+                  }}
+                />
               </div>
 
               <div className="dc-form-group">
                 <label>Concessionária</label>
-                <select
-                  className="dc-form-select"
-                  value={quickUploadConc}
-                  onChange={(e) => setQuickUploadConc(e.target.value)}
-                  disabled={!quickUploadCondo}
-                  required
-                >
-                  <option value="">Selecione a Concessionária</option>
-                  {filteredConcessionarias.map((c: any) => (
-                    <option key={c.id} value={c.id}>
-                      {c.tipo === 'Outros' ? c.nome_personalizado : c.tipo} {c.instalacao ? `(${c.instalacao})` : ''}
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  options={filteredConcessionarias.map((c: any) => ({
+                    value: c.id,
+                    label: `${c.tipo === 'Outros' ? c.nome_personalizado : c.tipo} ${c.instalacao ? `(${c.instalacao})` : ''}`
+                  }))}
+                  value={selectedConcObj}
+                  onChange={(option: any) => setQuickUploadConc(option?.value || '')}
+                  isDisabled={!quickUploadCondo}
+                  placeholder="Selecione a Concessionária..."
+                  styles={selectStyles}
+                  noOptionsMessage={() => "Nenhuma concessionária encontrada"}
+                  isSearchable
+                />
               </div>
 
               <div className="dc-form-group">
