@@ -25,6 +25,7 @@ from app.models.audit_log import AuditLog
 from sqlalchemy import select
 from datetime import datetime, timezone
 import base64
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -111,11 +112,51 @@ async def n8n_email_invoice(
         email_log.dados_extraidos = body_data
 
         # ── PDF Processing ───────────────────────────────────────────────
-        password = ""
-        if conc and condo:
-            password = conc.gerar_senha_pdf(condo.cnpj_digits)
+        # Step 1: Try opening without password (unprotected PDF)
+        unlocked_bytes = None
+        try:
+            import pikepdf
+            with pikepdf.open(io.BytesIO(pdf_bytes)) as test_pdf:
+                output = io.BytesIO()
+                test_pdf.save(output)
+                output.seek(0)
+                unlocked_bytes = output.read()
+                logger.info("PDF opened without password (unprotected)")
+        except pikepdf.PasswordError:
+            pass  # PDF is encrypted, will try password below
+        except Exception as e:
+            logger.warning(f"PDF open test failed: {e}")
 
-        unlocked_bytes = unlock_pdf(pdf_bytes, password)
+        # Step 2: Try with the generated password
+        if not unlocked_bytes:
+            password = ""
+            if conc and condo:
+                password = conc.gerar_senha_pdf(condo.cnpj_digits)
+            if password:
+                unlocked_bytes = unlock_pdf(pdf_bytes, password)
+            elif conc and not condo:
+                logger.warning("Concessionaria found but no condo — cannot generate password")
+
+        # Step 3: Brute-force fallback (try all condos' passwords)
+        if not unlocked_bytes:
+            from app.services.email_monitor import try_brute_force_unlock
+            condo_bf, conc_bf, unlocked_bf, ext_bf = await try_brute_force_unlock(subject, pdf_bytes, db)
+            if unlocked_bf:
+                unlocked_bytes = unlocked_bf
+                # Update references if brute-force found the right condo
+                if condo_bf:
+                    condo = condo_bf
+                    email_log.condominio_id = condo.id
+                if conc_bf:
+                    conc = conc_bf
+                    email_log.codigo_identificacao = conc.instalacao
+                logger.info(f"Brute-force unlock succeeded: Condo={condo.nome if condo else 'N/A'}")
+                # Merge brute-force extracted data into body_data
+                if ext_bf:
+                    for k, v in ext_bf.items():
+                        if v and k not in body_data:
+                            body_data[k] = v
+
         pdf_unlocked = unlocked_bytes is not None
         final_bytes = unlocked_bytes or pdf_bytes
 

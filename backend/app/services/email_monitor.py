@@ -10,6 +10,7 @@ PDF files are uploaded to Supabase Storage (bucket: faturas).
 
 import asyncio
 import base64
+import io
 import logging
 import os
 import json
@@ -353,8 +354,22 @@ async def _process_pdf_attachments(attachments, password, conc, condo, db, body_
         unlocked_bytes = None
         extracted_from_bf = None
         
+        # Passo 0: Tentar abrir sem senha (PDF não protegido)
+        try:
+            import pikepdf
+            with pikepdf.open(io.BytesIO(pdf_bytes)) as test_pdf:
+                output = io.BytesIO()
+                test_pdf.save(output)
+                output.seek(0)
+                unlocked_bytes = output.read()
+                logger.info(f"PDF '{filename}' opened without password (unprotected)")
+        except pikepdf.PasswordError:
+            pass  # PDF is encrypted
+        except Exception as e:
+            logger.warning(f"PDF open test failed for '{filename}': {e}")
+        
         # 1º Passo: Se não identificou o condomínio inicialmente, tenta Força Bruta
-        if not conc:
+        if not unlocked_bytes and not conc:
             condo_bf, conc_bf, unlocked_bf, ext_bf = await try_brute_force_unlock(subject, pdf_bytes, db)
             if unlocked_bf:
                 condo = condo_bf
@@ -369,8 +384,20 @@ async def _process_pdf_attachments(attachments, password, conc, condo, db, body_
                 condo_name = f"{str(condo.numero).zfill(4)} - {condo.nome}"
 
         # 2º Passo: Se não foi via força bruta, tenta com a senha padrão (se houver)
-        if not unlocked_bytes:
+        if not unlocked_bytes and password:
             unlocked_bytes = unlock_pdf(pdf_bytes, password)
+
+        # 2.5: Se a senha padrão falhou, tenta brute force como fallback
+        if not unlocked_bytes and conc:
+            condo_bf, conc_bf, unlocked_bf, ext_bf = await try_brute_force_unlock(subject, pdf_bytes, db)
+            if unlocked_bf:
+                unlocked_bytes = unlocked_bf
+                extracted_from_bf = ext_bf
+                if condo_bf:
+                    condo = condo_bf
+                if conc_bf:
+                    conc = conc_bf
+                logger.info(f"Brute-force fallback succeeded for '{filename}'")
             
         pdf_unlocked = unlocked_bytes is not None
         final_bytes = unlocked_bytes or pdf_bytes
@@ -452,7 +479,7 @@ async def _process_pdf_attachments(attachments, password, conc, condo, db, body_
                 vencimento=fatura.vencimento,
                 valor=fatura.valor,
                 pdf_nome_original=fatura.pdf_nome_original,
-                pdf_base64=fatura.pdf_base64,
+                base_64=fatura.pdf_base64,
                 debito_automatico=fatura.debito_automatico,
                 email_remetente=fatura.email_remetente,
                 email_assunto=fatura.email_assunto,
