@@ -220,7 +220,7 @@ async def check_missing_bills(db: AsyncSession) -> None:
 
 
 # Roles authorized to receive alert email notifications
-ALERT_NOTIFICATION_ROLES = {"admin", "assistente", "concessionarias", "gerencia"}
+ALERT_NOTIFICATION_ROLES = {"admin", "assistente", "supervisor", "gerencia"}
 
 
 async def notify_alert(
