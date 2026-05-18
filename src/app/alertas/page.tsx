@@ -227,7 +227,7 @@ export default function AlertasPage() {
                 </div>
                 {!readOnly && (
                   <div className="dc-full-alert-actions">
-                    {['pdf_erro', 'email_nao_identificado'].includes(a.tipo) && a.fatura_id && (
+                    {a.fatura_id && (
                       <button
                         className="dc-btn"
                         style={{

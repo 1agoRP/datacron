@@ -370,7 +370,7 @@ async def _process_pdf_attachments(attachments, password, conc, condo, db, body_
         
         # 1º Passo: Se não identificou o condomínio inicialmente, tenta Força Bruta
         if not unlocked_bytes and not conc:
-            condo_bf, conc_bf, unlocked_bf, ext_bf = await try_brute_force_unlock(subject, pdf_bytes, db)
+            condo_bf, conc_bf, unlocked_bf, ext_bf = await try_brute_force_unlock(subject, pdf_bytes, db, sender)
             if unlocked_bf:
                 condo = condo_bf
                 conc = conc_bf
@@ -389,7 +389,7 @@ async def _process_pdf_attachments(attachments, password, conc, condo, db, body_
 
         # 2.5: Se a senha padrão falhou, tenta brute force como fallback
         if not unlocked_bytes and conc:
-            condo_bf, conc_bf, unlocked_bf, ext_bf = await try_brute_force_unlock(subject, pdf_bytes, db)
+            condo_bf, conc_bf, unlocked_bf, ext_bf = await try_brute_force_unlock(subject, pdf_bytes, db, sender)
             if unlocked_bf:
                 unlocked_bytes = unlocked_bf
                 extracted_from_bf = ext_bf

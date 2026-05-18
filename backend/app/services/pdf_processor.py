@@ -1,10 +1,3 @@
-"""
-PDF Processing Service
-=======================
-Handles PDF unlocking (pikepdf), data extraction (pdfplumber), 
-and OCR fallback (pytesseract) for scanned documents.
-"""
-
 import re
 import io
 import os
@@ -316,3 +309,109 @@ def _parse_fields(text: str, result: Dict[str, Any]):
         if m:
             result["numero_instalacao"] = m.group(1)
             break
+
+async def try_brute_force_unlock(
+    subject: str, 
+    pdf_bytes: bytes, 
+    db: Any, 
+    sender: str = None
+) -> tuple[Optional[Any], Optional[Any], Optional[bytes], Optional[Dict[str, Any]]]:
+    """
+    Tries to brute-force the PDF password based on Concessionaria rules.
+    If sender is provided, isolates the search to condominios linked to the sender's wallet first.
+    If it fails, tries all condominios.
+    """
+    from sqlalchemy.future import select
+    from app.models.condominio import Condominio
+    from app.models.concessionaria import Concessionaria
+    from app.models.user import User
+    from app.models.user_condominio import UserCondominio
+    
+    subj_lower = subject.lower() if subject else ""
+    
+    # Identify rule based on subject
+    rule = "5_primeiros_cnpj" # Default
+    tipo_concessionaria = None
+    if "comgás" in subj_lower or "comgas" in subj_lower or "sabesp" in subj_lower:
+        rule = "3_primeiros_cnpj"
+        tipo_concessionaria = "Comgás" if "comg" in subj_lower else "Sabesp"
+    elif "vivo" in subj_lower:
+        rule = "4_primeiros_cnpj"
+        tipo_concessionaria = "Vivo"
+    elif "claro" in subj_lower:
+        tipo_concessionaria = "Claro"
+    elif "enel" in subj_lower:
+        tipo_concessionaria = "Enel"
+        
+    def get_pwd(cnpj_digits: str) -> str:
+        if rule == "3_primeiros_cnpj": return cnpj_digits[:3]
+        if rule == "4_primeiros_cnpj": return cnpj_digits[:4]
+        return cnpj_digits[:5]
+
+    wallet_condos = []
+    
+    # 1. Fetch wallet condos if sender is known
+    if sender:
+        user_res = await db.execute(select(User).where(User.email == sender))
+        user = user_res.scalar_one_or_none()
+        if user:
+            # Check UserCondominio
+            uc_res = await db.execute(
+                select(Condominio).join(UserCondominio).where(UserCondominio.user_id == user.id)
+            )
+            wallet_condos = uc_res.scalars().all()
+            if not wallet_condos:
+                # Try by assistente_id or gerente_id as fallback
+                c_res = await db.execute(
+                    select(Condominio).where(
+                        (Condominio.assistente_id == user.id) | (Condominio.gerente_id == user.id)
+                    )
+                )
+                wallet_condos = c_res.scalars().all()
+
+    tried_condo_ids = set()
+    
+    # Helper to test a list of condominios
+    async def try_condos(condos_to_test):
+        for c in condos_to_test:
+            if c.id in tried_condo_ids:
+                continue
+            tried_condo_ids.add(c.id)
+            
+            pwd = get_pwd(c.cnpj_digits)
+            if test_pdf_password(pdf_bytes, pwd):
+                unlocked = unlock_pdf(pdf_bytes, pwd)
+                if unlocked:
+                    ext = extract_data(unlocked)
+                    
+                    # Find Concessionaria for this condo
+                    conc_q = select(Concessionaria).where(Concessionaria.condominio_id == c.id)
+                    if tipo_concessionaria:
+                        # try to match by type
+                        conc_q = conc_q.where(Concessionaria.tipo.ilike(f"%{tipo_concessionaria}%"))
+                        
+                    conc_res = await db.execute(conc_q)
+                    conc_match = conc_res.scalars().first()
+                    
+                    # If we couldn't match the specific type, just get the first one to avoid None
+                    if not conc_match:
+                        fallback_q = select(Concessionaria).where(Concessionaria.condominio_id == c.id)
+                        conc_match = (await db.execute(fallback_q)).scalars().first()
+                        
+                    return c, conc_match, unlocked, ext
+        return None, None, None, None
+
+    # 2. Try Wallet Condos first
+    if wallet_condos:
+        logger.info(f"Brute-forcing {len(wallet_condos)} condominios from sender {sender}'s wallet.")
+        c, conc, unl, ext = await try_condos(wallet_condos)
+        if unl:
+            logger.info("Unlock successful using wallet isolation!")
+            return c, conc, unl, ext
+            
+    # 3. If failed or no wallet, try ALL condominios
+    logger.info("Wallet brute-force failed or no wallet found. Brute-forcing ALL condominios.")
+    all_res = await db.execute(select(Condominio).where(Condominio.ativo == True))
+    all_condos = all_res.scalars().all()
+    
+    return await try_condos(all_condos)

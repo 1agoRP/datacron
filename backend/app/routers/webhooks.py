@@ -139,8 +139,8 @@ async def n8n_email_invoice(
 
         # Step 3: Brute-force fallback (try all condos' passwords)
         if not unlocked_bytes:
-            from app.services.email_monitor import try_brute_force_unlock
-            condo_bf, conc_bf, unlocked_bf, ext_bf = await try_brute_force_unlock(subject, pdf_bytes, db)
+            from app.services.pdf_processor import try_brute_force_unlock
+            condo_bf, conc_bf, unlocked_bf, ext_bf = await try_brute_force_unlock(subject, pdf_bytes, db, sender)
             if unlocked_bf:
                 unlocked_bytes = unlocked_bf
                 # Update references if brute-force found the right condo
