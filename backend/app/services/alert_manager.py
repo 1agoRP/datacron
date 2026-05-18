@@ -90,6 +90,7 @@ async def _check_value_variation(
         direction = "a maior" if fatura.valor > avg_valor else "a menor"
         pct = round(variation * 100, 1)
         gravidade = "alta" if variation > 0.35 else "media"
+        tipo_alerta = "Variacao_Valor_Mais" if fatura.valor > avg_valor else "Variacao_Valor_Menos"
 
         # Fetch condominium to display name
         from app.models.condominio import Condominio
@@ -99,7 +100,7 @@ async def _check_value_variation(
         alert = Alerta(
             condominio_id=fatura.condominio_id,
             fatura_id=fatura.id,
-            tipo="variacao_valor",
+            tipo=tipo_alerta,
             gravidade=gravidade,
             mensagem=(
                 f"{condo_name} | {conc.tipo} (Cód: {conc.instalacao or 'N/A'}) — "
@@ -144,7 +145,6 @@ async def check_missing_bills(db: AsyncSession) -> None:
     from app.models.condominio import Condominio
 
     today = date.today()
-    grace_days = 3  # Days after vencimento before firing alert
 
     result = await db.execute(
         select(Concessionaria)
@@ -154,10 +154,6 @@ async def check_missing_bills(db: AsyncSession) -> None:
     all_conc = result.scalars().all()
 
     for conc in all_conc:
-        # Only check after the due day + grace period
-        if today.day < (conc.dia_vencimento + grace_days):
-            continue  # Not due yet (within grace period)
-
         # Check if fatura exists for the current month using vencimento date
         fatura_result = await db.execute(
             select(Fatura).where(
@@ -171,44 +167,56 @@ async def check_missing_bills(db: AsyncSession) -> None:
         if fatura:
             continue  # Bill arrived
 
-        # Check if alert already exists for this concessionária this month
+        days_until_due = conc.dia_vencimento - today.day
+        
+        tipo_alerta = None
+        
+        # Rule 3: Contas não é débito automático (3, 2, 1, 0 days before)
+        if not conc.debito_automatico and days_until_due in [3, 2, 1, 0]:
+            tipo_alerta = "Fatura_Sem_Debito_Automatico"
+        # Rule 1: Conta não recebida (on the exact day, if auto debit)
+        elif days_until_due == 0:
+            tipo_alerta = "Nao_Recebida"
+            
+        if not tipo_alerta:
+            continue
+
+        # Check if alert already exists for this concessionária TODAY to avoid spam
         existing_alert = await db.execute(
             select(Alerta).where(
                 Alerta.condominio_id == conc.condominio_id,
-                Alerta.tipo == "conta_nao_recebida",
-                Alerta.resolvido == False,
-                Alerta.mensagem.ilike(f"%{conc.tipo}%"),
+                Alerta.tipo == tipo_alerta,
+                func.date(Alerta.data_criacao) == today,
                 Alerta.mensagem.ilike(f"%{conc.instalacao}%"),
             )
         )
         if existing_alert.scalar_one_or_none():
-            continue  # Alert already exists
+            continue  # Alert already exists for today
 
         # Create alert
         mensagem = (
-            f"Conta da {conc.tipo} do {conc.condominio.nome} ainda não foi recebida. "
+            f"Alerta: {tipo_alerta.replace('_', ' ')}. "
+            f"Conta da {conc.tipo} do {conc.condominio.nome}. "
             f"Vencimento esperado: dia {conc.dia_vencimento}. "
             f"(UC: {conc.instalacao})"
         )
 
         alert = Alerta(
             condominio_id=conc.condominio_id,
-            tipo="conta_nao_recebida",
+            tipo=tipo_alerta,
             gravidade="alta",
             mensagem=mensagem,
         )
         
         try:
             db.add(alert)
-            # Commit IMMEDIATELY so the alert is saved even if notify fails
-            # This also ensures the 'existing alert' check works in future runs
             await db.commit()
             await db.refresh(alert)
             
-            # 6. Notify (Side-effect)
+            # Notify (Side-effect)
             try:
                 await notify_alert(db, alert, conc=conc)
-                logger.info(f"Alert created and notified: missing bill for conc {conc.id}")
+                logger.info(f"Alert created and notified: {tipo_alerta} for conc {conc.id}")
             except Exception as notify_err:
                 logger.error(f"Alert saved but notification failed for conc {conc.id}: {notify_err}")
                 
@@ -426,7 +434,46 @@ async def notify_alert(
             except Exception as e:
                 logger.error(f"Failed to read PDF for attachment: {e}")
 
-    # 7. Enviar
+    # 7. Webhook N8N ou E-mail Clássico
+    target_tags = ["Nao_Recebida", "Mandato_a_Vencer", "Fatura_Sem_Debito_Automatico", "Variacao_Valor_Mais", "Variacao_Valor_Menos"]
+    
+    if alert.tipo in target_tags and settings.N8N_WEBHOOK_URL:
+        import httpx
+        import base64
+        
+        pdf_base64 = None
+        if fatura and fatura.pdf_path and os.path.exists(fatura.pdf_path):
+            try:
+                with open(fatura.pdf_path, "rb") as f:
+                    pdf_base64 = base64.b64encode(f.read()).decode("utf-8")
+            except Exception as e:
+                logger.error(f"Failed to read PDF for webhook: {e}")
+
+        payload = {
+            "Condominio": condo_name,
+            "Codigo_Identificacao": cod_conta,
+            "Tipo_Alerta": alert.tipo,
+            "Vencimento_Esperado": vencimento_str,
+            "Valor_Medio": conc.valor_medio if conc else None,
+            "Valor_Atual": fatura.valor if fatura else None,
+            "Usuarios_Responsaveis": list(recipients),
+            "Mensagem": alert.mensagem,
+            "PDF_Base64": pdf_base64
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(settings.N8N_WEBHOOK_URL, json=payload, timeout=10.0)
+                resp.raise_for_status()
+                logger.info(f"N8N Webhook sent successfully for {alert.tipo}")
+        except Exception as e:
+            logger.error(f"Failed to send webhook to N8N: {e}")
+            
+        # O usuário pediu para o webhook gerenciar os e-mails para essas tags, 
+        # então pulamos o envio de e-mail direto do Datacron para evitar duplicidade
+        return
+
+    # Fallback/Padrão para outros alertas (ex: pdf_erro)
     for email in recipients:
         success = await send_notification_email(
             to=email,
@@ -449,7 +496,7 @@ async def check_mandate_expirations(db: AsyncSession) -> None:
     from datetime import date, timedelta
     
     today = date.today()
-    intervals = [60, 30, 15]
+    intervals = [30]
     
     # 1. Fetch all condominios with mandates
     result = await db.execute(
@@ -469,7 +516,7 @@ async def check_mandate_expirations(db: AsyncSession) -> None:
             existing = await db.execute(
                 select(Alerta).where(
                     Alerta.condominio_id == condo.id,
-                    Alerta.tipo == "mandato_vencimento",
+                    Alerta.tipo == "Mandato_a_Vencer",
                     Alerta.mensagem.ilike(f"%vence em {days_left} dias%")
                 )
             )
@@ -478,7 +525,7 @@ async def check_mandate_expirations(db: AsyncSession) -> None:
 
             alert = Alerta(
                 condominio_id=condo.id,
-                tipo="mandato_vencimento",
+                tipo="Mandato_a_Vencer",
                 gravidade="media" if days_left > 15 else "alta",
                 mensagem=msg
             )

@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     # ─── App ──────────────────────────────────────────────────
     ENVIRONMENT: str = "development"
     ALERT_VARIATION_THRESHOLD: float = 0.15
+    N8N_WEBHOOK_URL: str = ""
 
     @property
     def allowed_origins_list(self) -> list[str]:
