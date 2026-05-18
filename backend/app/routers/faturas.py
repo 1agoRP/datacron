@@ -171,6 +171,104 @@ async def create_fatura_manual(
     return FaturaResponse.model_validate(nova_fatura)
 
 
+@router.patch("/{fatura_id}/upload-pdf")
+async def upload_pdf_to_fatura(
+    fatura_id: uuid.UUID,
+    pdf_file: UploadFile = FastAPIFile(...),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
+):
+    """Upload rápido de PDF para uma fatura existente (ex: resolver alerta pdf_erro)."""
+    if user.role not in ["admin", "assistente", "gerencia"]:
+        raise HTTPException(status_code=403, detail="Acesso negado para enviar PDFs")
+
+    result = await db.execute(select(Fatura).where(Fatura.id == fatura_id))
+    fatura = result.scalar_one_or_none()
+    if not fatura:
+        raise HTTPException(status_code=404, detail="Fatura não encontrada")
+
+    if allowed_condo_ids is not None and fatura.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
+
+    content = await pdf_file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Arquivo PDF muito grande (máx. 10MB)")
+
+    # Fetch context for filename
+    condo = None
+    conc = None
+    if fatura.condominio_id:
+        condo = (await db.execute(select(Condominio).where(Condominio.id == fatura.condominio_id))).scalar_one_or_none()
+    if fatura.concessionaria_id:
+        conc = (await db.execute(select(Concessionaria).where(Concessionaria.id == fatura.concessionaria_id))).scalar_one_or_none()
+
+    pdf_nome = generate_standard_filename(
+        condo_numero=condo.numero if condo else 0,
+        condo_nome=condo.nome if condo else "Manual",
+        conc_tipo=conc.tipo if conc else "N-A",
+        conc_codigo=conc.instalacao if conc else "N-A",
+        vencimento=fatura.vencimento,
+        valor=fatura.valor,
+    )
+
+    fatura.pdf_base64 = base64.b64encode(content).decode("utf-8")
+    fatura.pdf_nome_original = pdf_nome
+    fatura.pdf_desbloqueado = True
+    fatura.status = "processada"
+
+    # Also update HistoricoFatura if it exists
+    from app.models.historico_fatura import HistoricoFatura
+    hist_result = await db.execute(
+        select(HistoricoFatura).where(
+            HistoricoFatura.condominio_id == fatura.condominio_id,
+            HistoricoFatura.concessionaria_id == fatura.concessionaria_id,
+            HistoricoFatura.vencimento == fatura.vencimento,
+            HistoricoFatura.valor == fatura.valor,
+        )
+    )
+    hist = hist_result.scalar_one_or_none()
+    if hist:
+        hist.base_64 = fatura.pdf_base64
+        hist.pdf_nome_original = pdf_nome
+    else:
+        # Create history entry now that the PDF is available
+        new_hist = HistoricoFatura(
+            condominio_id=fatura.condominio_id,
+            concessionaria_id=fatura.concessionaria_id,
+            referencia=fatura.referencia,
+            vencimento=fatura.vencimento,
+            valor=fatura.valor,
+            pdf_nome_original=pdf_nome,
+            base_64=fatura.pdf_base64,
+            debito_automatico=fatura.debito_automatico,
+            email_remetente=fatura.email_remetente,
+            email_assunto=fatura.email_assunto,
+            gmail_message_id=fatura.gmail_message_id,
+        )
+        db.add(new_hist)
+
+    # Audit
+    log = AuditLog(
+        usuario_id=user.id,
+        usuario_nome=user.nome,
+        usuario_email=user.email,
+        acao="alteracao",
+        entidade_tipo="fatura",
+        entidade_id=fatura.id,
+        detalhes={
+            "acao": "upload_pdf_rapido",
+            "condominio_nome": condo.nome if condo else "N/A",
+            "concessionaria_tipo": conc.tipo if conc else "N/A",
+            "pdf_nome": pdf_nome,
+        },
+    )
+    db.add(log)
+
+    await db.commit()
+    return {"status": "success", "pdf_nome": pdf_nome, "fatura_id": str(fatura_id)}
+
+
 @router.delete("/{fatura_id}")
 async def delete_fatura(
     fatura_id: uuid.UUID,

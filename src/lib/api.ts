@@ -812,6 +812,14 @@ class ApiClient {
     return this.request(`/faturas/${id}`, { method: 'DELETE' });
   }
 
+  async uploadFaturaPdf(faturaId: string, pdfFile: File) {
+    const formData = new FormData();
+    formData.append('pdf_file', pdfFile);
+    return this.requestMultipart<{ status: string; pdf_nome: string; fatura_id: string }>(
+      `/faturas/${faturaId}/upload-pdf`, formData, { method: 'PATCH' }
+    );
+  }
+
   // New Portfolio & Audit Features
   async getPortfolioStats() {
     return this.request<any[]>('/dashboard/portfolio-stats');

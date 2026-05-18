@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Shell from '@/components/layout/Shell';
-import { AlertCircle, Clock, CheckCircle2, ArrowUpRight, Trash2, Shield, XCircle, X } from 'lucide-react';
+import { AlertCircle, Clock, CheckCircle2, ArrowUpRight, Trash2, Shield, XCircle, X, Upload } from 'lucide-react';
 import { api } from '@/lib/api';
 import { format } from 'date-fns';
 import useSWR from 'swr';
@@ -26,6 +26,52 @@ export default function AlertasPage() {
 
   const { user } = useAuth();
   const readOnly = isReadOnly(user);
+
+  // Quick PDF upload
+  const [uploadingAlertId, setUploadingAlertId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingAlertRef = useRef<any>(null);
+
+  const handleUploadClick = (alerta: any) => {
+    if (!alerta.fatura_id) {
+      alert('Este alerta não possui uma fatura vinculada para upload.');
+      return;
+    }
+    pendingAlertRef.current = alerta;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const alerta = pendingAlertRef.current;
+    if (!file || !alerta) return;
+
+    // Reset input so the same file can be selected again
+    e.target.value = '';
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Apenas arquivos PDF são permitidos.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Arquivo muito grande (máximo 10 MB).');
+      return;
+    }
+
+    try {
+      setUploadingAlertId(alerta.id);
+      const res = await api.uploadFaturaPdf(alerta.fatura_id, file);
+      // Auto-resolve the alert
+      await api.resolveAlerta(alerta.id, `PDF enviado manualmente: ${res.pdf_nome}`);
+      alert(`✅ PDF enviado com sucesso!\nArquivo: ${res.pdf_nome}\n\nO alerta foi resolvido automaticamente.`);
+      mutate();
+    } catch (err: any) {
+      alert('Erro ao enviar PDF: ' + (err.message || 'Erro desconhecido'));
+    } finally {
+      setUploadingAlertId(null);
+      pendingAlertRef.current = null;
+    }
+  };
 
   const handleResolve = (alerta: any) => {
     setJustModal({ alerta, acao: 'resolver' });
@@ -97,6 +143,14 @@ export default function AlertasPage() {
 
   return (
     <Shell>
+      {/* Hidden file input for quick PDF upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf"
+        style={{ display: 'none' }}
+        onChange={handleFileSelected}
+      />
       <div className="dc-page-header">
         <div>
           <h1 className="dc-page-title" style={{ color: '#dc2626' }}>Central de Alertas</h1>
@@ -173,6 +227,23 @@ export default function AlertasPage() {
                 </div>
                 {!readOnly && (
                   <div className="dc-full-alert-actions">
+                    {['pdf_erro', 'email_nao_identificado'].includes(a.tipo) && a.fatura_id && (
+                      <button
+                        className="dc-btn"
+                        style={{
+                          height: 34, padding: '0 14px', fontSize: '0.8rem', gap: 6,
+                          background: '#059669', color: '#fff', border: 'none', borderRadius: 8,
+                        }}
+                        onClick={() => handleUploadClick(a)}
+                        disabled={uploadingAlertId === a.id}
+                      >
+                        {uploadingAlertId === a.id ? (
+                          <><div className="dc-loading-spinner" style={{ width: 12, height: 12, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent' }} /> Enviando...</>
+                        ) : (
+                          <><Upload size={14} /> Upload Rápido PDF</>
+                        )}
+                      </button>
+                    )}
                     <button
                       className="dc-btn dc-btn-primary"
                       style={{ height: 34, padding: '0 14px', fontSize: '0.8rem', gap: 6 }}
