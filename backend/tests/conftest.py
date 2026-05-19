@@ -17,6 +17,8 @@ engine = create_async_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
+    pool_pre_ping=True,
+    pool_recycle=1800,
 )
 TestingSessionLocal = async_sessionmaker(
     bind=engine, autoflush=False, autocommit=False, expire_on_commit=False, class_=AsyncSession
