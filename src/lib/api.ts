@@ -820,6 +820,14 @@ class ApiClient {
     );
   }
 
+  async createFaturaManualFromAlerta(alertaId: string, pdfFile: File) {
+    const formData = new FormData();
+    formData.append('pdf_file', pdfFile);
+    return this.requestMultipart<{ pdf_nome: string; fatura_id: string }>(
+      `/alertas/${alertaId}/resolver-com-pdf`, formData, { method: 'POST' }
+    );
+  }
+
   // New Portfolio & Audit Features
   async getPortfolioStats() {
     return this.request<any[]>('/dashboard/portfolio-stats');

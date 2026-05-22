@@ -2,7 +2,7 @@ import uuid
 from typing import Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Body, File, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -302,6 +302,190 @@ async def _send_manager_confirmation(
         html_body=body_html,
     )
 
+
+
+
+@router.post("/{id}/resolver-com-pdf")
+async def resolver_alerta_com_pdf(
+    id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    pdf_file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
+):
+    """
+    Recebe um PDF, encontra a Concessionaria associada ao alerta de conta_nao_recebida,
+    cria uma Fatura manual e marca o alerta como resolvido.
+    Retorna { pdf_nome: str, fatura_id: str }.
+    """
+    import re as _re
+    import base64
+    from app.models.concessionaria import Concessionaria
+    from app.models.condominio import Condominio
+    from app.models.fatura import Fatura
+    from app.models.audit_log import AuditLog
+    from app.services.pdf_processor import extract_data, generate_standard_filename
+    from datetime import date
+
+    # 1. Fetch alerta
+    result = await db.execute(
+        select(Alerta)
+        .options(joinedload(Alerta.condominio))
+        .where(Alerta.id == id)
+    )
+    a = result.scalar_one_or_none()
+    if not a:
+        raise HTTPException(status_code=404, detail="Alerta nao encontrado")
+
+    if (
+        allowed_condo_ids is not None
+        and a.condominio_id
+        and a.condominio_id not in allowed_condo_ids
+    ):
+        raise HTTPException(status_code=403, detail="Acesso negado a este alerta")
+
+    if not a.condominio_id:
+        raise HTTPException(status_code=400, detail="Alerta nao possui condominio associado")
+
+    # 2. Parse UC code from alert message (format: "(UC: 12345)")
+    uc_match = _re.search(r"\(UC:\s*([^)]+)\)", a.mensagem)
+    if not uc_match:
+        raise HTTPException(
+            status_code=400,
+            detail="Nao foi possivel identificar o codigo de instalacao (UC) na mensagem do alerta"
+        )
+    uc_code = uc_match.group(1).strip()
+
+    # 3. Find the Concessionaria by instalacao and condominio_id
+    conc_result = await db.execute(
+        select(Concessionaria).where(
+            Concessionaria.instalacao == uc_code,
+            Concessionaria.condominio_id == a.condominio_id,
+        )
+    )
+    conc = conc_result.scalar_one_or_none()
+    if not conc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Concessionaria com UC '{uc_code}' nao encontrada para este condominio"
+        )
+
+    # 4. Read PDF
+    pdf_bytes = await pdf_file.read()
+    if len(pdf_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Arquivo PDF muito grande (max. 10MB)")
+
+    # 5. Extract data from PDF
+    extracted = extract_data(pdf_bytes)
+    valor = extracted.get("valor") or 0.0
+
+    vencimento_str = extracted.get("vencimento")
+    vencimento = None
+    if vencimento_str:
+        try:
+            vencimento = date.fromisoformat(vencimento_str)
+        except ValueError:
+            pass
+    if not vencimento:
+        today = date.today()
+        day = conc.dia_vencimento if conc.dia_vencimento <= 28 else 28
+        vencimento = today.replace(day=day)
+
+    # 6. Load condominio
+    condo_result = await db.execute(
+        select(Condominio).where(Condominio.id == a.condominio_id)
+    )
+    condo = condo_result.scalar_one_or_none()
+
+    # 7. Generate standardized filename
+    pdf_nome = generate_standard_filename(
+        condo_numero=condo.numero if condo else 0,
+        condo_nome=condo.nome if condo else "Condominio",
+        conc_tipo=conc.tipo,
+        conc_codigo=conc.instalacao,
+        vencimento=vencimento,
+        valor=valor,
+    )
+    pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+
+    # 8. Generate referencia
+    mes_nome = [
+        "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+    ]
+    referencia = extracted.get("referencia") or f"{mes_nome[vencimento.month - 1]}/{vencimento.year}"
+
+    # 9. Create Fatura
+    nova_fatura = Fatura(
+        condominio_id=a.condominio_id,
+        concessionaria_id=conc.id,
+        valor=valor,
+        vencimento=vencimento,
+        referencia=referencia,
+        status="pendente",
+        email_remetente=f"Manual - {current_user.email}",
+        email_assunto=f"Resolucao de alerta por {current_user.nome}",
+        pdf_base64=pdf_base64,
+        pdf_nome_original=pdf_nome,
+        pdf_desbloqueado=True,
+    )
+    db.add(nova_fatura)
+
+    # 10. Audit log for fatura
+    log = AuditLog(
+        usuario_id=current_user.id,
+        usuario_nome=current_user.nome,
+        usuario_email=current_user.email,
+        acao="inclusao",
+        entidade_tipo="fatura",
+        entidade_id=nova_fatura.id,
+        detalhes={
+            "condominio_nome": condo.nome if condo else "N/A",
+            "concessionaria_tipo": conc.tipo,
+            "concessionaria_codigo": conc.instalacao,
+            "valor": valor,
+            "vencimento": str(vencimento),
+            "referencia": referencia,
+            "metodo": "resolver_alerta_com_pdf",
+            "alerta_id": str(a.id),
+        },
+    )
+    db.add(log)
+
+    # 11. Resolve the alerta and create audit
+    audit = AlertaAuditLog(
+        alerta_id=a.id,
+        alerta_tipo=a.tipo,
+        alerta_gravidade=a.gravidade,
+        alerta_mensagem=a.mensagem,
+        condominio_id=a.condominio_id,
+        acao="resolvido",
+        justificativa=f"Fatura cadastrada via upload de PDF (UC: {uc_code})",
+        usuario_id=current_user.id,
+        usuario_nome=current_user.nome,
+        usuario_email=current_user.email,
+    )
+    db.add(audit)
+
+    a.lido = True
+    a.resolvido = True
+    a.fatura_id = nova_fatura.id
+
+    await db.commit()
+
+    # 12. Background emails
+    background_tasks.add_task(
+        process_alert_resolution_emails,
+        a.tipo,
+        a.mensagem,
+        current_user.email,
+        condo.nome if condo else None,
+        a.email_remetente,
+        a.email_assunto,
+    )
+
+    return {"pdf_nome": pdf_nome, "fatura_id": str(nova_fatura.id)}
 
 @router.delete("/{id}")
 async def delete_alerta(
