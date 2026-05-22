@@ -2,12 +2,15 @@
 
 import React, { useState, useRef } from 'react';
 import Shell from '@/components/layout/Shell';
-import { AlertCircle, Clock, CheckCircle2, ArrowUpRight, Trash2, Shield, XCircle, X, Upload } from 'lucide-react';
+import { AlertCircle, Clock, CheckCircle2, ArrowUpRight, Trash2, X, Upload } from 'lucide-react';
 import { api } from '@/lib/api';
 import { format } from 'date-fns';
 import useSWR from 'swr';
 import { useAuth } from '@/context/AuthContext';
 import { isReadOnly } from '@/types';
+
+// Tipos de alertas que indicam conta não recebida (sem fatura vinculada)
+const TIPOS_CONTA_NAO_RECEBIDA = ['Nao_Recebida', 'Fatura_Sem_Debito_Automatico'];
 
 export default function AlertasPage() {
   const { data: alertas = [], isLoading: loading, mutate } = useSWR(
@@ -19,7 +22,7 @@ export default function AlertasPage() {
   const [resolving, setResolving] = useState<string | null>(null);
   const [discarding, setDiscarding] = useState<string | null>(null);
 
-  // Justification modal state
+  // Estado do modal de justificativa
   const [justModal, setJustModal] = useState<{ alerta: any; acao: 'resolver' | 'descartar' } | null>(null);
   const [justificativa, setJustificativa] = useState('');
   const [justSubmitting, setJustSubmitting] = useState(false);
@@ -27,16 +30,24 @@ export default function AlertasPage() {
   const { user } = useAuth();
   const readOnly = isReadOnly(user);
 
-  // Quick PDF upload
+  // Upload rápido de PDF
   const [uploadingAlertId, setUploadingAlertId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingAlertRef = useRef<any>(null);
 
+  /**
+   * Verifica se o alerta deve exibir o botão de upload.
+   * Exibe apenas para contas não recebidas (sem fatura ainda no sistema)
+   * ou para alertas que já possuem fatura vinculada (ex: erro de PDF).
+   * NÃO exibe para alertas de variação de consumo/valor, pois a conta
+   * já foi recebida e a variação pode ser avaliada diretamente.
+   */
+  const deveMostrarUpload = (alerta: any): boolean => {
+    if (alerta.fatura_id) return true;
+    return TIPOS_CONTA_NAO_RECEBIDA.includes(alerta.tipo);
+  };
+
   const handleUploadClick = (alerta: any) => {
-    if (!alerta.fatura_id) {
-      alert('Este alerta não possui uma fatura vinculada para upload.');
-      return;
-    }
     pendingAlertRef.current = alerta;
     fileInputRef.current?.click();
   };
@@ -46,7 +57,7 @@ export default function AlertasPage() {
     const alerta = pendingAlertRef.current;
     if (!file || !alerta) return;
 
-    // Reset input so the same file can be selected again
+    // Limpa o input para permitir selecionar o mesmo arquivo novamente
     e.target.value = '';
 
     if (!file.name.toLowerCase().endsWith('.pdf')) {
@@ -60,10 +71,18 @@ export default function AlertasPage() {
 
     try {
       setUploadingAlertId(alerta.id);
-      const res = await api.uploadFaturaPdf(alerta.fatura_id, file);
-      // Auto-resolve the alert
-      await api.resolveAlerta(alerta.id, `PDF enviado manualmente: ${res.pdf_nome}`);
-      alert(`✅ PDF enviado com sucesso!\nArquivo: ${res.pdf_nome}\n\nO alerta foi resolvido automaticamente.`);
+
+      if (alerta.fatura_id) {
+        // Alerta já possui fatura vinculada — apenas faz upload do PDF
+        const res = await api.uploadFaturaPdf(alerta.fatura_id, file);
+        await api.resolveAlerta(alerta.id, `PDF enviado manualmente: ${res.pdf_nome}`);
+        alert(`✅ PDF enviado com sucesso!\nArquivo: ${res.pdf_nome}\n\nO alerta foi resolvido automaticamente.`);
+      } else {
+        // Conta não recebida — cria a fatura manualmente a partir do PDF
+        const res = await api.createFaturaManualFromAlerta(alerta.id, file);
+        alert(`✅ Fatura cadastrada com sucesso!\nArquivo: ${res.pdf_nome}\n\nO alerta foi resolvido automaticamente.`);
+      }
+
       mutate();
     } catch (err: any) {
       alert('Erro ao enviar PDF: ' + (err.message || 'Erro desconhecido'));
@@ -143,7 +162,7 @@ export default function AlertasPage() {
 
   return (
     <Shell>
-      {/* Hidden file input for quick PDF upload */}
+      {/* Input oculto para upload de PDF */}
       <input
         ref={fileInputRef}
         type="file"
@@ -151,39 +170,31 @@ export default function AlertasPage() {
         style={{ display: 'none' }}
         onChange={handleFileSelected}
       />
+
+      {/* Cabeçalho */}
       <div className="dc-page-header">
         <div>
-          <h1 className="dc-page-title" style={{ color: '#dc2626' }}>Central de Alertas</h1>
+          <h1 className="dc-page-title">Central de Alertas</h1>
           <p className="dc-page-subtitle">
-            Monitore anomalias, vencimentos atrasados e erros de processamento em tempo real.
+            Gerencie e resolva pendências e anomalias detectadas pelo sistema.
           </p>
         </div>
-        <div className="dc-page-header-actions">
-          <button className="dc-btn dc-btn-secondary" onClick={() => setActiveTab('Todos')}>
-            <CheckCircle2 size={16} /> Limpar Filtros
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 16px', background: '#fef2f2',
+              border: '1px solid #fecaca', borderRadius: 12,
+              color: '#dc2626', fontWeight: 700, fontSize: '0.875rem'
+            }}
+          >
+            <AlertCircle size={16} />
+            <span>{alertas.length} alerta{alertas.length !== 1 ? 's' : ''} ativo{alertas.length !== 1 ? 's' : ''}</span>
+          </div>
         </div>
       </div>
 
-      {/* Alert count bar */}
-      {alertas.length > 0 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'linear-gradient(135deg, #fef3c7, #fef9c3)',
-          border: '1px solid #fde68a', borderRadius: 12,
-          padding: '14px 20px', marginBottom: 16,
-          flexWrap: 'wrap', gap: 12,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Shield size={20} color="#92400e" />
-            <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#92400e' }}>
-              {alertas.length} alerta{alertas.length !== 1 ? 's' : ''} ativo{alertas.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Pills */}
+      {/* Abas de filtro */}
       <div className="dc-alert-pills">
         {Object.entries(counts).map(([label, count]) => (
           <button
@@ -202,7 +213,7 @@ export default function AlertasPage() {
         ))}
       </div>
 
-      {/* Alerts list */}
+      {/* Lista de alertas */}
       <div className="dc-space-y-4">
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
@@ -210,6 +221,7 @@ export default function AlertasPage() {
           const isUrgent = a.gravidade === 'alta';
           const isResolvingThis = resolving === a.id;
           const isDiscardingThis = discarding === a.id;
+          const mostrarUpload = deveMostrarUpload(a);
 
           return (
             <div key={a.id} className={`dc-full-alert ${isUrgent ? 'urgent' : 'medium'}`}>
@@ -227,7 +239,7 @@ export default function AlertasPage() {
                 </div>
                 {!readOnly && (
                   <div className="dc-full-alert-actions">
-                    {a.fatura_id && (
+                    {mostrarUpload && (
                       <button
                         className="dc-btn"
                         style={{
@@ -297,7 +309,7 @@ export default function AlertasPage() {
         )}
       </div>
 
-      {/* Justification Modal */}
+      {/* Modal de justificativa */}
       {justModal && (
         <div className="dc-modal-overlay">
           <div className="dc-modal-content" style={{ maxWidth: 480 }}>

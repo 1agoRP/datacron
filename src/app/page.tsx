@@ -2,7 +2,7 @@
 
 import { useState, FormEvent, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, X, AlertTriangle, ChevronDown, Check, Zap, Shield, Bell, Database, BarChart3, Mail } from 'lucide-react';
+import { ArrowRight, X, AlertTriangle, ChevronDown, Check, Zap, Shield, Bell, Database, BarChart3, Mail, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 
@@ -840,6 +840,7 @@ export default function LandingPage() {
   const [isLoginView, setIsLoginView] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -1434,7 +1435,37 @@ export default function LandingPage() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">Senha</label>
-                    <input type="password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        className="form-input"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        style={{ paddingRight: '2.5rem' }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '0.75rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--text3)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '4px',
+                        }}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                   <button type="submit" className="form-submit" disabled={isLoading} style={{ marginTop: '0.5rem' }}>
                     {isLoading ? 'Autenticando...' : 'Entrar no Sistema →'}
