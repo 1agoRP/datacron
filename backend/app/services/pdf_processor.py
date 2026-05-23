@@ -384,6 +384,40 @@ async def try_brute_force_unlock(
                 if unlocked:
                     ext = extract_data(unlocked)
                     
+                    # Validate that the unlocked PDF actually belongs to this condominium
+                    pdf_text = ext.get("texto_completo", "")
+                    cnpj_clean = c.cnpj_digits
+                    text_clean = re.sub(r'\D', '', pdf_text)
+                    
+                    matched = False
+                    if cnpj_clean and cnpj_clean in text_clean:
+                        matched = True
+                    else:
+                        import unicodedata
+                        def simplify(t):
+                            t = unicodedata.normalize('NFKD', t).encode('ASCII', 'ignore').decode('ASCII')
+                            return re.sub(r'[^a-zA-Z0-9\s]', '', t).lower()
+                        
+                        clean_name = simplify(c.nome)
+                        words = [w for w in clean_name.split() if w not in [
+                            'cond', 'condominio', 'ed', 'edificio', 'residencial', 'conjunto', 'cjto',
+                            'de', 'da', 'do', 'dos', 'das', 'e'
+                        ]]
+                        if words:
+                            simplified_text = simplify(pdf_text)
+                            long_words = [w for w in words if len(w) >= 4]
+                            if long_words and any(lw in simplified_text for lw in long_words):
+                                matched = True
+                            elif all(w in simplified_text for w in words):
+                                matched = True
+                                
+                    if not matched:
+                        logger.warning(
+                            f"Brute-force password match for condo {c.nome} (CNPJ: {c.cnpj}), "
+                            f"but PDF text validation failed. Skipping."
+                        )
+                        continue
+                    
                     # Find Concessionaria for this condo
                     conc_q = select(Concessionaria).where(Concessionaria.condominio_id == c.id)
                     if tipo_concessionaria:
