@@ -78,9 +78,7 @@ export default function CondominiosPage() {
   // History modal
   const [historyConc, setHistoryConc] = useState<any>(null);
   const [historyFaturas, setHistoryFaturas] = useState<any[]>([]);
-  const [gmailHistory, setGmailHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [activeHistoryTab, setActiveHistoryTab] = useState<'sistema' | 'gmail'>('sistema');
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusModalCondo, setStatusModalCondo] = useState<any>(null);
   const [statusItems, setStatusItems] = useState<any[]>([]);
@@ -371,28 +369,17 @@ export default function CondominiosPage() {
     if (!detailsCondo) return;
     setHistoryConc(conc);
     setHistoryFaturas([]);
-    setGmailHistory([]);
-    setActiveHistoryTab('sistema');
     try {
       setLoadingHistory(true);
-      // 1. Fetch from Historico Table (Combined current + legacy)
       const condId = String(detailsCondo.id);
       const concId = String(conc.id);
       const dbFaturas = await api.getHistoricoFaturas(condId, concId);
-
       const sorted = [...dbFaturas].sort((a: any, b: any) => {
         const dateA = new Date(a.vencimento || 0);
         const dateB = new Date(b.vencimento || 0);
         return dateB.getTime() - dateA.getTime();
       });
       setHistoryFaturas(sorted);
-
-      // 2. Fetch from Gmail (Background)
-      if (conc.instalacao) {
-        api.getGmailHistory(detailsCondo.id, conc.id).then(gmailFats => {
-          setGmailHistory(gmailFats || []);
-        }).catch(err => console.error("Gmail fetch error:", err));
-      }
     } catch (err) {
       console.error(err);
       setHistoryFaturas([]);
@@ -506,99 +493,242 @@ export default function CondominiosPage() {
 
   return (
     <Shell>
-      <div className="dc-page-header">
-        <div>
-          <h1 className="dc-page-title">Condomínios</h1>
-          <p className="dc-page-subtitle">Gerencie sua base de clientes e acompanhe o status de cada Condomínio.</p>
+      {/* ── Hero Header ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #3b82f6 100%)',
+        borderRadius: 20,
+        padding: '28px 32px',
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 24,
+        boxShadow: '0 8px 32px rgba(37,99,235,0.22)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* decorative circles */}
+        <div style={{ position: 'absolute', right: -40, top: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: 80, bottom: -60, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            flexShrink: 0,
+          }}>
+            <Building2 size={28} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>Condomínios</h1>
+            <p style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', marginTop: 5 }}>
+              {portfolioStats.total} condomínio{portfolioStats.total !== 1 ? 's' : ''} ativos · Referência: <strong style={{ color: '#fff' }}>{selectedReferencia}</strong>
+            </p>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <button className="dc-btn dc-btn-secondary" onClick={handleDownloadAll} title="Baixar todas as faturas do mês atual em um arquivo ZIP" style={{ gap: 8 }}>
-            <Download size={16} /> Baixar Faturas do Mês
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+          <button
+            className="dc-btn"
+            onClick={handleDownloadAll}
+            title="Baixar todas as faturas do mês"
+            style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)', gap: 8 }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+          >
+            <Download size={15} /> Baixar Faturas
           </button>
           {isAdmin && (
-            <button className="dc-btn dc-btn-primary" onClick={() => setIsModalOpen(true)}>
-              <Plus size={16} /> Adicionar Condomínio
+            <button
+              className="dc-btn"
+              onClick={() => setIsModalOpen(true)}
+              style={{ background: '#fff', color: '#2563eb', fontWeight: 800, gap: 8 }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+            >
+              <Plus size={15} /> Novo Condomínio
             </button>
           )}
         </div>
       </div>
 
-      <div className="dc-stats-grid" style={{ marginBottom: 18 }}>
-        <div className="dc-stat-card">
-          <div className="dc-stat-top">
-            <div className="dc-stat-icon" style={{ background: '#eff6ff', color: '#2563eb' }}><Building2 size={20} /></div>
-            <div className="dc-stat-badge positive">Carteira</div>
+      {/* ── Stats Grid ── */}
+      <div className="dc-stats-grid" style={{ marginBottom: 20 }}>
+        {/* Card 1: Carteira */}
+        <div style={{
+          background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+          padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)', borderTop: '3px solid #2563eb',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+              <Building2 size={20} />
+            </div>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', padding: '3px 10px', borderRadius: 20, letterSpacing: '0.03em' }}>CARTEIRA</span>
           </div>
-          <div className="dc-stat-label">Condomínios ativos</div>
-          <div className="dc-stat-value">{portfolioStats.total}</div>
+          <div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Condomínios ativos</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1, marginTop: 4 }}>{portfolioStats.total}</div>
+          </div>
         </div>
-        <div className="dc-stat-card">
-          <div className="dc-stat-top">
-            <div className="dc-stat-icon" style={{ background: '#f0fdf4', color: '#16a34a' }}><CheckCircle2 size={20} /></div>
-            <div className="dc-stat-badge">{portfolioStats.received}/{portfolioStats.expected}</div>
+
+        {/* Card 2: Contas */}
+        <div style={{
+          background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+          padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+          borderTop: `3px solid ${portfolioStats.completion === 100 ? '#10b981' : portfolioStats.completion > 0 ? '#f59e0b' : '#e2e8f0'}`,
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+              <CheckCircle2 size={20} />
+            </div>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', background: '#f1f5f9', padding: '3px 10px', borderRadius: 20 }}>{portfolioStats.received}/{portfolioStats.expected} contas</span>
           </div>
-          <div className="dc-stat-label">Contas recebidas em {selectedReferencia}</div>
-          <div className="dc-stat-value">{portfolioStats.completion}%</div>
+          <div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recebidas em {selectedReferencia}</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1, marginTop: 4 }}>{portfolioStats.completion}<span style={{ fontSize: '1.1rem', fontWeight: 700, color: '#94a3b8' }}>%</span></div>
+            <div style={{ marginTop: 8, height: 4, borderRadius: 99, background: '#e2e8f0', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${portfolioStats.completion}%`, borderRadius: 99, background: portfolioStats.completion === 100 ? '#10b981' : '#f59e0b', transition: 'width 0.5s ease' }} />
+            </div>
+          </div>
         </div>
-        <div className="dc-stat-card">
-          <div className="dc-stat-top">
-            <div className="dc-stat-icon" style={{ background: '#fff7ed', color: '#ea580c' }}><AlertCircle size={20} /></div>
-            <div className="dc-stat-badge">Atenção</div>
+
+        {/* Card 3: Atenção Docs */}
+        <div style={{
+          background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+          padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+          borderTop: `3px solid ${portfolioStats.docAttention > 0 ? '#f59e0b' : '#10b981'}`,
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: portfolioStats.docAttention > 0 ? '#fffbeb' : '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: portfolioStats.docAttention > 0 ? '#d97706' : '#16a34a' }}>
+              <AlertCircle size={20} />
+            </div>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '3px 10px', borderRadius: 20,
+              background: portfolioStats.docAttention > 0 ? '#fffbeb' : '#f0fdf4',
+              color: portfolioStats.docAttention > 0 ? '#d97706' : '#16a34a',
+            }}>DOCS</span>
           </div>
-          <div className="dc-stat-label">Documentos ou mandatos críticos</div>
-          <div className="dc-stat-value">{portfolioStats.docAttention}</div>
+          <div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Documentos críticos</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1, marginTop: 4 }}>{portfolioStats.docAttention}</div>
+            <div style={{ fontSize: '0.72rem', color: portfolioStats.docAttention > 0 ? '#d97706' : '#059669', fontWeight: 600, marginTop: 4 }}>
+              {portfolioStats.docAttention > 0 ? 'Atenção requerida' : 'Tudo em dia ✓'}
+            </div>
+          </div>
         </div>
-        <div className="dc-stat-card">
-          <div className="dc-stat-top">
-            <div className="dc-stat-icon" style={{ background: '#f8fafc', color: '#475569' }}><Zap size={20} /></div>
-            <div className="dc-stat-badge">Operação</div>
+
+        {/* Card 4: Leitura Individual */}
+        <div style={{
+          background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+          padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)', borderTop: '3px solid #8b5cf6',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6' }}>
+              <Zap size={20} />
+            </div>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#8b5cf6', background: '#f5f3ff', padding: '3px 10px', borderRadius: 20 }}>OPERAÇÃO</span>
           </div>
-          <div className="dc-stat-label">Leitura individualizada</div>
-          <div className="dc-stat-value">{portfolioStats.individualized}</div>
+          <div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Leitura individualizada</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1, marginTop: 4 }}>{portfolioStats.individualized}</div>
+            <div style={{ fontSize: '0.72rem', color: '#8b5cf6', fontWeight: 600, marginTop: 4 }}>
+              {portfolioStats.total > 0 ? `${Math.round((portfolioStats.individualized / portfolioStats.total) * 100)}% da carteira` : '—'}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Filter bar */}
-      <div className="dc-filter-bar">
-        <div className="dc-filter-search">
-          <Search />
+      {/* ── Filter Bar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '12px 16px',
+        background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
+        marginBottom: 16, flexWrap: 'wrap',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+      }}>
+        {/* Search */}
+        <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
           <input
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Buscar por nome, número ou CNPJ..."
+            style={{
+              width: '100%', height: 38, padding: '0 14px 0 36px',
+              borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc',
+              fontSize: '0.875rem', fontFamily: 'inherit', color: '#0f172a',
+              transition: 'all 0.2s', outline: 'none',
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
+
+        {/* Referência pill */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 4px 0 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, height: 38, flexShrink: 0 }}>
+          <Calendar size={13} style={{ color: '#64748b', flexShrink: 0 }} />
+          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>Ref.:</span>
+          <select
+            style={{ height: 30, border: 'none', background: 'transparent', fontSize: '0.83rem', fontFamily: 'inherit', fontWeight: 700, color: '#0f172a', cursor: 'pointer', outline: 'none', paddingRight: 4 }}
+            value={refMonth}
+            onChange={(e) => setRefMonth(e.target.value)}
+            aria-label="Mês de referência"
+          >
+            {monthsList.map((month) => (
+              <option key={month.value} value={month.value}>{month.label}</option>
+            ))}
+          </select>
+          <input
+            style={{ width: 56, height: 30, border: 'none', background: 'transparent', fontSize: '0.83rem', fontFamily: 'inherit', fontWeight: 700, color: '#0f172a', outline: 'none', textAlign: 'center' }}
+            type="number" min="2020" max="2100"
+            value={refYear}
+            onChange={(e) => setRefYear(e.target.value)}
+            aria-label="Ano de referência"
+          />
+        </div>
+
+        {/* Filter toggle */}
         <button
-          className={`dc-btn ${showFilters ? 'dc-btn-primary' : 'dc-btn-secondary'}`}
-          style={{ height: 40, padding: '0 16px', fontSize: '0.85rem' }}
+          style={{
+            height: 38, padding: '0 14px', borderRadius: 10,
+            fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            border: `1px solid ${showFilters ? '#2563eb' : '#e2e8f0'}`,
+            background: showFilters ? '#eff6ff' : '#f8fafc',
+            color: showFilters ? '#2563eb' : '#64748b',
+            transition: 'all 0.15s',
+          }}
           onClick={() => setShowFilters(!showFilters)}
         >
-          <Filter size={15} /> Filtro Síndicos {showFilters ? '✕' : ''}
+          <Filter size={13} /> Síndico {showFilters ? '✕' : ''}
         </button>
-        <select
-          className="dc-form-input"
-          style={{ width: 132, height: 40 }}
-          value={refMonth}
-          onChange={(e) => setRefMonth(e.target.value)}
-          aria-label="Mês de referência"
-        >
-          {monthsList.map((month) => (
-            <option key={month.value} value={month.value}>{month.label}</option>
-          ))}
-        </select>
-        <input
-          className="dc-form-input"
-          style={{ width: 92, height: 40 }}
-          type="number"
-          min="2020"
-          max="2100"
-          value={refYear}
-          onChange={(e) => setRefYear(e.target.value)}
-          aria-label="Ano de referência"
-        />
-        <div className="dc-filter-divider" />
-        <span className="dc-filter-count">
-          {filtered.length} Condomínio{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
+
+        <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
+
+        <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap' }}>
+          <span style={{ color: '#0f172a' }}>{filtered.length}</span> {filtered.length !== 1 ? 'condomínios' : 'condomínio'}
         </span>
       </div>
 
@@ -629,94 +759,200 @@ export default function CondominiosPage() {
         </div>
       )}
 
-      {/* Table */}
-      <div className="dc-card">
-        <div className="dc-table-wrapper">
-          <table className="dc-table">
+      {/* ── Table ── */}
+      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
-              <tr>
-                <th onClick={() => toggleSort('nome')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+              <tr style={{ background: 'linear-gradient(to right, #f8fafc, #f1f5f9)' }}>
+                <th onClick={() => toggleSort('nome')} style={{ padding: '13px 20px', fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>
                   Condomínio <SortIcon field="nome" />
                 </th>
-                <th>Status de Contas</th>
-                <th onClick={() => toggleSort('numero')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                <th style={{ padding: '13px 20px', fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>Status de Contas</th>
+                <th onClick={() => toggleSort('numero')} style={{ padding: '13px 20px', fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap', cursor: 'pointer', userSelect: 'none' }}>
                   Nº <SortIcon field="numero" />
                 </th>
-                <th>Síndico(a) / CNPJ</th>
-                <th>Ações</th>
+                <th style={{ padding: '13px 20px', fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>Síndico(a)</th>
+                <th style={{ padding: '13px 20px', fontSize: '0.7rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap', textAlign: 'right' }}>Documentos / Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: '40px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: '60px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></td></tr>
               ) : filtered.map((condo: any) => {
                 const total = condo.contas_esperadas || 0;
                 const rec = condo.contas_recebidas || 0;
                 const pct = total > 0 ? Math.round((rec / total) * 100) : 0;
+                const pendentes = total - rec;
+
+                // Semântica de cor por estado
+                const isComplete = total > 0 && rec >= total;
+                const isPartial = total > 0 && rec > 0 && rec < total;
+                const isEmpty = total === 0 || rec === 0;
+
+                const barColor = isComplete ? '#10b981' : isPartial ? '#f59e0b' : '#e2e8f0';
+                const pillBg = isComplete ? '#f0fdf4' : isPartial ? '#fffbeb' : '#f8fafc';
+                const pillBorder = isComplete ? '#bbf7d0' : isPartial ? '#fde68a' : '#e2e8f0';
+                const pillColor = isComplete ? '#059669' : isPartial ? '#d97706' : '#94a3b8';
+                const PillIcon = isComplete ? CheckCircle2 : isPartial ? Clock : AlertCircle;
+                const pillLabel = isComplete ? 'Completo' : isPartial ? 'Parcial' : (total === 0 ? 'Sem vínculos' : 'Pendente');
+
                 return (
-                  <tr key={condo.id}>
-                    <td>
+                  <tr key={condo.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.12s' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#fafbff')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <td style={{ padding: '14px 20px', fontSize: '0.875rem', verticalAlign: 'middle' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div className="dc-condo-icon">
+                        <div style={{
+                          width: 44, height: 44, borderRadius: 12,
+                          background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: '#2563eb', flexShrink: 0,
+                        }}>
                           <Building2 size={20} />
                         </div>
                         <div>
-                          <div className="dc-cell-primary">{condo.nome}</div>
-                          <div className="dc-cell-secondary" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <MapPin size={11} style={{ color: '#94a3b8' }} />
-                            {condo.endereco}
+                          <div style={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.4 }}>{condo.nome}</div>
+                          <div style={{ fontSize: '0.76rem', color: '#94a3b8', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <MapPin size={11} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}>{condo.endereco}</span>
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td style={{ padding: '14px 20px', verticalAlign: 'middle' }}>
                       <div
-                        className="dc-progress-bar-wrap"
-                        style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
-                        title="Clique para ver detalhes das contas"
                         onClick={(e) => { e.stopPropagation(); handleOpenStatus(condo); }}
-                        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        title="Clique para ver detalhes das contas"
+                        style={{
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 6,
+                          padding: '6px 8px',
+                          borderRadius: 10,
+                          transition: 'background 0.15s, box-shadow 0.15s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#f1f5f9';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
                       >
-                        <div className="dc-progress-bar-labels">
-                          <span className="dc-progress-bar-label">{rec}/{total} contas</span>
-                          <span className="dc-progress-bar-pct">{pct}%</span>
+                        {/* Pill de status */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                            padding: '3px 10px', borderRadius: 20,
+                            background: pillBg, border: `1px solid ${pillBorder}`,
+                            color: pillColor, fontSize: '0.75rem', fontWeight: 700,
+                          }}>
+                            <PillIcon size={12} />
+                            {pillLabel}
+                          </div>
+                          {pendentes > 0 && total > 0 && (
+                            <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>
+                              {rec}/{total}
+                            </span>
+                          )}
+                          {isComplete && total > 0 && (
+                            <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 600 }}>
+                              {total}/{total}
+                            </span>
+                          )}
                         </div>
-                        <div className="dc-progress-track">
-                          <div className="dc-progress-fill" style={{ width: `${pct}%` }} />
-                        </div>
+                        {/* Barra de progresso com cor semântica */}
+                        {total > 0 && (
+                          <div style={{ height: 5, borderRadius: 99, background: '#e2e8f0', overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%',
+                              width: `${pct}%`,
+                              borderRadius: 99,
+                              background: barColor,
+                              transition: 'width 0.4s ease',
+                            }} />
+                          </div>
+                        )}
                       </div>
                     </td>
-                    <td>
-                      <span style={{ fontWeight: 800, color: '#475569', fontSize: '0.95rem' }}>{condo.numero}</span>
+                    <td style={{ padding: '14px 20px', verticalAlign: 'middle' }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        minWidth: 36, height: 28, padding: '0 10px',
+                        borderRadius: 8, background: '#f1f5f9',
+                        fontWeight: 900, color: '#475569', fontSize: '0.85rem',
+                        border: '1px solid #e2e8f0',
+                      }}>{condo.numero}</span>
                     </td>
-                    <td>
-                      <div className="dc-cell-primary">{condo.sindico}</div>
-                      <div className="dc-cell-secondary">{condo.cnpj}</div>
+                    <td style={{ padding: '14px 20px', verticalAlign: 'middle' }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.875rem' }}>{condo.sindico}</div>
+                      <div style={{ fontSize: '0.76rem', color: '#94a3b8', marginTop: 2, fontFamily: 'monospace' }}>{condo.cnpj}</div>
                     </td>
-                    <td>
-                      <div className="dc-row-actions" style={{ justifyContent: 'flex-end', display: 'flex', gap: 6 }}>
+                    <td style={{ padding: '14px 20px', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
+                        {/* Doc chips */}
                         {condo.avcb_url && (
-                          <button className="dc-icon-action" style={{ background: '#fef2f2', color: '#ef4444', borderColor: '#fecaca' }} title="Baixar AVCB" onClick={() => handleDownloadAvcb(condo.id)}>
-                            <Flame size={15} />
+                          <button
+                            onClick={() => handleDownloadAvcb(condo.id)}
+                            title="Baixar AVCB"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#fee2e2')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = '#fef2f2')}
+                          >
+                            <Flame size={11} /> AVCB
                           </button>
                         )}
                         {condo.apolice_seguro_url && (
-                          <button className="dc-icon-action" style={{ background: '#fefce8', color: '#eab308', borderColor: '#fef08a' }} title="Baixar Apólice de Seguro" onClick={() => handleDownloadApolice(condo.id)}>
-                            <ShieldAlert size={15} />
+                          <button
+                            onClick={() => handleDownloadApolice(condo.id)}
+                            title="Baixar Apólice"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, background: '#fefce8', color: '#ca8a04', border: '1px solid #fde68a', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#fef08a')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = '#fefce8')}
+                          >
+                            <ShieldAlert size={11} /> Apólice
                           </button>
                         )}
                         {condo.ata_eleicao_nome && (
-                          <button className="dc-icon-action dc-badge-green" style={{ background: '#f0fdf4' }} title={`Baixar ATA: ${condo.ata_eleicao_nome}`} onClick={() => handleDownloadAta(condo.id)}>
-                            <FileSignature size={15} />
+                          <button
+                            onClick={() => handleDownloadAta(condo.id)}
+                            title={`Baixar ATA: ${condo.ata_eleicao_nome}`}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#dcfce7')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = '#f0fdf4')}
+                          >
+                            <FileSignature size={11} /> ATA
                           </button>
                         )}
-                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginLeft: 4 }}>
-                          <button className="dc-icon-action" title="Abrir detalhes" onClick={() => handleOpenDetails(condo)}><ExternalLink size={15} /></button>
-                          {!readOnly && (
-                            <button className="dc-icon-action" title="Editar / Opções" onClick={() => handleOpenEdit(condo)}><MoreVertical size={15} /></button>
-                          )}
-                        </div>
+                        {/* Divider if any docs */}
+                        {(condo.avcb_url || condo.apolice_seguro_url || condo.ata_eleicao_nome) && (
+                          <div style={{ width: 1, height: 20, background: '#e2e8f0' }} />
+                        )}
+                        {/* Action buttons */}
+                        <button
+                          style={{ width: 32, height: 32, borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', cursor: 'pointer', transition: 'all 0.15s' }}
+                          title="Abrir detalhes"
+                          onClick={() => handleOpenDetails(condo)}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.color = '#2563eb'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                        >
+                          <ExternalLink size={14} />
+                        </button>
+                        {!readOnly && (
+                          <button
+                            style={{ width: 32, height: 32, borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', cursor: 'pointer', transition: 'all 0.15s' }}
+                            title="Editar / Opções"
+                            onClick={() => handleOpenEdit(condo)}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#0f172a'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; }}
+                          >
+                            <MoreVertical size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -725,10 +961,14 @@ export default function CondominiosPage() {
               {!loading && filtered.length === 0 && (
                 <tr>
                   <td colSpan={5}>
-                    <div style={{ padding: '60px 24px', textAlign: 'center', color: '#94a3b8' }}>
-                      <Building2 size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-                      <div style={{ fontWeight: 700, fontSize: '1rem', color: '#475569' }}>Nenhum condomínio cadastrado</div>
-                      <div style={{ fontSize: '0.85rem', marginTop: 4 }}>Comece adicionando seu primeiro cliente.</div>
+                    <div style={{ padding: '80px 24px', textAlign: 'center', color: '#94a3b8' }}>
+                      <div style={{ width: 72, height: 72, borderRadius: 20, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#cbd5e1' }}>
+                        <Building2 size={36} />
+                      </div>
+                      <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#475569' }}>Nenhum condomínio encontrado</div>
+                      <div style={{ fontSize: '0.85rem', marginTop: 6, color: '#94a3b8' }}>
+                        {searchTerm ? `Nenhum resultado para "${searchTerm}"` : 'Comece adicionando seu primeiro cliente.'}
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -738,10 +978,10 @@ export default function CondominiosPage() {
         </div>
       </div>
 
-      {/* Pagination */}
-      <div className="dc-pagination">
-        <span className="dc-pagination-info">
-          Mostrando {filtered.length} registro{filtered.length !== 1 ? 's' : ''}
+      {/* Footer count */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12, paddingRight: 4 }}>
+        <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600 }}>
+          {filtered.length} registro{filtered.length !== 1 ? 's' : ''} exibido{filtered.length !== 1 ? 's' : ''}
         </span>
       </div>
 
@@ -913,9 +1153,9 @@ export default function CondominiosPage() {
               </h2>
               <button className="dc-modal-close" onClick={() => { setDetailsCondo(null); setHistoryConc(null); }}><X size={20} /></button>
             </div>
-            <div className="dc-modal-body dc-space-y-4" style={{ maxHeight: 500, overflowY: 'auto' }}>
+            <div className="dc-modal-body dc-space-y-4" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
               {historyConc ? (
-                /* HISTORY VIEW (CLEAN SABESP PORTAL STYLE) */
+                /* HISTORY VIEW */
                 <div style={{ marginTop: -8 }}>
                   {/* Banner Débito Automático */}
                   <div
@@ -928,75 +1168,32 @@ export default function CondominiosPage() {
                       alignItems: 'center',
                       gap: 16,
                       marginBottom: 24,
-                      cursor: 'pointer'
                     }}
                   >
                     <div style={{ padding: 10, background: '#fff', borderRadius: 8, color: '#0066cc', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
                       <CreditCard size={20} />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 800, color: '#004080', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span>{historyConc.debito_automatico ? 'Débito Automático Ativo' : 'Débito Automático Inativo'}</span>
-                        <ChevronLeft size={16} style={{ transform: 'rotate(180deg)', opacity: 0.5 }} />
+                      <div style={{ fontWeight: 800, color: '#004080', fontSize: '0.9rem' }}>
+                        {historyConc.debito_automatico ? 'Débito Automático Ativo' : 'Débito Automático Inativo'}
                       </div>
                       <div style={{ fontSize: '0.78rem', color: '#004080', opacity: 0.7, marginTop: 1 }}>
                         {historyConc.debito_automatico
-                          ? 'Suas faturas são processadas automaticamente de maneira programada.'
+                          ? 'Faturas processadas automaticamente.'
                           : 'As faturas deste condomínio precisam ser pagas manualmente.'}
                       </div>
                     </div>
                   </div>
 
-                  {/* Tab Switcher */}
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 20, padding: 4, background: '#f1f5f9', borderRadius: 10 }}>
-                    <button
-                      onClick={() => setActiveHistoryTab('sistema')}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        border: 'none',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        background: activeHistoryTab === 'sistema' ? '#fff' : 'transparent',
-                        color: activeHistoryTab === 'sistema' ? '#0f172a' : '#64748b',
-                        boxShadow: activeHistoryTab === 'sistema' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                      }}
-                    >
-                      Faturas Registradas
-                    </button>
-                    <button
-                      onClick={() => setActiveHistoryTab('gmail')}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        border: 'none',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        background: activeHistoryTab === 'gmail' ? '#fff' : 'transparent',
-                        color: activeHistoryTab === 'gmail' ? '#0f172a' : '#64748b',
-                        boxShadow: activeHistoryTab === 'gmail' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                      }}
-                    >
-                      Gmail ({gmailHistory.length})
-                    </button>
-                  </div>
-
-                  {/* Toolbar de Ações Rápidas */}
+                  {/* Toolbar */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                    <h5 style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e293b', margin: 0 }}>Faturas Registradas</h5>
+                    <h5 style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e293b', margin: 0 }}>Histórico de Faturas</h5>
                     <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>{historyFaturas.length} documento(s) encontrado(s)</div>
                   </div>
 
                   {loadingHistory ? (
                     <div style={{ padding: 80, textAlign: 'center' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
-                  ) : activeHistoryTab === 'sistema' ? (
-                    /* SISTEMA TAB */
+                  ) : (
                     <>
                       {historyFaturas.length === 0 ? (
                         <div style={{ padding: 80, textAlign: 'center', color: '#94a3b8', background: '#fff', border: '1px solid #f3f4f6', borderRadius: 16 }}>
@@ -1005,14 +1202,13 @@ export default function CondominiosPage() {
                           <div style={{ fontSize: '0.9rem', marginTop: 10 }}>As faturas processadas aparecerão aqui automaticamente.</div>
                         </div>
                       ) : (
-                        /* CARD-BASED LIST */
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                           {historyFaturas.map(f => {
                             const hasAutoDebit = f.debito_automatico === true || String(f.debito_automatico) === 'true';
                             const isLegacy = !f.status;
-                            const status = f.status || 'processada'; // Default for legacy
+                            const status = f.status || 'processada';
 
-                            let statusColor = '#10b981'; // Default green
+                            let statusColor = '#10b981';
                             let statusBg = '#f0fdf4';
                             let statusLabel = status.toUpperCase();
 
@@ -1037,7 +1233,6 @@ export default function CondominiosPage() {
                                 border: '1px solid #e2e8f0',
                                 borderRadius: 14,
                                 boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-                                transition: 'transform 0.2s'
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                                   <div style={{
@@ -1063,7 +1258,6 @@ export default function CondominiosPage() {
                                       <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#cbd5e1' }} />
                                       <span>Registrada em {f.created_at ? format(new Date(f.created_at), 'dd/MM/yyyy') : '—'}</span>
                                     </div>
-
                                     {f.email_remetente && (
                                       <div style={{
                                         fontSize: '0.75rem',
@@ -1115,68 +1309,112 @@ export default function CondominiosPage() {
                         </div>
                       )}
                     </>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      {gmailHistory.length === 0 ? (
-                        <div style={{ padding: 56, textAlign: 'center', color: '#94a3b8', background: '#fff', border: '1px solid #f3f4f6', borderRadius: 16 }}>
-                          <Mail size={42} style={{ margin: '0 auto 16px', opacity: 0.2 }} />
-                          <div style={{ fontWeight: 800, color: '#475569' }}>Nenhum documento localizado no Gmail</div>
-                          <div style={{ fontSize: '0.85rem', marginTop: 6 }}>O histórico aparecerá aqui quando houver mensagens compatíveis com a instalação.</div>
-                        </div>
-                      ) : gmailHistory.map((item: any, idx: number) => (
-                        <div key={item.id || idx} style={{ padding: 16, border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff', display: 'flex', justifyContent: 'space-between', gap: 16 }}>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.subject || item.assunto || 'Mensagem sem assunto'}</div>
-                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 4 }}>{item.from || item.remetente || 'Remetente não informado'}</div>
-                          </div>
-                          <button
-                            className="dc-icon-action"
-                            title="Baixar fatura do Gmail"
-                            onClick={() => handleDownloadFatura(item, item.filename || item.nome_arquivo || 'fatura.pdf', 'gmail')}
-                          >
-                            <Download size={15} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
                   )}
-
 
                 </div>
               ) : (
-                /* DETAILS VIEW */
+                /* DETAILS VIEW — REDESIGN */
                 <>
-                  {/* Info Header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                    <div className="dc-condo-icon" style={{ width: 48, height: 48 }}>
-                      <Building2 size={24} />
+                  {/* ── Hero Header ── */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #f8fafc 60%, #fff 100%)',
+                    borderRadius: 14,
+                    border: '1px solid #dbeafe',
+                    padding: '20px 24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 18,
+                    marginBottom: 4,
+                  }}>
+                    <div style={{
+                      width: 60, height: 60, borderRadius: 16,
+                      background: 'linear-gradient(135deg, #2563eb, #60a5fa)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#fff', flexShrink: 0,
+                      boxShadow: '0 4px 16px rgba(37,99,235,0.25)',
+                    }}>
+                      <Building2 size={28} />
                     </div>
-                    <div>
-                      <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{detailsCondo.nome}</h3>
-                      <div style={{ display: 'flex', gap: 12, fontSize: '0.85rem', color: '#64748b', marginTop: 4 }}>
-                        <span>Cód: Nº {detailsCondo.numero}</span>
-                        <span>CNPJ: {detailsCondo.cnpj}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: 0, lineHeight: 1.2 }}>{detailsCondo.nome}</h3>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, background: '#fff', border: '1px solid #e2e8f0', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                          # {detailsCondo.numero}
+                        </span>
+                        {detailsCondo.carteira && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, background: '#fff', border: '1px solid #e2e8f0', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                            Carteira {detailsCondo.carteira}
+                          </span>
+                        )}
+                        {detailsCondo.leitura_individualizada_ativa && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, background: '#ecfdf5', border: '1px solid #6ee7b7', fontSize: '0.75rem', fontWeight: 700, color: '#059669' }}>
+                            <Zap size={11} /> Leitura Individual
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Specifics */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>SÍNDICO(A) RESPONSÁVEL</div>
-                      <div style={{ fontWeight: 600, color: '#334155' }}>{detailsCondo.sindico}</div>
+                  {/* ── Info Cards ── */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
+                    {/* Síndico */}
+                    <div style={{ padding: '14px 16px', borderRadius: 12, background: '#fff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', flexShrink: 0 }}>
+                        <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>Síndico(a)</div>
+                        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{detailsCondo.sindico || '—'}</div>
+                        {detailsCondo.mandato_fim && (() => {
+                          const now = new Date();
+                          const fim = new Date(String(detailsCondo.mandato_fim).substring(0,10) + 'T12:00:00');
+                          const dias = Math.ceil((fim.getTime() - now.getTime()) / 86400000);
+                          const expirado = dias < 0;
+                          const proximo = dias >= 0 && dias <= 45;
+                          return (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, padding: '2px 8px', borderRadius: 20, fontSize: '0.68rem', fontWeight: 700,
+                              background: expirado ? '#fef2f2' : proximo ? '#fffbeb' : '#f0fdf4',
+                              color: expirado ? '#ef4444' : proximo ? '#d97706' : '#059669',
+                              border: `1px solid ${expirado ? '#fecaca' : proximo ? '#fde68a' : '#bbf7d0'}` }}>
+                              <Calendar size={10} />
+                              Mandato: {expirado ? 'Expirado' : `até ${format(fim, 'dd/MM/yyyy')}`}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>ENDEREÇO</div>
-                      <div style={{ fontWeight: 600, color: '#334155' }}>{detailsCondo.endereco}</div>
+
+                    {/* Endereço */}
+                    <div style={{ padding: '14px 16px', borderRadius: 12, background: '#fff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
+                        <MapPin size={18} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>Endereço</div>
+                        <div style={{ fontWeight: 600, color: '#334155', fontSize: '0.85rem', lineHeight: 1.4 }}>{detailsCondo.endereco || '—'}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>ADMINISTRADORA</div>
-                      <div style={{ fontWeight: 600, color: '#334155' }}>{detailsCondo.administradora || 'Não informada'}</div>
+
+                    {/* CNPJ */}
+                    <div style={{ padding: '14px 16px', borderRadius: 12, background: '#fff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fdf4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9333ea', flexShrink: 0 }}>
+                        <FileText size={18} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>CNPJ</div>
+                        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem', fontFamily: 'monospace' }}>{detailsCondo.cnpj || '—'}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>CARTEIRA</div>
-                      <div style={{ fontWeight: 600, color: '#334155' }}>{detailsCondo.carteira ?? 'Não informada'}</div>
+
+                    {/* Administradora */}
+                    <div style={{ padding: '14px 16px', borderRadius: 12, background: '#fff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ea580c', flexShrink: 0 }}>
+                        <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>Administradora</div>
+                        <div style={{ fontWeight: 600, color: '#334155', fontSize: '0.9rem' }}>{detailsCondo.administradora || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Não informada</span>}</div>
+                      </div>
                     </div>
                   </div>
 
@@ -1355,47 +1593,99 @@ export default function CondominiosPage() {
                   </div>
 
 
-                  {/* Concessionarias List */}
+                  {/* ── Concessionárias ── */}
                   <div style={{ marginTop: 24 }}>
-                    <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Zap size={16} color="#eab308" /> Concessionárias Vinculadas
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Zap size={15} color="#eab308" /> Concessionárias Vinculadas
+                      {condoConcs.length > 0 && (
+                        <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: 20 }}>
+                          {condoConcs.length} ativa{condoConcs.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
                     </h4>
                     {loadingDetails ? (
                       <div style={{ padding: '20px' }}><div className="dc-loading-spinner" style={{ margin: '0 auto' }} /></div>
                     ) : condoConcs.length === 0 ? (
-                      <div style={{ padding: 24, textAlign: 'center', background: '#f8fafc', borderRadius: 8, fontSize: '0.9rem', color: '#64748b', border: '1px dashed #cbd5e1' }}>
-                        Este condomínio ainda não possui automações vinculadas.
+                      <div style={{ padding: 28, textAlign: 'center', background: '#f8fafc', borderRadius: 12, fontSize: '0.9rem', color: '#64748b', border: '2px dashed #e2e8f0' }}>
+                        <Zap size={28} style={{ margin: '0 auto 8px', opacity: 0.25 }} />
+                        <div style={{ fontWeight: 700 }}>Nenhuma automação vinculada</div>
+                        <div style={{ fontSize: '0.8rem', marginTop: 4 }}>Configure concessionárias para este condomínio.</div>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {condoConcs.map(conc => (
-                          <div key={conc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 16, border: '1px solid #e2e8f0', borderRadius: 8, background: '#fff' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                              <div style={{ width: 38, height: 38, borderRadius: 8, background: conc.tipo === 'Sabesp' ? '#ecfeff' : conc.tipo === 'Enel' ? '#eff6ff' : '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: conc.tipo === 'Sabesp' ? '#0891b2' : conc.tipo === 'Enel' ? '#2563eb' : '#ea580c', fontWeight: 800 }}>
-                                {conc.tipo[0]}
-                              </div>
-                              <div>
-                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>{conc.tipo === 'Outros' && conc.nome_personalizado ? conc.nome_personalizado : conc.tipo}</div>
-                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Instalação: {conc.instalacao}</div>
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <button
-                                className="dc-btn dc-btn-secondary"
-                                style={{ height: 32, padding: '0 12px', fontSize: '0.78rem', gap: 6 }}
-                                onClick={() => handleOpenHistory(conc)}
-                              >
-                                <History size={13} /> Histórico
-                              </button>
-                              <div style={{ textAlign: 'right' }}>
-                                <span className="dc-badge dc-badge-green">Ativo</span>
-                                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
-                                  <Calendar size={13} /> Dia {conc.dia_vencimento}
+                        {condoConcs.map(conc => {
+                          const concName = conc.tipo === 'Outros' && conc.nome_personalizado ? conc.nome_personalizado : conc.tipo;
+                          const avatarBg =
+                            conc.tipo === 'Sabesp' ? 'linear-gradient(135deg,#06b6d4,#0891b2)' :
+                            conc.tipo === 'Enel'   ? 'linear-gradient(135deg,#3b82f6,#2563eb)' :
+                            conc.tipo === 'Comgás' ? 'linear-gradient(135deg,#f97316,#ea580c)' :
+                            'linear-gradient(135deg,#8b5cf6,#7c3aed)';
+                          const instLabel =
+                            conc.tipo === 'Sabesp' ? `Fornecimento: ${conc.instalacao}` :
+                            conc.tipo === 'Enel' || conc.tipo === 'Comgás' ? `Instalação: ${conc.instalacao}` :
+                            `Código: ${conc.instalacao}`;
+                          return (
+                            <div key={conc.id} style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              padding: '14px 16px',
+                              border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff',
+                              transition: 'box-shadow 0.15s',
+                            }}
+                              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                                <div style={{
+                                  width: 44, height: 44, borderRadius: 12,
+                                  background: avatarBg,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  color: '#fff', fontWeight: 900, fontSize: '1rem',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                }}>
+                                  {concName.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>{concName}</div>
+                                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>{instLabel}</div>
+                                  <div style={{ display: 'flex', gap: 6, marginTop: 5 }}>
+                                    <span style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: 3,
+                                      padding: '2px 8px', borderRadius: 20, fontSize: '0.68rem', fontWeight: 700,
+                                      background: conc.debito_automatico ? '#eff6ff' : '#f8fafc',
+                                      color: conc.debito_automatico ? '#2563eb' : '#64748b',
+                                      border: `1px solid ${conc.debito_automatico ? '#bfdbfe' : '#e2e8f0'}`,
+                                    }}>
+                                      <CreditCard size={10} />
+                                      {conc.debito_automatico ? 'Débito Auto' : 'Manual'}
+                                    </span>
+                                    <span style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: 3,
+                                      padding: '2px 8px', borderRadius: 20, fontSize: '0.68rem', fontWeight: 700,
+                                      background: '#f0fdf4', color: '#059669', border: '1px solid #bbf7d0',
+                                    }}>
+                                      <CheckCircle2 size={10} /> Ativo
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Vencimento</div>
+                                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>Dia {conc.dia_vencimento}</div>
+                                </div>
+                                <button
+                                  className="dc-btn dc-btn-primary"
+                                  style={{ height: 36, padding: '0 14px', fontSize: '0.8rem', gap: 6, background: '#f8fafc', color: '#334155', border: '1px solid #e2e8f0', boxShadow: 'none' }}
+                                  onClick={() => handleOpenHistory(conc)}
+                                  onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.color = '#2563eb'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                                >
+                                  <History size={13} /> Histórico
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
