@@ -46,95 +46,185 @@ export default function RecebimentosPage() {
 
   return (
     <Shell>
-      <div className="dc-page-header">
-        <div>
-          <h1 className="dc-page-title">Central de Recebimento</h1>
-          <p className="dc-page-subtitle">
-            Faturas processadas automaticamente pelo Agente Datacron e disponíveis para download.
-          </p>
+      {/* ── Hero Header ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #334155 100%)',
+        borderRadius: 20,
+        padding: '28px 32px',
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 24,
+        boxShadow: '0 8px 32px rgba(15,23,42,0.18)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* decorative circles */}
+        <div style={{ position: 'absolute', right: -40, top: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.03)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: 80, bottom: -60, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.02)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: 'rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            flexShrink: 0,
+          }}>
+            <Mail size={28} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>Central de Recebimento</h1>
+            <p style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', marginTop: 5 }}>
+              Faturas processadas automaticamente pelo Agente Datacron e prontas para exportação.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="dc-stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
-        <div className="dc-stat-card">
-          <div className="dc-stat-top">
-            <span className="dc-stat-badge" style={{ background: '#eff6ff', color: '#2563eb' }}>Inbox</span>
-            <div className="dc-stat-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>
-              <Mail size={24} />
+      {/* ── Stats Grid ── */}
+      <div className="dc-stats-grid" style={{ marginBottom: 20, gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+        {/* Card 1: Inbox */}
+        <div style={{
+          background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+          padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)', borderTop: '3px solid #2563eb',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+              <Mail size={20} />
             </div>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', padding: '3px 10px', borderRadius: 20, letterSpacing: '0.03em' }}>INBOX</span>
           </div>
           <div>
-            <div className="dc-stat-label">E-MAILS NA INBOX</div>
-            <div className="dc-stat-value">{inboxData?.inbox_count ?? '—'}</div>
-          </div>
-        </div>
-        
-        <div className="dc-stat-card">
-          <div className="dc-stat-top">
-            <span className="dc-stat-badge positive">Sucesso</span>
-            <div className="dc-stat-icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
-              <FileCheck size={24} />
-            </div>
-          </div>
-          <div>
-            <div className="dc-stat-label">FATURAS PROCESSADAS</div>
-            <div className="dc-stat-value">{logs.length}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>E-mails na inbox</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1, marginTop: 4 }}>{inboxData?.inbox_count ?? '—'}</div>
           </div>
         </div>
 
-        <div className="dc-stat-card">
-          <div className="dc-stat-top">
-            <span className="dc-stat-badge" style={{ background: '#faf5ff', color: '#9333ea' }}>PDFs</span>
-            <div className="dc-stat-icon" style={{ background: '#faf5ff', color: '#9333ea' }}>
-              <FileText size={24} />
+        {/* Card 2: Faturas */}
+        <div style={{
+          background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+          padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)', borderTop: '3px solid #16a34a',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+              <FileCheck size={20} />
             </div>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', background: '#f0fdf4', padding: '3px 10px', borderRadius: 20, letterSpacing: '0.03em' }}>SUCESSO</span>
           </div>
           <div>
-            <div className="dc-stat-label">PDFs DESBLOQUEADOS</div>
-            <div className="dc-stat-value">{logs.filter(l => l.fatura_desbloqueada).length}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Faturas Processadas</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1, marginTop: 4 }}>{logs.length}</div>
           </div>
         </div>
 
-        <div className="dc-stat-card">
-          <div className="dc-stat-top">
-            <span className="dc-stat-badge" style={{ background: '#fff7ed', color: '#ea580c' }}>Valor</span>
-            <div className="dc-stat-icon" style={{ background: '#fff7ed', color: '#ea580c' }}>
-              <Activity size={24} />
+        {/* Card 3: PDFs Desbloqueados */}
+        <div style={{
+          background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+          padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)', borderTop: '3px solid #9333ea',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#faf5ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9333ea' }}>
+              <FileText size={20} />
             </div>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#9333ea', background: '#faf5ff', padding: '3px 10px', borderRadius: 20, letterSpacing: '0.03em' }}>PDFS</span>
           </div>
           <div>
-            <div className="dc-stat-label">VALOR PROCESSADO</div>
-            <div className="dc-stat-value" style={{ fontSize: '1.5rem' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>PDFs Desbloqueados</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1, marginTop: 4 }}>
+              {logs.filter(l => l.fatura_desbloqueada).length}
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Valor Processado */}
+        <div style={{
+          background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+          padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)', borderTop: '3px solid #ea580c',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ea580c' }}>
+              <Activity size={20} />
+            </div>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#ea580c', background: '#fff7ed', padding: '3px 10px', borderRadius: 20, letterSpacing: '0.03em' }}>VALOR</span>
+          </div>
+          <div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valor Processado</div>
+            <div style={{ fontSize: '1.65rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1.2, marginTop: 8 }}>
               {formatCurrency(logs.reduce((sum, l) => sum + (l.fatura_valor || 0), 0))}
             </div>
           </div>
         </div>
 
-        <div className="dc-stat-card">
-          <div className="dc-stat-top">
-            <span className="dc-stat-badge" style={{ background: '#ecfeff', color: '#0891b2' }}>Cron</span>
-            <div className="dc-stat-icon" style={{ background: '#ecfeff', color: '#0891b2' }}>
-              <ShieldCheck size={24} />
+        {/* Card 5: Cron Job */}
+        <div style={{
+          background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+          padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)', borderTop: '3px solid #0891b2',
+          transition: 'transform 0.2s, box-shadow 0.2s',
+        }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#ecfeff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0891b2' }}>
+              <ShieldCheck size={20} />
             </div>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0891b2', background: '#ecfeff', padding: '3px 10px', borderRadius: 20, letterSpacing: '0.03em' }}>CRON</span>
           </div>
           <div>
-            <div className="dc-stat-label">PRÓXIMA VARREDURA</div>
-            <div className="dc-stat-value" style={{ fontSize: '1.65rem' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Próxima Varredura</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1, marginTop: 4 }}>
               {status?.jobs?.[0]?.next_run ? format(new Date(status.jobs[0].next_run), "HH:mm") : 'Em breve'}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Filter */}
-      <div className="dc-filter-bar">
-        <div className="dc-filter-search" style={{ flex: 1 }}>
-          <Search />
+      {/* ── Filter Bar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '12px 16px',
+        background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
+        marginBottom: 16,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+      }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
           <input 
             placeholder="Buscar por remetente, assunto ou condomínio..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%', height: 38, padding: '0 14px 0 36px',
+              borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc',
+              fontSize: '0.875rem', fontFamily: 'inherit', color: '#0f172a',
+              transition: 'all 0.2s', outline: 'none',
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
       </div>

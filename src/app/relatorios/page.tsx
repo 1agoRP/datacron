@@ -245,16 +245,46 @@ export default function RelatoriosPage() {
 
   return (
     <Shell>
-      <div className="dc-page-header">
-        <div>
-          <h1 className="dc-page-title">Relatórios</h1>
-          <p className="dc-page-subtitle">
-            Gere relatórios analíticos por condomínio, concessionária, período ou status.
-          </p>
+      {/* ── Hero Header ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #3b82f6 100%)',
+        borderRadius: 20,
+        padding: '28px 32px',
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 24,
+        boxShadow: '0 8px 32px rgba(37,99,235,0.22)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* decorative circles */}
+        <div style={{ position: 'absolute', right: -40, top: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: 80, bottom: -60, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            flexShrink: 0,
+          }}>
+            <BarChart2 size={28} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>Relatórios</h1>
+            <p style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', marginTop: 5 }}>
+              Gere relatórios analíticos por condomínio, concessionária, período ou status.
+            </p>
+          </div>
         </div>
-        <div className="dc-page-header-actions">
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
           {/* Format selector */}
-          <div style={{ display: 'flex', borderRadius: 10, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', overflow: 'hidden', backdropFilter: 'blur(8px)' }}>
             {Object.entries(formatLabels).map(([label, value]) => (
               <button
                 key={label}
@@ -262,14 +292,14 @@ export default function RelatoriosPage() {
                 style={{
                   padding: '0 16px',
                   height: 40,
-                  background: selectedFormat === value ? '#2563eb' : '#fff',
-                  color: selectedFormat === value ? '#fff' : '#64748b',
+                  background: selectedFormat === value ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)',
+                  color: '#fff',
                   border: 'none',
                   fontWeight: 700,
                   fontSize: '0.82rem',
                   cursor: 'pointer',
                   fontFamily: 'inherit',
-                  borderRight: label !== 'CSV' ? '1px solid #e2e8f0' : 'none',
+                  borderRight: label !== 'CSV' ? '1px solid rgba(255,255,255,0.15)' : 'none',
                   transition: 'all 0.15s',
                 }}
               >
@@ -277,8 +307,15 @@ export default function RelatoriosPage() {
               </button>
             ))}
           </div>
-          <button className="dc-btn dc-btn-primary" onClick={handleExport} disabled={loading}>
-            {loading ? <div className="dc-loading-spinner" style={{width: 14, height: 14, borderWidth: 2, borderColor: '#fff', borderTopColor: 'transparent'}} /> : <Download size={16} />}
+          <button
+            className="dc-btn"
+            onClick={handleExport}
+            disabled={loading}
+            style={{ background: '#fff', color: '#2563eb', fontWeight: 800, gap: 8 }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+          >
+            {loading ? <div className="dc-loading-spinner" style={{width: 14, height: 14, borderWidth: 2, borderColor: '#2563eb', borderTopColor: 'transparent'}} /> : <Download size={15} />}
             {loading ? 'Exportando...' : `Exportar ${selectedFormat === 'csv' ? 'CSV' : selectedFormat === 'pdf' ? 'PDF' : 'Excel'}`}
           </button>
         </div>

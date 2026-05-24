@@ -90,35 +90,68 @@ export default function AuditoriaPage() {
 
   return (
     <Shell>
-      <div className="dc-page-header">
-        <div>
-          <h1 className="dc-page-title" style={{ color: '#7c3aed' }}>Auditoria</h1>
-          <p className="dc-page-subtitle">
-            Acompanhe todas as ações críticas realizadas no sistema.
-          </p>
+      {/* ── Hero Header ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #5b21b6 0%, #7c3aed 55%, #a78bfa 100%)',
+        borderRadius: 20,
+        padding: '28px 32px',
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 24,
+        boxShadow: '0 8px 32px rgba(124,58,237,0.22)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* decorative circles */}
+        <div style={{ position: 'absolute', right: -40, top: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: 80, bottom: -60, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            flexShrink: 0,
+          }}>
+            <Shield size={28} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>Auditoria</h1>
+            <p style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', marginTop: 5 }}>
+              Acompanhe todas as ações críticas e alterações realizadas no sistema.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="dc-tabs" style={{ marginBottom: 24, borderBottom: '2px solid #f1f5f9' }}>
+      {/* ── Tabs ── */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 24, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
         <button
-          className={`dc-tab ${activeTab === 'alertas' ? 'active' : ''}`}
           onClick={() => setActiveTab('alertas')}
           style={{
-            padding: '12px 24px', fontSize: '0.9rem', fontWeight: activeTab === 'alertas' ? 800 : 600,
-            borderBottom: activeTab === 'alertas' ? '3px solid #7c3aed' : 'none',
-            color: activeTab === 'alertas' ? '#7c3aed' : '#64748b'
+            height: 38, padding: '0 16px', borderRadius: 10,
+            fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer',
+            border: `1px solid ${activeTab === 'alertas' ? '#7c3aed' : 'transparent'}`,
+            background: activeTab === 'alertas' ? '#f5f3ff' : 'transparent',
+            color: activeTab === 'alertas' ? '#7c3aed' : '#64748b',
+            transition: 'all 0.15s',
           }}
         >
           Alertas e Notificações
         </button>
         <button
-          className={`dc-tab ${activeTab === 'sistema' ? 'active' : ''}`}
           onClick={() => setActiveTab('sistema')}
           style={{
-            padding: '12px 24px', fontSize: '0.9rem', fontWeight: activeTab === 'sistema' ? 800 : 600,
-            borderBottom: activeTab === 'sistema' ? '3px solid #7c3aed' : 'none',
-            color: activeTab === 'sistema' ? '#7c3aed' : '#64748b'
+            height: 38, padding: '0 16px', borderRadius: 10,
+            fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer',
+            border: `1px solid ${activeTab === 'sistema' ? '#7c3aed' : 'transparent'}`,
+            background: activeTab === 'sistema' ? '#f5f3ff' : 'transparent',
+            color: activeTab === 'sistema' ? '#7c3aed' : '#64748b',
+            transition: 'all 0.15s',
           }}
         >
           Ações de Sistema (Infra)
@@ -127,26 +160,46 @@ export default function AuditoriaPage() {
 
       {activeTab === 'alertas' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+          {/* Card 1: Total */}
           <div style={{
-            padding: '20px 24px', borderRadius: 14, background: 'linear-gradient(135deg, #f5f3ff, #ede9fe)',
-            border: '1px solid #ddd6fe',
-          }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total de Ações</div>
-            <div style={{ fontSize: '2rem', fontWeight: 900, color: '#4c1d95', marginTop: 4 }}>{stats.total}</div>
+            background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+            padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.04)', borderTop: '3px solid #7c3aed',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+          >
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total de Ações</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1, marginTop: 4 }}>{stats.total}</div>
           </div>
+
+          {/* Card 2: Resolvidos */}
           <div style={{
-            padding: '20px 24px', borderRadius: 14, background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
-            border: '1px solid #bbf7d0',
-          }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: 0.5 }}>Resolvidos</div>
-            <div style={{ fontSize: '2rem', fontWeight: 900, color: '#166534', marginTop: 4 }}>{stats.resolvidos}</div>
+            background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+            padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.04)', borderTop: '3px solid #16a34a',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+          >
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Resolvidos</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1, marginTop: 4 }}>{stats.resolvidos}</div>
           </div>
+
+          {/* Card 3: Descartados */}
           <div style={{
-            padding: '20px 24px', borderRadius: 14, background: 'linear-gradient(135deg, #fef2f2, #fecaca)',
-            border: '1px solid #fecaca',
-          }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: 0.5 }}>Descartados</div>
-            <div style={{ fontSize: '2rem', fontWeight: 900, color: '#991b1b', marginTop: 4 }}>{stats.descartados}</div>
+            background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+            padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.04)', borderTop: '3px solid #dc2626',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+          >
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descartados</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1, marginTop: 4 }}>{stats.descartados}</div>
           </div>
         </div>
       )}

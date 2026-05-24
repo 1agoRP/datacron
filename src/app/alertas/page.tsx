@@ -171,46 +171,85 @@ export default function AlertasPage() {
         onChange={handleFileSelected}
       />
 
-      {/* Cabeçalho */}
-      <div className="dc-page-header">
-        <div>
-          <h1 className="dc-page-title">Central de Alertas</h1>
-          <p className="dc-page-subtitle">
-            Gerencie e resolva pendências e anomalias detectadas pelo sistema.
-          </p>
+      {/* ── Hero Header ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #ea580c 0%, #f97316 55%, #fb923c 100%)',
+        borderRadius: 20,
+        padding: '28px 32px',
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 24,
+        boxShadow: '0 8px 32px rgba(234,88,12,0.22)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* decorative circles */}
+        <div style={{ position: 'absolute', right: -40, top: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: 80, bottom: -60, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            flexShrink: 0,
+          }}>
+            <AlertCircle size={28} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>Central de Alertas</h1>
+            <p style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', marginTop: 5 }}>
+              Gerencie e resolva pendências e anomalias detectadas em faturas pelo sistema.
+            </p>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 16px', background: '#fef2f2',
-              border: '1px solid #fecaca', borderRadius: 12,
-              color: '#dc2626', fontWeight: 700, fontSize: '0.875rem'
-            }}
-          >
-            <AlertCircle size={16} />
-            <span>{alertas.length} alerta{alertas.length !== 1 ? 's' : ''} ativo{alertas.length !== 1 ? 's' : ''}</span>
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+          <div style={{
+            display: 'flex', gap: 8, alignItems: 'center',
+            padding: '8px 16px', background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12,
+            color: '#fff', fontWeight: 700, fontSize: '0.85rem',
+            backdropFilter: 'blur(8px)'
+          }}>
+            <AlertCircle size={16} style={{ color: '#fff' }} />
+            <span>{alertas.length} pendências ativas</span>
           </div>
         </div>
       </div>
 
-      {/* Abas de filtro */}
-      <div className="dc-alert-pills">
-        {Object.entries(counts).map(([label, count]) => (
-          <button
-            key={label}
-            className="dc-alert-pill"
-            onClick={() => setActiveTab(label)}
-            style={{
-              color: activeTab === label ? '#dc2626' : '#64748b',
-              borderColor: activeTab === label ? '#fecaca' : '#e2e8f0',
-              background: activeTab === label ? '#fecaca33' : '#fff',
-            }}
-          >
-            {label}
-            <span className="dc-alert-pill-count">{count}</span>
-          </button>
-        ))}
+      {/* ── Filter Pills ── */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+        {Object.entries(counts).map(([label, count]) => {
+          const isActive = activeTab === label;
+          return (
+            <button
+              key={label}
+              onClick={() => setActiveTab(label)}
+              style={{
+                height: 38, padding: '0 16px', borderRadius: 10,
+                fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                border: `1px solid ${isActive ? '#ea580c' : '#e2e8f0'}`,
+                background: isActive ? '#fff7ed' : '#fff',
+                color: isActive ? '#ea580c' : '#64748b',
+                transition: 'all 0.15s',
+              }}
+            >
+              {label}
+              <span style={{
+                fontSize: '0.72rem', fontWeight: 800,
+                background: isActive ? '#ffedd5' : '#f1f5f9',
+                color: isActive ? '#ea580c' : '#475569',
+                padding: '2px 8px', borderRadius: 20,
+              }}>{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Lista de alertas */}

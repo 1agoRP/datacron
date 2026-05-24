@@ -390,50 +390,128 @@ export default function ConcessionariasPage() {
 
   return (
     <Shell>
-      <div className="dc-page-header">
-        <div>
-          <h1 className="dc-page-title">Concessionárias</h1>
-          <p className="dc-page-subtitle">
-            Configure regras de senha, e-mails esperados e vencimentos de cada vinculação.
-          </p>
+      {/* ── Hero Header ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #334155 0%, #475569 55%, #64748b 100%)',
+        borderRadius: 20,
+        padding: '28px 32px',
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 24,
+        boxShadow: '0 8px 32px rgba(71,85,105,0.22)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* decorative circles */}
+        <div style={{ position: 'absolute', right: -40, top: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: 80, bottom: -60, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            flexShrink: 0,
+          }}>
+            <Building2 size={28} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>Concessionárias</h1>
+            <p style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', marginTop: 5 }}>
+              Configure regras de senha, e-mails esperados e vencimentos de cada vinculação.
+            </p>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="dc-btn dc-btn-secondary" onClick={() => setIsHistoricoModalOpen(true)}>
-            <History size={16} /> Histórico
+
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+          <button
+            className="dc-btn"
+            onClick={() => setIsHistoricoModalOpen(true)}
+            style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)', gap: 8 }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+          >
+            <History size={15} /> Histórico
           </button>
           {isAdmin && (
-            <button className="dc-btn dc-btn-dark" onClick={() => setIsReajusteModalOpen(true)}>
-              <TrendingUp size={16} /> Aplicar Reajuste
+            <button
+              className="dc-btn"
+              onClick={() => setIsReajusteModalOpen(true)}
+              style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)', gap: 8 }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+            >
+              <TrendingUp size={15} /> Reajuste
             </button>
           )}
           {!readOnly && (
-            <button className="dc-btn dc-btn-primary" onClick={handleOpenCreate}>
-              <Plus size={16} /> Vincular Nova
+            <button
+              className="dc-btn"
+              onClick={handleOpenCreate}
+              style={{ background: '#fff', color: '#475569', fontWeight: 800, gap: 8 }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#f1f5f9')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+            >
+              <Plus size={15} /> Vincular Nova
             </button>
           )}
         </div>
       </div>
 
-      {/* Filter bar */}
-      <div className="dc-filter-bar">
-        <div className="dc-filter-search">
-          <Search />
+      {/* ── Filter Bar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '12px 16px',
+        background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
+        marginBottom: 16, flexWrap: 'wrap',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+      }}>
+        {/* Search */}
+        <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
           <input
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Buscar por condomínio, código ou tipo..."
+            style={{
+              width: '100%', height: 38, padding: '0 14px 0 36px',
+              borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc',
+              fontSize: '0.875rem', fontFamily: 'inherit', color: '#0f172a',
+              transition: 'all 0.2s', outline: 'none',
+            }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
-        <div className="dc-tabs" style={{ border: 'none', margin: 0, padding: 0 }}>
+
+        {/* Tab switcher */}
+        <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 10, flexWrap: 'wrap' }}>
           {tabs.map(t => (
-            <button key={t} className={`dc-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                height: 30, padding: '0 12px', border: 'none', cursor: 'pointer',
+                borderRadius: 8, fontSize: '0.8rem', fontWeight: 700,
+                background: tab === t ? '#fff' : 'transparent',
+                color: tab === t ? '#0f172a' : '#64748b',
+                boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.15s',
+              }}
+            >
               {t}
             </button>
           ))}
         </div>
-        <div className="dc-filter-divider" />
-        <span className="dc-filter-count">
-          {filtered.length} vinculaç{filtered.length !== 1 ? 'ões' : 'ão'}
+
+        <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
+
+        <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap' }}>
+          <span style={{ color: '#0f172a' }}>{filtered.length}</span> {filtered.length !== 1 ? 'vinculações' : 'vinculação'}
         </span>
       </div>
 

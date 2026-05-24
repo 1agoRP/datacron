@@ -204,24 +204,65 @@ export default function Dashboard() {
 
   return (
     <Shell>
-      {/* Header with quick stats and actions */}
-      <div className="dc-page-header dc-animate-fade-in" style={{ alignItems: 'center' }}>
-        <div>
-          <h1 className="dc-page-title">{isCoordinator ? 'Dashboard de Coordenação' : 'Painel Operacional'}</h1>
-          <p className="dc-page-subtitle">
-            Análise em tempo real para <span style={{ fontWeight: 700, color: '#2563eb' }}>{user?.administradora || 'PropStarter'}</span>
-          </p>
+      {/* ── Hero Header ── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #3b82f6 100%)',
+        borderRadius: 20,
+        padding: '28px 32px',
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 24,
+        boxShadow: '0 8px 32px rgba(37,99,235,0.22)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* decorative circles */}
+        <div style={{ position: 'absolute', right: -40, top: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', right: 80, bottom: -60, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+            flexShrink: 0,
+          }}>
+            <Building2 size={28} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+              {isCoordinator ? 'Dashboard de Coordenação' : 'Painel Operacional'}
+            </h1>
+            <p style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', marginTop: 5 }}>
+              Análise em tempo real para <span style={{ fontWeight: 700, color: '#fff' }}>{user?.administradora || 'PropStarter'}</span>
+            </p>
+          </div>
         </div>
 
-        <div className="dc-page-header-actions">
-          <div className="dc-dashboard-header-stats hide-mobile">
-            <Clock size={16} style={{ color: '#2563eb' }} />
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+          <div style={{
+            display: 'flex', gap: 8, alignItems: 'center',
+            padding: '8px 16px', background: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12,
+            color: '#fff', fontWeight: 700, fontSize: '0.85rem',
+            backdropFilter: 'blur(8px)'
+          }} className="hide-mobile">
+            <Clock size={16} style={{ color: '#fff' }} />
             {format(currentTime, "dd 'de' MMMM '·' HH:mm", { locale: ptBR })}
           </div>
           {user?.role === 'admin' && (
-            <button className="dc-btn dc-btn-primary" onClick={() => router.push('/importacoes')}>
-              <Upload size={16} />
-              Importar
+            <button
+              className="dc-btn"
+              onClick={() => router.push('/importacoes')}
+              style={{ background: '#fff', color: '#2563eb', fontWeight: 800, gap: 8 }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+            >
+              <Upload size={15} /> Importar
             </button>
           )}
         </div>
@@ -959,23 +1000,38 @@ export default function Dashboard() {
 }
 
 function StatCard({ title, value, subtitle, icon, gradient, iconColor, badge, positive, danger }: any) {
+  const borderTopColor = danger ? '#ef4444' : positive ? '#10b981' : iconColor || '#e2e8f0';
   return (
-    <div className={`dc-stat-card dc-animate-fade-in ${danger ? 'dc-card-vibrant' : ''}`} style={{ borderColor: danger ? '#fca5a5' : '#e2e8f0' }}>
-      <div className="dc-stat-top">
-        <div className="dc-stat-icon" style={{ background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`, color: iconColor }}>
+    <div
+      style={{
+        background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
+        padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.04)', borderTop: `3px solid ${borderTopColor}`,
+        transition: 'transform 0.2s, box-shadow 0.2s',
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: gradient[0], display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor }}>
           {icon}
         </div>
-        <div className="dc-stat-badge" style={{ color: positive ? '#16a34a' : danger ? '#dc2626' : '#64748b', background: positive ? '#f0fdf4' : danger ? '#fef2f2' : '#f1f5f9' }}>
+        <span style={{
+          fontSize: '0.7rem', fontWeight: 800,
+          color: positive ? '#16a34a' : danger ? '#dc2626' : '#64748b',
+          background: positive ? '#f0fdf4' : danger ? '#fef2f2' : '#f1f5f9',
+          padding: '3px 10px', borderRadius: 20, letterSpacing: '0.03em'
+        }}>
           {badge}
-        </div>
+        </span>
       </div>
       <div>
-        <div className="dc-stat-label">{title}</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <div className="dc-stat-value">{value}</div>
+        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+          <div style={{ fontSize: '2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.04em', lineHeight: 1 }}>{value}</div>
           {positive && <ArrowUpRight size={16} style={{ color: '#16a34a' }} />}
         </div>
-        <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 6, fontWeight: 500 }}>{subtitle}</div>
+        <div style={{ fontSize: '0.75rem', color: danger ? '#dc2626' : '#94a3b8', fontWeight: 600, marginTop: 6 }}>{subtitle}</div>
       </div>
     </div>
   );
