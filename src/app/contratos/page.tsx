@@ -5,10 +5,13 @@ import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import {
   AlertTriangle,
+  ArrowUpDown,
   CalendarClock,
   CheckCircle2,
   Download,
+  Filter,
   FileSignature,
+  Pencil,
   Plus,
   ReceiptText,
   Save,
@@ -23,6 +26,9 @@ import { formatCurrency } from '@/lib/utils';
 import { Condominio, Contrato, ContratoPagamento } from '@/types';
 
 const currentYear = new Date().getFullYear();
+type SortKey = 'data_fim' | 'condominio_nome' | 'empresa' | 'tipo_contrato' | 'valor_atual' | 'dia_vencimento' | 'pagamentos_pendentes';
+type SortDirection = 'asc' | 'desc';
+type StatusFilter = 'todos' | 'pendentes' | 'nao_assinados' | 'vencidos' | 'ativos';
 
 const emptyForm = {
   condominio_id: '',
@@ -56,6 +62,17 @@ function paymentClass(payment: ContratoPagamento) {
   return 'contract-month open';
 }
 
+function formatDate(value?: string | null) {
+  if (!value) return 'Indeterminado';
+  const [year, month, day] = value.slice(0, 10).split('-');
+  if (!year || !month || !day) return value;
+  return `${day}/${month}/${year}`;
+}
+
+function monthCompact(payment: ContratoPagamento) {
+  return payment.mes_label.slice(0, 3).toUpperCase();
+}
+
 export default function ContratosPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -66,6 +83,9 @@ export default function ContratosPage() {
   const [editing, setEditing] = useState<Contrato | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [paymentDraft, setPaymentDraft] = useState<Record<string, string>>({});
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
+  const [sortKey, setSortKey] = useState<SortKey>('data_fim');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const isAdmin = user?.role === 'admin';
 
   const { data: contratos = [], isLoading, mutate } = useSWR(
@@ -83,18 +103,47 @@ export default function ContratosPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return contratos;
-    return contratos.filter((c) =>
-      [c.empresa, c.tipo_contrato, c.condominio_nome, c.cnpj_empresa]
+    return contratos.filter((c) => {
+      const matchesText = !q || [c.empresa, c.tipo_contrato, c.condominio_nome, c.cnpj_empresa, c.razao_social]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(q))
-    );
-  }, [contratos, query]);
+        .some((value) => String(value).toLowerCase().includes(q));
+      const matchesStatus =
+        statusFilter === 'todos' ||
+        (statusFilter === 'pendentes' && (c.pagamentos_pendentes || 0) > 0) ||
+        (statusFilter === 'nao_assinados' && !c.assinado) ||
+        (statusFilter === 'vencidos' && c.status === 'vencido') ||
+        (statusFilter === 'ativos' && c.status === 'ativo');
+      return matchesText && matchesStatus;
+    });
+  }, [contratos, query, statusFilter]);
+
+  const sortedContracts = useMemo(() => {
+    const direction = sortDirection === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const av = a[sortKey] ?? '';
+      const bv = b[sortKey] ?? '';
+      if (typeof av === 'number' || typeof bv === 'number') {
+        return ((Number(av) || 0) - (Number(bv) || 0)) * direction;
+      }
+      return String(av || '').localeCompare(String(bv || ''), 'pt-BR', { numeric: true }) * direction;
+    });
+  }, [filtered, sortDirection, sortKey]);
 
   const selected = useMemo(() => {
-    if (!filtered.length) return null;
-    return filtered.find((c) => c.id === selectedId) || filtered[0];
-  }, [filtered, selectedId]);
+    if (!sortedContracts.length) return null;
+    return sortedContracts.find((c) => c.id === selectedId) || sortedContracts[0];
+  }, [sortedContracts, selectedId]);
+
+  const overdueCount = useMemo(() => contratos.filter((c) => (c.pagamentos || []).some((p) => p.vencido && !p.recebido)).length, [contratos]);
+
+  const setSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((current) => current === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    setSortKey(key);
+    setSortDirection(key === 'valor_atual' || key === 'pagamentos_pendentes' ? 'desc' : 'asc');
+  };
 
   if (user && !isAdmin) {
     return null;
@@ -332,12 +381,32 @@ export default function ContratosPage() {
         </div>
       </div>
 
-      <div className="contract-workspace">
-        <section className="contract-list-panel">
-          <div className="contract-toolbar">
-            <div className="dc-filter-search">
+      <div className="contract-board">
+        <section className="contract-table-panel">
+          <div className="contract-table-toolbar">
+            <div className="dc-filter-search contract-search">
               <Search />
-              <input placeholder="Buscar contrato, empresa ou condominio..." value={query} onChange={(e) => setQuery(e.target.value)} />
+              <input placeholder="Buscar por condomínio, empresa, tipo, razão social ou CNPJ..." value={query} onChange={(e) => setQuery(e.target.value)} />
+            </div>
+            <div className="contract-filter-group" aria-label="Filtros de contrato">
+              {[
+                ['todos', 'Todos', contratos.length],
+                ['pendentes', 'Mensalidades pendentes', stats?.mensalidades_vencidas ?? 0],
+                ['nao_assinados', 'Sem assinatura', stats?.nao_assinados ?? 0],
+                ['vencidos', 'Contratos vencidos', stats?.vencidos ?? 0],
+                ['ativos', 'Ativos', stats?.ativos ?? 0],
+              ].map(([value, label, count]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`contract-filter-chip${statusFilter === value ? ' active' : ''}`}
+                  onClick={() => setStatusFilter(value as StatusFilter)}
+                >
+                  <Filter size={13} />
+                  {label}
+                  <span>{count}</span>
+                </button>
+              ))}
             </div>
             <input
               className="dc-form-input contract-year"
@@ -346,39 +415,123 @@ export default function ContratosPage() {
               max={2100}
               value={ano}
               onChange={(e) => setAno(Number(e.target.value || currentYear))}
+              aria-label="Ano dos pagamentos"
             />
           </div>
 
-          <div className="contract-list">
-            {isLoading && <div style={{ padding: 24 }}>Carregando contratos...</div>}
-            {!isLoading && filtered.length === 0 && (
-              <div style={{ padding: 24, color: '#64748b' }}>Nenhum contrato encontrado.</div>
-            )}
-            {filtered.map((contrato) => (
-              <button
-                key={contrato.id}
-                className={`contract-row${selected?.id === contrato.id ? ' active' : ''}`}
-                onClick={() => setSelectedId(contrato.id)}
-              >
-                <div>
-                  <div className="contract-row-title">{contrato.empresa}</div>
-                  <div className="contract-row-subtitle">{contrato.condominio_nome} · {contrato.tipo_contrato}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span className={statusBadge(contrato.status)}>{contrato.status.replace('_', ' ')}</span>
-                  <div className="contract-row-money">{formatCurrency(contrato.valor_atual || 0)}</div>
-                </div>
-              </button>
-            ))}
+          <div className="contract-table-summary">
+            <div><strong>{sortedContracts.length}</strong><span>contratos na visão</span></div>
+            <div><strong>{overdueCount}</strong><span>com mês vencido</span></div>
+            <div><strong>{formatCurrency(stats?.valor_mensal || 0)}</strong><span>valor mensal previsto</span></div>
+            <div><strong>{formatCurrency(stats?.total_recebido_ano || 0)}</strong><span>recebido em {ano}</span></div>
+          </div>
+
+          <div className="contract-table-scroll">
+            <table className="contract-table">
+              <thead>
+                <tr>
+                  {[
+                    ['data_fim', 'Venc. contrato'],
+                    ['condominio_nome', 'Condomínio'],
+                    ['empresa', 'Empresa'],
+                    ['tipo_contrato', 'Tipo'],
+                    ['valor_atual', 'Mensalidade'],
+                    ['dia_vencimento', 'Dia mensal'],
+                    ['pagamentos_pendentes', 'Pendências'],
+                  ].map(([key, label]) => (
+                    <th key={key}>
+                      <button type="button" onClick={() => setSort(key as SortKey)}>
+                        {label}
+                        <ArrowUpDown size={13} className={sortKey === key ? 'active' : ''} />
+                      </button>
+                    </th>
+                  ))}
+                  <th>Assinatura</th>
+                  <th>Pagamentos {ano}</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading && (
+                  <tr>
+                    <td colSpan={10} className="contract-table-empty">Carregando contratos...</td>
+                  </tr>
+                )}
+                {!isLoading && sortedContracts.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="contract-table-empty">Nenhum contrato encontrado para os filtros atuais.</td>
+                  </tr>
+                )}
+                {sortedContracts.map((contrato) => {
+                  const pendingPayments = contrato.pagamentos_pendentes || 0;
+                  return (
+                    <tr
+                      key={contrato.id}
+                      className={selected?.id === contrato.id ? 'selected' : ''}
+                      onClick={() => setSelectedId(contrato.id)}
+                    >
+                      <td>
+                        <span className={statusBadge(contrato.status)}>{contrato.status.replace('_', ' ')}</span>
+                        <div className="contract-table-date">{formatDate(contrato.data_fim)}</div>
+                      </td>
+                      <td>
+                        <strong>{contrato.condominio_nome || 'Sem condomínio'}</strong>
+                        <span className="contract-muted">Início {formatDate(contrato.data_inicio)}</span>
+                      </td>
+                      <td>
+                        <strong>{contrato.empresa}</strong>
+                        <span className="contract-muted">{contrato.cnpj_empresa || contrato.razao_social || 'Sem CNPJ'}</span>
+                      </td>
+                      <td>{contrato.tipo_contrato}</td>
+                      <td><strong>{formatCurrency(contrato.valor_atual || 0)}</strong></td>
+                      <td>Dia {contrato.dia_vencimento || 10}</td>
+                      <td>
+                        <span className={`contract-pending-pill${pendingPayments > 0 ? ' danger' : ''}`}>
+                          {pendingPayments > 0 ? `${pendingPayments} pendente${pendingPayments > 1 ? 's' : ''}` : 'Em dia'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={contrato.assinado ? 'dc-badge dc-badge-green' : 'dc-badge dc-badge-amber'}>
+                          {contrato.assinado ? 'Assinado' : 'Pendente'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="contract-payment-strip">
+                          {(contrato.pagamentos || []).map((payment) => (
+                            <span
+                              key={`${contrato.id}-${payment.mes}`}
+                              className={`contract-payment-dot ${payment.recebido ? 'paid' : payment.vencido ? 'late' : 'open'}`}
+                              title={`${payment.mes_label}: ${payment.recebido ? 'recebido' : payment.vencido ? 'vencido' : 'em aberto'}`}
+                            >
+                              {monthCompact(payment)}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="contract-table-actions">
+                          <button className="dc-btn dc-btn-secondary" type="button" onClick={(e) => { e.stopPropagation(); openEdit(contrato); }}>
+                            <Pencil size={14} />
+                          </button>
+                          <button className="dc-btn dc-btn-danger" type="button" onClick={(e) => { e.stopPropagation(); removeContract(contrato); }}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </section>
 
-        <section className="contract-detail-panel">
+        <section className="contract-detail-panel compact">
           {selected ? (
             <>
               <div className="contract-detail-header">
                 <div>
-                  <div className="contract-eyebrow">{selected.condominio_nome}</div>
+                  <div className="contract-eyebrow">Contrato selecionado · {selected.condominio_nome}</div>
                   <h2>{selected.empresa}</h2>
                   <div className="contract-detail-meta">
                     <span className={statusBadge(selected.status)}>{selected.status.replace('_', ' ')}</span>
@@ -413,8 +566,8 @@ export default function ContratosPage() {
               </div>
 
               <div className="contract-facts">
-                <div><span>Assinado em</span><strong>{selected.data_assinatura || 'Nao assinado'}</strong></div>
-                <div><span>Vigencia</span><strong>{selected.data_inicio} ate {selected.data_fim || 'indeterminado'}</strong></div>
+                <div><span>Assinado em</span><strong>{selected.data_assinatura ? formatDate(selected.data_assinatura) : 'Nao assinado'}</strong></div>
+                <div><span>Vigencia</span><strong>{formatDate(selected.data_inicio)} ate {formatDate(selected.data_fim)}</strong></div>
                 <div><span>Reajuste</span><strong>{selected.indice_reajuste || 'Sem indice'} · {selected.periodicidade}</strong></div>
                 <div><span>Vencimento mensal</span><strong>Dia {selected.dia_vencimento || 10}</strong></div>
               </div>
