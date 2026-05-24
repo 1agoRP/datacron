@@ -1,4 +1,4 @@
-import secrets
+﻿import secrets
 from datetime import timedelta, datetime, timezone
 from typing import Optional, List
 
@@ -19,7 +19,7 @@ from app.limiter import limiter
 from app.models.user_condominio import UserCondominio
 from app.models.refresh_token import RefreshToken
 
-router = APIRouter(prefix="/auth", tags=["Autenticação"])
+router = APIRouter(prefix="/auth", tags=["AutenticaÃ§Ã£o"])
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -119,14 +119,14 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
     """Refreshes the access token using a valid HttpOnly refresh token cookie."""
     token_str = request.cookies.get("datacron_refresh_token")
     if not token_str:
-        raise HTTPException(status_code=401, detail="Refresh token não encontrado")
+        raise HTTPException(status_code=401, detail="Refresh token nÃ£o encontrado")
         
     result = await db.execute(select(RefreshToken).where(RefreshToken.token == token_str))
     rt = result.scalar_one_or_none()
     
     if not rt:
         response.delete_cookie("datacron_refresh_token")
-        raise HTTPException(status_code=401, detail="Refresh token inválido")
+        raise HTTPException(status_code=401, detail="Refresh token invÃ¡lido")
         
     # Ensure timezone info is present (SQLite often drops it)
     rt_expires = rt.expires_at
@@ -143,7 +143,7 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
     user = user_result.scalar_one_or_none()
     
     if not user or not user.ativo:
-        raise HTTPException(status_code=401, detail="Usuário inativo")
+        raise HTTPException(status_code=401, detail="UsuÃ¡rio inativo")
         
     # Rotacionar o refresh token (consumir o atual e gerar um novo)
     await db.delete(rt)
@@ -297,7 +297,7 @@ async def register(
 
     exists = await db.execute(select(User).where(User.email == body.email))
     if exists.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="E-mail já cadastrado")
+        raise HTTPException(status_code=409, detail="E-mail jÃ¡ cadastrado")
 
     user = User(
         nome=body.nome,
@@ -343,34 +343,7 @@ async def get_sessions(request: Request, current_user: User = Depends(get_curren
             "device": device,
             "location": location,
             "is_current": True,
-            "last_active": "Sessão Atual"
+            "last_active": "SessÃ£o Atual"
         }
     ]
 
-class NotificationPrefs(BaseModel):
-    invoiceCreated: bool
-    invoicePaid: bool
-    invoiceOverdue: bool
-    systemAlerts: bool
-
-@router.post("/notifications")
-async def save_notifications(prefs: NotificationPrefs, current_user: User = Depends(get_current_user)):
-    """Receives user notification preferences and sends a real confirmation email."""
-    # In a real app, we would save prefs to current_user.
-    
-    from app.services.email_monitor import send_notification_email
-    
-    body = (
-        f"Olá {current_user.nome},\n\n"
-        "Suas preferências de notificação do Datacron foram atualizadas com sucesso.\n"
-        "Se você não fez essa alteração, acesse sua conta imediatamente e mude sua senha.\n\n"
-        "Equipe Datacron"
-    )
-    
-    # Try sending via Gmail integration if available
-    success = await send_notification_email(current_user.email, "Datacron - Preferências Atualizadas", body)
-    
-    return {
-        "message": "Preferências salvas com sucesso.",
-        "email_dispatched": success
-    }

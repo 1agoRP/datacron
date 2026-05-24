@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
-  User, Shield, Bell, Globe, Database, Mail, Smartphone, ArrowRight, Check, Key, Link as LinkIcon, LogOut, Trash2, Copy, Plus, Activity, RefreshCw, AlertTriangle, Pencil, Lock
+  User, Shield, Globe, Database, Smartphone, LogOut, Activity, Pencil, Lock
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
@@ -12,7 +12,6 @@ import { isReadOnly } from '@/types';
 
 const allNavItems = [
   { icon: User,       label: 'Perfil & Conta',            adminOnly: false },
-  { icon: Bell,       label: 'Notificações',               adminOnly: true },
 ];
 
 export default function ConfiguracoesPage() {
@@ -56,7 +55,7 @@ export default function ConfiguracoesPage() {
       return;
     }
     if (pwForm.novaSenha !== pwForm.confirmaSenha) {
-      alert('As senhas não coincidem!');
+      alert('As senhas nÃ£o coincidem!');
       return;
     }
     try {
@@ -109,14 +108,6 @@ export default function ConfiguracoesPage() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
 
-  // Notifications
-  const [notifConfig, setNotifConfig] = useState({
-    invoiceCreated: true,
-    invoicePaid: true,
-    invoiceOverdue: true,
-    systemAlerts: false
-  });
-
   React.useEffect(() => {
 
 
@@ -137,10 +128,10 @@ export default function ConfiguracoesPage() {
         return (
           <div className="dc-profile-grid">
             <div className="dc-profile-main dc-space-y-6">
-              {/* Informações Pessoais */}
+              {/* InformaÃ§Ãµes Pessoais */}
               <div className="dc-card dc-card-p">
                 <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <User size={18} color="#2563eb" /> Informações do Perfil
+                  <User size={18} color="#2563eb" /> InformaÃ§Ãµes do Perfil
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
@@ -190,7 +181,7 @@ export default function ConfiguracoesPage() {
                   </div>
 
                   <div className="dc-form-group">
-                    <label className="dc-form-label">Cargo / Função</label>
+                    <label className="dc-form-label">Cargo / FunÃ§Ã£o</label>
                     <input 
                       className="dc-form-input" 
                       style={{ width: '100%', textTransform: 'capitalize', background: '#f1f5f9', color: '#64748b' }}
@@ -208,10 +199,10 @@ export default function ConfiguracoesPage() {
                 </div>
               </div>
 
-              {/* Segurança e Senha */}
+              {/* SeguranÃ§a e Senha */}
               <div className="dc-card dc-card-p">
                 <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Shield size={18} color="#2563eb" /> Segurança & Acesso
+                  <Shield size={18} color="#2563eb" /> SeguranÃ§a & Acesso
                 </div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
@@ -254,7 +245,7 @@ export default function ConfiguracoesPage() {
 
                    {/* Coluna de Dispositivos */}
                    <div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: 16 }}>SESSÕES ATIVAS</div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569', marginBottom: 16 }}>SESSÃ•ES ATIVAS</div>
                       <div className="dc-space-y-3">
                         {sessions.slice(0, 3).map(s => (
                           <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
@@ -277,7 +268,7 @@ export default function ConfiguracoesPage() {
                     <button 
                       className="dc-btn" 
                       style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 600, border: 'none', background: 'none', textDecoration: 'underline' }}
-                      onClick={() => confirm('Tem certeza que deseja solicitar a desativação desta conta?')}
+                      onClick={() => confirm('Tem certeza que deseja solicitar a desativaÃ§Ã£o desta conta?')}
                     >
                       Deseja encerrar ou desativar sua conta? Clique aqui.
                     </button>
@@ -312,7 +303,7 @@ export default function ConfiguracoesPage() {
                        <Activity size={16} />
                      </div>
                      <div>
-                       <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Código</div>
+                       <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>CÃ³digo</div>
                        <div style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 700 }}>#{user?.codigo_usuario || '1420'}</div>
                      </div>
                   </div>
@@ -321,7 +312,7 @@ export default function ConfiguracoesPage() {
                        <Database size={16} />
                      </div>
                      <div className="dc-min-w-0">
-                       <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Condomínios</div>
+                       <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>CondomÃ­nios</div>
                        <div style={{ fontSize: '0.82rem', color: '#1e293b', fontWeight: 600 }} className="dc-truncate">
                          {user?.condominios_ids?.join(', ') || 'Acesso a todos'}
                        </div>
@@ -337,7 +328,7 @@ export default function ConfiguracoesPage() {
                     <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#065f46' }}>Conta Protegida</span>
                  </div>
                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 8, lineHeight: 1.4 }}>
-                    Seu acesso está verificado e operando sob protocolo AES-256.
+                    Seu acesso estÃ¡ verificado e operando sob protocolo AES-256.
                  </div>
               </div>
 
@@ -349,67 +340,6 @@ export default function ConfiguracoesPage() {
             </div>
           </div>
         );
-
-
-
-      case 'Notificações':
-        const notificationOption = (key: keyof typeof notifConfig, title: string, desc: string) => (
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid #e2e8f0' }}>
-            <div style={{ maxWidth: '80%' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155', marginBottom: 4 }}>{title}</div>
-              <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>{desc}</div>
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }}>
-              <input 
-                type="checkbox" 
-                style={{ opacity: 0, position: 'absolute', width: 0, height: 0 }} 
-                checked={notifConfig[key]}
-                onChange={(e) => setNotifConfig({ ...notifConfig, [key]: e.target.checked })}
-              />
-              <div style={{ 
-                width: 40, height: 24, borderRadius: 12, 
-                background: notifConfig[key] ? '#2563eb' : '#cbd5e1',
-                padding: 2, transition: 'all 0.2s', display: 'flex'
-              }}>
-                <div style={{ 
-                  width: 20, height: 20, borderRadius: '50%', background: '#fff', 
-                  transition: 'all 0.2s', transform: notifConfig[key] ? 'translateX(16px)' : 'translateX(0)' 
-                }} />
-              </div>
-            </label>
-          </div>
-        );
-
-        return (
-          <div className="dc-card dc-card-p">
-            <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: 6 }}>Preferências de Notificação</div>
-            <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: 8 }}>Gerencie todos os alertas que chegam ao seu e-mail.</div>
-            
-            {notificationOption('invoiceCreated', 'Nova Fatura Processada', 'Seja notificado no e-mail assim que o extrator finalizar a leitura de um novo PDF no Gmail.')}
-            {notificationOption('invoicePaid', 'Aviso de Pagamento Confirmado', 'Receba um e-mail quando recebermos os metadados do ERP atualizando o status.')}
-            {notificationOption('invoiceOverdue', 'Alerta de Vencimento', 'Gera um alerta de urgência para faturas não conciliadas 2 dias antes do vencimento.')}
-            {notificationOption('systemAlerts', 'Alertas do Sistema', 'Receba notificações de segurança e atualizações importantes sobre a saúde do seu servidor.')}
-            
-            <div style={{ marginTop: 24 }}>
-              <button 
-                className="dc-btn dc-btn-primary" 
-                onClick={async () => {
-                  try {
-                    const res: any = await api.saveNotifications(notifConfig);
-                    const emailMsg = res?.email_dispatched 
-                      ? ' (E-mail de confirmação enviado!)' 
-                      : ' (Integração de E-mail inativa).';
-                    alert('Preferências de notificação salvas com sucesso!' + emailMsg);
-                  } catch (e: any) {
-                    alert('Falha ao salvar preferências: ' + e.message);
-                }}}
-              >
-                Salvar Preferências
-              </button>
-            </div>
-          </div>
-        );
-
       default:
         return null;
     }
@@ -419,8 +349,8 @@ export default function ConfiguracoesPage() {
     <Shell>
       <div className="dc-page-header">
         <div>
-          <h1 className="dc-page-title">Configurações</h1>
-          <p className="dc-page-subtitle">Gerencie preferências da conta, segurança e integrações do sistema.</p>
+          <h1 className="dc-page-title">ConfiguraÃ§Ãµes</h1>
+          <p className="dc-page-subtitle">Gerencie preferÃªncias da conta, seguranÃ§a e integraÃ§Ãµes do sistema.</p>
         </div>
       </div>
 
@@ -445,3 +375,4 @@ export default function ConfiguracoesPage() {
     </Shell>
   );
 }
+

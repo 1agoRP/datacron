@@ -140,7 +140,7 @@ async def mark_as_read(
 async def resolve_alerta(
     id: uuid.UUID,
     background_tasks: BackgroundTasks,
-    body: JustificativaBody = Body(...),
+    body: JustificativaBody | None = Body(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
@@ -169,7 +169,7 @@ async def resolve_alerta(
         alerta_mensagem=a.mensagem,
         condominio_id=a.condominio_id,
         acao="resolvido",
-        justificativa=body.justificativa,
+        justificativa=body.justificativa if body else "Resolvido sem justificativa.",
         usuario_id=current_user.id,
         usuario_nome=current_user.nome,
         usuario_email=current_user.email,

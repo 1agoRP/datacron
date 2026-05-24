@@ -3,7 +3,7 @@
  * Centralized fetch wrapper with support for JWT authentication.
  */
 
-import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData, ReajusteConcessionaria } from '@/types';
+import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData, ReajusteConcessionaria, Contrato } from '@/types';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -490,14 +490,6 @@ class ApiClient {
     return this.request('/emails/logs');
   }
 
-  async forceEmailScan() {
-    // We removed the 30s timeout here because the backend handles the scan in background.
-    // However, if the server is VERY slow (cold start), we still want to wait a bit.
-    return await this.request('/emails/forcar-varredura', {
-      method: 'POST'
-    });
-  }
-
   async getAgentStatus() {
     return this.request('/emails/status');
   }
@@ -516,13 +508,6 @@ class ApiClient {
 
   async getSessions() {
     return this.request('/auth/sessions');
-  }
-
-  async saveNotifications(prefs: any) {
-    return this.request('/auth/notifications', {
-      method: 'POST',
-      body: JSON.stringify(prefs)
-    });
   }
 
   // Importações
@@ -867,6 +852,53 @@ class ApiClient {
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  // Contratos (admin)
+  async getContratos(params: Record<string, string | number> = {}) {
+    const safeParams: Record<string, string> = {};
+    for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
+    const query = new URLSearchParams(safeParams).toString();
+    return this.request<Contrato[]>(`/contratos${query ? `?${query}` : ''}`);
+  }
+
+  async getContratoStats() {
+    return this.request<{ total: number; ativos: number; a_vencer: number; vencidos: number; valor_mensal: number }>('/contratos/stats');
+  }
+
+  async createContrato(data: Partial<Contrato>) {
+    return this.request<Contrato>('/contratos', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateContrato(id: string, data: Partial<Contrato>) {
+    return this.request<Contrato>(`/contratos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteContrato(id: string) {
+    return this.request(`/contratos/${id}`, { method: 'DELETE' });
+  }
+
+  async exportContratos(formato: 'excel' | 'csv' = 'excel') {
+    const token = this.getToken();
+    const response = await fetchWithRetry(`${API_BASE_URL}/contratos/exportar?formato=${formato}`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+    if (!response.ok) throw new Error('Falha ao exportar contratos');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `contratos_datacron.${formato === 'csv' ? 'csv' : 'xlsx'}`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);

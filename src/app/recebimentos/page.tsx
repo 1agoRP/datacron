@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Shell from '@/components/layout/Shell';
 import {
   Mail, Search, Filter, CheckCircle2, AlertCircle,
-  ShieldCheck, FileCheck, Activity, Layers, MoreVertical,
+  ShieldCheck, FileCheck, Activity, Layers,
   Download, FileDigit, FileText
 } from 'lucide-react';
 import { api, API_BASE_URL } from '@/lib/api';
@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 export default function RecebimentosPage() {
   // SWR for logs and status — automatic cache + background revalidation
-  const { data: logs = [], isLoading: loading, mutate: mutateLogs } = useSWR(
+  const { data: logs = [], isLoading: loading } = useSWR(
     'emailLogs',
     () => api.getEmailLogs() as Promise<any[]>,
     { revalidateOnFocus: true }
@@ -36,31 +36,13 @@ export default function RecebimentosPage() {
     }
   }, [user, router]);
 
-  const { data: inboxData, mutate: mutateInbox } = useSWR(
+  const { data: inboxData } = useSWR(
     'inboxCount',
     () => api.getInboxCount(),
     { revalidateOnFocus: true }
   );
 
-  const [scanning, setScanning] = useState(false);
-  const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-
-  const handleForceScan = async () => {
-    try {
-      setScanning(true);
-      await api.forceEmailScan();
-      alert('Varredura iniciada com sucesso! Os resultados aparecerão nos logs em instantes.');
-      setTimeout(() => {
-        mutateLogs();
-        mutateInbox();
-      }, 3000); // revalidate after scan
-      setScanning(false);
-    } catch (err: any) {
-      alert('Erro ao iniciar varredura: ' + (err.message || 'Erro desconhecido'));
-      setScanning(false);
-    }
-  };
 
   return (
     <Shell>
@@ -70,15 +52,6 @@ export default function RecebimentosPage() {
           <p className="dc-page-subtitle">
             Faturas processadas automaticamente pelo Agente Datacron e disponíveis para download.
           </p>
-        </div>
-        <div className="dc-page-header-actions">
-          <button 
-            className="dc-btn dc-btn-primary" 
-            onClick={handleForceScan}
-            disabled={scanning}
-          >
-            <Mail size={16} /> {scanning ? 'Varrendo...' : 'Forçar Varredura'}
-          </button>
         </div>
       </div>
 

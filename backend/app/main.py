@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -24,6 +25,7 @@ from app.routers import (
     alertas,
     emails,
     importacoes,
+    contratos,
     relatorios,
     dashboard,
     fornecedores,
@@ -190,16 +192,17 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = jsonable_encoder(exc.errors())
     asyncio.create_task(_send_error_webhook({
         "type": "ValidationError",
         "status_code": 422,
         "method": request.method,
         "url": str(request.url),
-        "errors": exc.errors(),
+        "errors": errors,
         "headers": dict(request.headers),
         "client_ip": request.client.host if request.client else "unknown"
     }))
-    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
@@ -225,6 +228,7 @@ app.include_router(concessionarias.router, prefix=API_PREFIX)
 app.include_router(alertas.router, prefix=API_PREFIX)
 app.include_router(emails.router, prefix=API_PREFIX)
 app.include_router(importacoes.router, prefix=API_PREFIX)
+app.include_router(contratos.router, prefix=API_PREFIX)
 app.include_router(relatorios.router, prefix=API_PREFIX)
 app.include_router(dashboard.router, prefix=API_PREFIX)
 app.include_router(fornecedores.router, prefix=API_PREFIX)

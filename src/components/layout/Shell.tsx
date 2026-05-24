@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  BarChart3, Building2, Zap, Mail, FileText,
+  BarChart3, Building2, Zap, Mail,
   AlertCircle, Download, ChevronLeft, ChevronRight,
   Search, Layers, BarChart2, Settings, LogOut, FileSignature, TrendingUp, ClipboardCheck
 } from 'lucide-react';
@@ -18,13 +18,14 @@ const allNav = [
   { href: '/reajustes',      icon: TrendingUp,   label: 'Reajustes',        module: null },
   { href: '/recebimentos',   icon: Mail,         label: 'Recebimentos',     module: 'gmail' },
   { href: '/alertas',        icon: AlertCircle,  label: 'Alertas',          module: null },
+  { href: '/contratos',      icon: FileSignature, label: 'Contratos',       module: 'contratos' },
   { href: '/auditoria',     icon: ClipboardCheck, label: 'Auditoria',       module: 'auditoria' },
   { href: '/relatorios',     icon: BarChart2,    label: 'Relatórios',       module: 'relatorios' },
   { href: '/importacoes',    icon: Download,     label: 'Importações',      module: 'importacoes' },
   { href: '/configuracoes',  icon: Settings,     label: 'Configurações',    module: null },
 ];
 
-const ADMIN_ONLY_MODULES = new Set(['relatorios', 'importacoes', 'notificacoes', 'gmail', 'auditoria']);
+const ADMIN_ONLY_MODULES = new Set(['relatorios', 'importacoes', 'gmail', 'auditoria', 'contratos']);
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',

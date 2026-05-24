@@ -1,3 +1,4 @@
+import io
 import uuid
 import base64
 from datetime import date
@@ -6,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Form, UploadFile, File as FastAPIFile, Query
 from fastapi.responses import StreamingResponse
 import zipfile
+import pandas as pd
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
@@ -20,6 +22,58 @@ from app.services.pdf_processor import generate_standard_filename
 
 
 router = APIRouter(prefix="/faturas", tags=["Faturas"])
+
+
+@router.get("/exportar")
+async def exportar_faturas(
+    formato: str = Query("excel", pattern="^(excel|csv)$"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
+):
+    stmt = (
+        select(Fatura)
+        .options()
+        .order_by(Fatura.created_at.desc())
+    )
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
+
+    result = await db.execute(stmt)
+    rows = []
+    for fatura in result.scalars().all():
+        condo = await db.get(Condominio, fatura.condominio_id) if fatura.condominio_id else None
+        conc = await db.get(Concessionaria, fatura.concessionaria_id) if fatura.concessionaria_id else None
+        rows.append(
+            {
+                "Condominio": condo.nome if condo else "",
+                "Concessionaria": conc.tipo if conc else "",
+                "Referencia": fatura.referencia or "",
+                "Vencimento": fatura.vencimento.isoformat() if fatura.vencimento else "",
+                "Valor": float(fatura.valor or 0),
+                "Status": fatura.status,
+            }
+        )
+
+    columns = ["Condominio", "Concessionaria", "Referencia", "Vencimento", "Valor", "Status"]
+    df = pd.DataFrame(rows, columns=columns)
+    if formato == "csv":
+        csv_data = df.to_csv(index=False, sep=";", encoding="utf-8-sig")
+        return StreamingResponse(
+            io.BytesIO(csv_data.encode("utf-8-sig")),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=faturas_datacron.csv"},
+        )
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Faturas")
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=faturas_datacron.xlsx"},
+    )
 
 
 @router.post("/manual", response_model=FaturaResponse)

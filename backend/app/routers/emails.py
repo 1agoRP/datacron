@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -12,7 +12,6 @@ from app.models.alerta import EmailLog
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
 from app.schemas import EmailLogResponse
-from app.services.email_monitor import run_email_scan
 from app.workers.scheduler import scheduler
 
 router = APIRouter(prefix="/emails", tags=["E-mails & Agente"])
@@ -69,16 +68,6 @@ async def get_email_logs(
         response_list.append(d)
 
     return response_list
-
-
-@router.post("/forcar-varredura")
-async def force_scan(
-    background_tasks: BackgroundTasks,
-    _: User = Depends(require_module("gmail")),
-):
-    """Triggers an immediate Gmail inbox scan in the background."""
-    background_tasks.add_task(run_email_scan)
-    return {"message": "Varredura iniciada em segundo plano. Verifique os logs em instantes."}
 
 
 @router.get("/status")
