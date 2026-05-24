@@ -31,14 +31,20 @@ const MONTHS_LIST = [
 ];
 
 export default function CondominiosPage() {
-  const { data: fetchCondos, isLoading: loading, mutate } = useSWR(['condominios', 'full'], () => api.getCondominios({ limit: 1000 }));
-  const condos = useMemo(() => fetchCondos || [], [fetchCondos]);
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const readOnly = isReadOnly(user);
   const canDeleteFatura = user?.role === 'admin' || user?.role === 'gerencia' || user?.role === 'assistente';
 
   const monthsList = MONTHS_LIST;
+  const [refMonth, setRefMonth] = useState(monthsList[new Date().getMonth()].value);
+  const [refYear, setRefYear] = useState(new Date().getFullYear().toString());
+
+  const { data: fetchCondos, isLoading: loading, mutate } = useSWR(
+    ['condominios', 'full', refMonth, refYear],
+    () => api.getCondominios({ limit: 1000, mes: Number(refMonth), ano: Number(refYear) })
+  );
+  const condos = useMemo(() => fetchCondos || [], [fetchCondos]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -93,9 +99,6 @@ export default function CondominiosPage() {
   const [manualFaturaPdf, setManualFaturaPdf] = useState<File | null>(null);
   const [savingManualFatura, setSavingManualFatura] = useState(false);
   const [isDraggingFatura, setIsDraggingFatura] = useState(false);
-
-  const [refMonth, setRefMonth] = useState(monthsList[new Date().getMonth()].value);
-  const [refYear, setRefYear] = useState(new Date().getFullYear().toString());
 
   // Removed manual fetchData in favor of useSWR
 
@@ -661,37 +664,20 @@ export default function CondominiosPage() {
       </div>
 
       {/* ── Filter Bar ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '12px 16px',
-        background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
-        marginBottom: 16, flexWrap: 'wrap',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
-      }}>
-        {/* Search */}
-        <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
-          <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+      <div className="condo-filter-bar">
+        <div className="condo-filter-search">
+          <Search size={15} />
           <input
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Buscar por nome, número ou CNPJ..."
-            style={{
-              width: '100%', height: 38, padding: '0 14px 0 36px',
-              borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc',
-              fontSize: '0.875rem', fontFamily: 'inherit', color: '#0f172a',
-              transition: 'all 0.2s', outline: 'none',
-            }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = '#2563eb'; e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.1)'; }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
 
-        {/* Referência pill */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 4px 0 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, height: 38, flexShrink: 0 }}>
-          <Calendar size={13} style={{ color: '#64748b', flexShrink: 0 }} />
-          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>Ref.:</span>
+        <div className="condo-reference-control">
+          <Calendar size={14} />
+          <span>Referência</span>
           <select
-            style={{ height: 30, border: 'none', background: 'transparent', fontSize: '0.83rem', fontFamily: 'inherit', fontWeight: 700, color: '#0f172a', cursor: 'pointer', outline: 'none', paddingRight: 4 }}
             value={refMonth}
             onChange={(e) => setRefMonth(e.target.value)}
             aria-label="Mês de referência"
@@ -701,7 +687,6 @@ export default function CondominiosPage() {
             ))}
           </select>
           <input
-            style={{ width: 56, height: 30, border: 'none', background: 'transparent', fontSize: '0.83rem', fontFamily: 'inherit', fontWeight: 700, color: '#0f172a', outline: 'none', textAlign: 'center' }}
             type="number" min="2020" max="2100"
             value={refYear}
             onChange={(e) => setRefYear(e.target.value)}
@@ -709,25 +694,14 @@ export default function CondominiosPage() {
           />
         </div>
 
-        {/* Filter toggle */}
         <button
-          style={{
-            height: 38, padding: '0 14px', borderRadius: 10,
-            fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer',
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            border: `1px solid ${showFilters ? '#2563eb' : '#e2e8f0'}`,
-            background: showFilters ? '#eff6ff' : '#f8fafc',
-            color: showFilters ? '#2563eb' : '#64748b',
-            transition: 'all 0.15s',
-          }}
+          className={`condo-filter-toggle${showFilters ? ' active' : ''}`}
           onClick={() => setShowFilters(!showFilters)}
         >
-          <Filter size={13} /> Síndico {showFilters ? '✕' : ''}
+          <Filter size={14} /> Síndico
         </button>
 
-        <div style={{ width: 1, height: 24, background: '#e2e8f0', flexShrink: 0 }} />
-
-        <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, whiteSpace: 'nowrap' }}>
+        <span className="condo-filter-count">
           <span style={{ color: '#0f172a' }}>{filtered.length}</span> {filtered.length !== 1 ? 'condomínios' : 'condomínio'}
         </span>
       </div>

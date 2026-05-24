@@ -78,6 +78,8 @@ def _add_audit_log(
 async def list_condominios(
     search: Optional[str] = Query(None, description="Busca por nome, nÃºmero ou CNPJ"),
     ativo: bool = Query(True),
+    mes: Optional[int] = Query(None, ge=1, le=12),
+    ano: Optional[int] = Query(None, ge=2000, le=2100),
     skip: int = Query(0, ge=0),
     limit: int = Query(1000, le=2000),
     db: AsyncSession = Depends(get_db),
@@ -132,13 +134,15 @@ async def list_condominios(
     # Query 3: Count faturas received this month per condo
     try:
         now = datetime.now()
+        ref_mes = mes or now.month
+        ref_ano = ano or now.year
         fat_result = await db.execute(
             select(Fatura.condominio_id, func.count(func.distinct(Fatura.concessionaria_id)))
             .join(Concessionaria, and_(Fatura.concessionaria_id == Concessionaria.id, Concessionaria.ativo == True))
             .where(
                 Fatura.condominio_id.in_(condo_ids),
-                extract("year", Fatura.vencimento) == now.year,
-                extract("month", Fatura.vencimento) == now.month,
+                extract("year", Fatura.vencimento) == ref_ano,
+                extract("month", Fatura.vencimento) == ref_mes,
             )
             .group_by(Fatura.condominio_id)
         )
