@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   BarChart3, Building2, Zap, Mail,
   AlertCircle, Download, ChevronLeft, ChevronRight,
-  Search, Layers, BarChart2, Settings, LogOut, FileSignature, TrendingUp, ClipboardCheck
+  Search, Layers, BarChart2, Settings, LogOut, FileSignature, TrendingUp, ClipboardCheck, FileSearch
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import '@/styles/app.css';
@@ -19,13 +19,14 @@ const allNav = [
   { href: '/recebimentos',   icon: Mail,         label: 'Recebimentos',     module: 'gmail' },
   { href: '/alertas',        icon: AlertCircle,  label: 'Alertas',          module: null },
   { href: '/contratos',      icon: FileSignature, label: 'Contratos',       module: 'contratos' },
+  { href: '/analise-previsao', icon: FileSearch,  label: 'Análise de Previsão', module: 'previsao' },
   { href: '/auditoria',     icon: ClipboardCheck, label: 'Auditoria',       module: 'auditoria' },
   { href: '/relatorios',     icon: BarChart2,    label: 'Relatórios',       module: 'relatorios' },
   { href: '/importacoes',    icon: Download,     label: 'Importações',      module: 'importacoes' },
   { href: '/configuracoes',  icon: Settings,     label: 'Configurações',    module: null },
 ];
 
-const ADMIN_ONLY_MODULES = new Set(['relatorios', 'importacoes', 'gmail', 'auditoria', 'contratos']);
+const ADMIN_ONLY_MODULES = new Set(['relatorios', 'importacoes', 'gmail', 'auditoria', 'contratos', 'previsao']);
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',

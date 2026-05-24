@@ -3,7 +3,7 @@
  * Centralized fetch wrapper with support for JWT authentication.
  */
 
-import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData, ReajusteConcessionaria, Contrato } from '@/types';
+import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData, ReajusteConcessionaria, Contrato, PrevisaoAnalysis } from '@/types';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -937,6 +937,13 @@ class ApiClient {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  }
+
+  // Análise de Previsão (admin)
+  async analyzePrevisaoBalancete(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.requestMultipart<PrevisaoAnalysis>('/previsao/analisar', formData, { method: 'POST' });
   }
 }
 

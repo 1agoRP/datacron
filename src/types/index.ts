@@ -185,3 +185,39 @@ export interface ReajusteConcessionaria {
   registros_afetados: number;
   created_at: string;
 }
+
+export interface PrevisaoContaComplementar {
+  nome: string;
+  saldo_anterior: number;
+  creditos: number;
+  debitos: number;
+  saldo_atual: number;
+}
+
+export interface PrevisaoDespesaDestaque {
+  categoria: string;
+  valor: number;
+}
+
+export interface PrevisaoAnalysis {
+  arquivo?: string | null;
+  referencia: string;
+  mes: number;
+  ano: number;
+  condominio_codigo: string;
+  condominio_nome: string;
+  endereco: string;
+  previsto: number;
+  receita_boleto_mes: number;
+  cotas_atrasadas_recebidas: number;
+  cotas_em_aberto: number;
+  receitas_ordinarias_totais: number;
+  despesas_ordinarias: number;
+  saldo_ordinaria: number;
+  resultado_percentual: number;
+  contas_complementares: PrevisaoContaComplementar[];
+  maiores_despesas: PrevisaoDespesaDestaque[];
+  flags: Record<string, boolean>;
+  justificativa_despesas: string;
+  sugestao_texto: string;
+}

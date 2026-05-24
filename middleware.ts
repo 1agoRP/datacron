@@ -13,6 +13,7 @@ import type { NextRequest } from 'next/server';
 
 // Paths that do NOT require authentication
 const PUBLIC_PATHS = ['/', '/politica-de-privacidade', '/termos-de-uso'];
+const ADMIN_ONLY_PATHS = ['/analise-previsao'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -37,6 +38,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Basic validation of the JWT structure and expiration
+  let payload: { role?: string; exp?: number } | null = null;
   try {
     if (token) {
       const parts = token.split('.');
@@ -46,10 +48,10 @@ export function middleware(request: NextRequest) {
       const base64Url = parts[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
       const payloadStr = atob(base64);
-      const payload = JSON.parse(payloadStr);
+      payload = JSON.parse(payloadStr);
       
       // Check expiration
-      if (payload.exp && payload.exp * 1000 < Date.now()) {
+      if (payload?.exp && payload.exp * 1000 < Date.now()) {
         if (!refreshToken) {
            throw new Error('Token expired and no refresh token available');
         }
@@ -62,6 +64,10 @@ export function middleware(request: NextRequest) {
     const response = NextResponse.redirect(loginUrl);
     response.cookies.delete('datacron_token');
     return response;
+  }
+
+  if (ADMIN_ONLY_PATHS.some(path => pathname.startsWith(path)) && payload?.role !== 'admin') {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   // Token present and valid (or refreshable) — allow the request through

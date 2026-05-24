@@ -34,6 +34,7 @@ from app.routers import (
     cron,
     faturas,
     auditoria,
+    previsao,
 )
 
 # ─── Logging ────────────────────────────────────────────────
@@ -237,6 +238,7 @@ app.include_router(webhooks.router, prefix=API_PREFIX)
 app.include_router(cron.router, prefix=API_PREFIX)
 app.include_router(faturas.router, prefix=API_PREFIX)
 app.include_router(auditoria.router, prefix=API_PREFIX)
+app.include_router(previsao.router, prefix=API_PREFIX)
 
 
 # ─── Health check ───────────────────────────────────────────
