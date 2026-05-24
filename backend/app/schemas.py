@@ -61,6 +61,10 @@ class CondominioCreate(BaseModel):
     cnpj: str
     sindico: str
     cpf_sindico: Optional[str] = None
+    administradora: Optional[str] = None
+    carteira: Optional[int] = None
+    gerente_id: Optional[int] = None
+    assistente_id: Optional[int] = None
     mandato_inicio: Optional[datetime] = None
     mandato_fim: Optional[datetime] = None
     leitura_individualizada_ativa: Optional[bool] = False
@@ -86,14 +90,28 @@ class CondominioCreate(BaseModel):
             if digito_esperado != int(digits[i]):
                 raise ValueError("CNPJ inválido (dígito verificador incorreto)")
 
-        return v
+        return digits
+
+    @field_validator("cpf_sindico")
+    @classmethod
+    def normalize_cpf(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        digits = "".join(filter(str.isdigit, v))
+        return digits or None
 
 
 class CondominioUpdate(BaseModel):
     nome: Optional[str] = None
+    numero: Optional[str] = None
     endereco: Optional[str] = None
+    cnpj: Optional[str] = None
     sindico: Optional[str] = None
     cpf_sindico: Optional[str] = None
+    administradora: Optional[str] = None
+    carteira: Optional[int] = None
+    gerente_id: Optional[int] = None
+    assistente_id: Optional[int] = None
     mandato_inicio: Optional[datetime] = None
     mandato_fim: Optional[datetime] = None
     leitura_individualizada_ativa: Optional[bool] = None
@@ -108,6 +126,18 @@ class CondominioUpdate(BaseModel):
     apolice_seguro_fim: Optional[datetime] = None
     ativo: Optional[bool] = None
 
+    @field_validator("cnpj")
+    @classmethod
+    def validate_cnpj_update(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        return CondominioCreate.validate_cnpj(v)
+
+    @field_validator("cpf_sindico")
+    @classmethod
+    def normalize_cpf_update(cls, v: Optional[str]) -> Optional[str]:
+        return CondominioCreate.normalize_cpf(v)
+
 
 class CondominioResponse(BaseModel):
     id: uuid.UUID
@@ -117,6 +147,10 @@ class CondominioResponse(BaseModel):
     cnpj: str
     sindico: str
     cpf_sindico: Optional[str]
+    administradora: Optional[str] = None
+    carteira: Optional[int] = None
+    gerente_id: Optional[int] = None
+    assistente_id: Optional[int] = None
     mandato_inicio: Optional[datetime] = None
     mandato_fim: Optional[datetime] = None
     leitura_individualizada_ativa: bool = False

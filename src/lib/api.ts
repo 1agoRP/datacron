@@ -283,8 +283,12 @@ class ApiClient {
     });
   }
 
-  async getStatusContas(condominioId: string) {
-    return this.request<any>(`/condominios/${condominioId}/status-contas`);
+  async getStatusContas(condominioId: string, params: { mes?: string | number; ano?: string | number } = {}) {
+    const query = new URLSearchParams();
+    if (params.mes) query.set('mes', String(params.mes));
+    if (params.ano) query.set('ano', String(params.ano));
+    const suffix = query.toString() ? `?${query}` : '';
+    return this.request<any>(`/condominios/${condominioId}/status-contas${suffix}`);
   }
 
   // Document Management Methods (Base64)

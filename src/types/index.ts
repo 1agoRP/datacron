@@ -5,16 +5,28 @@ export interface Condominio {
   endereco: string;
   cnpj: string;
   sindico: string;
-  cpf_sindico: string;
+  cpf_sindico: string | null;
+  administradora?: string | null;
+  carteira?: number | null;
+  gerente_id?: number | null;
+  assistente_id?: number | null;
   ata_eleicao_nome?: string | null;
+  ata_eleicao_inicio?: string | null;
+  ata_eleicao_fim?: string | null;
   avcb_url?: string | null;
+  avcb_inicio?: string | null;
+  avcb_fim?: string | null;
   apolice_seguro_url?: string | null;
+  apolice_seguro_inicio?: string | null;
+  apolice_seguro_fim?: string | null;
   mandato_inicio?: string | null;
   mandato_fim?: string | null;
   leitura_individualizada_ativa?: boolean;
   contas_esperadas?: number;
   contas_recebidas?: number;
+  ativo?: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Concessionaria {

@@ -1,55 +1,56 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Shell from '@/components/layout/Shell';
-import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, ArrowDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, Database, CreditCard, CheckCircle2, AlertCircle, Clock, Paperclip } from 'lucide-react';
-import { api, API_BASE_URL } from '@/lib/api';
+import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, CreditCard, CheckCircle2, AlertCircle, Clock, Paperclip } from 'lucide-react';
+import { api } from '@/lib/api';
 import { format } from 'date-fns';
 import { ShieldAlert, Flame, ShieldCheck, HardHat } from 'lucide-react';
-import { ptBR } from 'date-fns/locale';
 import useSWR from 'swr';
 import { formatCurrencyCeil } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
-import { isReadOnly } from '@/types';
+import { Condominio, Concessionaria, isReadOnly } from '@/types';
 
 type SortField = 'nome' | 'numero';
 type SortDir = 'asc' | 'desc';
+type CondoDraft = Omit<Pick<Condominio, 'nome' | 'numero' | 'endereco' | 'cnpj' | 'sindico'>, 'id'> & {
+  cpf_sindico: string;
+  administradora: string;
+  carteira: string;
+  mandato_inicio: string;
+  mandato_fim: string;
+  leitura_individualizada_ativa: boolean;
+};
+type EditableCondo = Omit<Condominio, 'carteira'> & { carteira?: number | string | null };
+
+const MONTHS_LIST = [
+  { value: '01', label: 'Janeiro' }, { value: '02', label: 'Fevereiro' }, { value: '03', label: 'Março' },
+  { value: '04', label: 'Abril' }, { value: '05', label: 'Maio' }, { value: '06', label: 'Junho' },
+  { value: '07', label: 'Julho' }, { value: '08', label: 'Agosto' }, { value: '09', label: 'Setembro' },
+  { value: '10', label: 'Outubro' }, { value: '11', label: 'Novembro' }, { value: '12', label: 'Dezembro' }
+];
 
 export default function CondominiosPage() {
   const { data: fetchCondos, isLoading: loading, mutate } = useSWR(['condominios', 'full'], () => api.getCondominios({ limit: 1000 }));
-  const condos = fetchCondos || [];
+  const condos = useMemo(() => fetchCondos || [], [fetchCondos]);
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const readOnly = isReadOnly(user);
   const canDeleteFatura = user?.role === 'admin' || user?.role === 'gerencia' || user?.role === 'assistente';
 
-  const monthsList = [
-    { value: '01', label: 'Janeiro' }, { value: '02', label: 'Fevereiro' }, { value: '03', label: 'Março' },
-    { value: '04', label: 'Abril' }, { value: '05', label: 'Maio' }, { value: '06', label: 'Junho' },
-    { value: '07', label: 'Julho' }, { value: '08', label: 'Agosto' }, { value: '09', label: 'Setembro' },
-    { value: '10', label: 'Outubro' }, { value: '11', label: 'Novembro' }, { value: '12', label: 'Dezembro' }
-  ];
-
-  const formatReferencia = (ref: string) => {
-    if (!ref) return '—';
-    const parts = ref.split('/');
-    if (parts.length === 2 && !isNaN(Number(parts[0]))) {
-      const m = parseInt(parts[0], 10);
-      const mLabel = monthsList.find(i => parseInt(i.value, 10) === m)?.label || parts[0];
-      return `${mLabel}, ${parts[1]}`;
-    }
-    return ref;
-  };
+  const monthsList = MONTHS_LIST;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newCondo, setNewCondo] = useState({
+  const [newCondo, setNewCondo] = useState<CondoDraft>({
     nome: '',
     numero: '',
     endereco: '',
     cnpj: '',
     sindico: '',
     cpf_sindico: '',
+    administradora: '',
+    carteira: '',
     mandato_inicio: '',
     mandato_fim: '',
     leitura_individualizada_ativa: false
@@ -65,9 +66,9 @@ export default function CondominiosPage() {
   const [filterSindico, setFilterSindico] = useState('');
 
   // Modals state
-  const [detailsCondo, setDetailsCondo] = useState<any>(null);
-  const [editCondo, setEditCondo] = useState<any>(null);
-  const [condoConcs, setCondoConcs] = useState<any[]>([]);
+  const [detailsCondo, setDetailsCondo] = useState<Condominio | null>(null);
+  const [editCondo, setEditCondo] = useState<EditableCondo | null>(null);
+  const [condoConcs, setCondoConcs] = useState<Concessionaria[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [docUploadModal, setDocUploadModal] = useState<{ type: 'ata' | 'avcb' | 'apolice', condoId: string } | null>(null);
   const [docUploadFile, setDocUploadFile] = useState<File | null>(null);
@@ -80,7 +81,6 @@ export default function CondominiosPage() {
   const [gmailHistory, setGmailHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [activeHistoryTab, setActiveHistoryTab] = useState<'sistema' | 'gmail'>('sistema');
-  const [selectedHistory, setSelectedHistory] = useState<Set<string>>(new Set());
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [statusModalCondo, setStatusModalCondo] = useState<any>(null);
   const [statusItems, setStatusItems] = useState<any[]>([]);
@@ -105,9 +105,13 @@ export default function CondominiosPage() {
     if (e) e.preventDefault();
     try {
       setCreating(true);
-      await api.createCondominio(newCondo);
+      await api.createCondominio({
+        ...newCondo,
+        carteira: newCondo.carteira ? Number(newCondo.carteira) : null,
+        cpf_sindico: newCondo.cpf_sindico || null,
+      });
       setIsModalOpen(false);
-      setNewCondo({ nome: '', numero: '', endereco: '', cnpj: '', sindico: '', cpf_sindico: '', mandato_inicio: '', mandato_fim: '', leitura_individualizada_ativa: false });
+      setNewCondo({ nome: '', numero: '', endereco: '', cnpj: '', sindico: '', cpf_sindico: '', administradora: '', carteira: '', mandato_inicio: '', mandato_fim: '', leitura_individualizada_ativa: false });
       mutate();
       setCreating(false);
     } catch (err: any) {
@@ -152,6 +156,48 @@ export default function CondominiosPage() {
 
     return result;
   }, [condos, searchTerm, filterSindico, sortField, sortDir]);
+
+  const selectedReferencia = useMemo(() => {
+    const month = monthsList.find((item) => item.value === refMonth)?.label || monthsList[new Date().getMonth()].label;
+    return `${month}/${refYear}`;
+  }, [monthsList, refMonth, refYear]);
+
+  const portfolioStats = useMemo(() => {
+    const now = new Date();
+    const inNext45Days = (dateValue?: string | null) => {
+      if (!dateValue) return false;
+      const target = new Date(String(dateValue).substring(0, 10) + 'T12:00:00');
+      const days = Math.ceil((target.getTime() - now.getTime()) / 86400000);
+      return days >= 0 && days <= 45;
+    };
+    const expired = (dateValue?: string | null) => {
+      if (!dateValue) return false;
+      return new Date(String(dateValue).substring(0, 10) + 'T12:00:00') < now;
+    };
+
+    const expected = condos.reduce((acc, condo) => acc + (condo.contas_esperadas || 0), 0);
+    const received = condos.reduce((acc, condo) => acc + (condo.contas_recebidas || 0), 0);
+    const docAttention = condos.filter((condo) =>
+      !condo.ata_eleicao_nome ||
+      !condo.avcb_url ||
+      !condo.apolice_seguro_url ||
+      expired(condo.mandato_fim) ||
+      expired(condo.avcb_fim) ||
+      expired(condo.apolice_seguro_fim) ||
+      inNext45Days(condo.mandato_fim) ||
+      inNext45Days(condo.avcb_fim) ||
+      inNext45Days(condo.apolice_seguro_fim)
+    ).length;
+
+    return {
+      total: condos.length,
+      expected,
+      received,
+      completion: expected > 0 ? Math.round((received / expected) * 100) : 0,
+      individualized: condos.filter((condo) => condo.leitura_individualizada_ativa).length,
+      docAttention,
+    };
+  }, [condos]);
 
   const handleOpenDetails = async (condo: any) => {
     setDetailsCondo(condo);
@@ -272,17 +318,15 @@ export default function CondominiosPage() {
     }
   };
 
-  const handleOpenStatus = async (condo: any) => {
+  const loadStatus = useCallback(async (condo: Condominio) => {
     if (!condo?.id) return;
-    setStatusModalCondo(condo);
-    setIsStatusModalOpen(true);
     setLoadingStatus(true);
     setStatusError(null);
     setStatusItems([]);
     setExtraStatusItems([]);
 
     try {
-      const data = await api.getStatusContas(String(condo.id));
+      const data = await api.getStatusContas(String(condo.id), { mes: refMonth, ano: refYear });
       if (data && data.items) {
         setStatusItems(data.items);
         setExtraStatusItems(data.extras || []);
@@ -297,7 +341,18 @@ export default function CondominiosPage() {
     } finally {
       setLoadingStatus(false);
     }
+  }, [refMonth, refYear]);
+
+  const handleOpenStatus = (condo: Condominio) => {
+    setStatusModalCondo(condo);
+    setIsStatusModalOpen(true);
   };
+
+  useEffect(() => {
+    if (isStatusModalOpen && statusModalCondo) {
+      void loadStatus(statusModalCondo);
+    }
+  }, [isStatusModalOpen, statusModalCondo, loadStatus]);
 
   const handleDeleteFatura = async (faturaId: string) => {
     if (!confirm('Deseja realmente excluir esta fatura? Esta ação não pode ser desfeita.')) return;
@@ -313,8 +368,10 @@ export default function CondominiosPage() {
   };
 
   const handleOpenHistory = async (conc: any) => {
+    if (!detailsCondo) return;
     setHistoryConc(conc);
     setHistoryFaturas([]);
+    setGmailHistory([]);
     setActiveHistoryTab('sistema');
     try {
       setLoadingHistory(true);
@@ -341,21 +398,6 @@ export default function CondominiosPage() {
       setHistoryFaturas([]);
     } finally {
       setLoadingHistory(false);
-    }
-  };
-
-  const toggleSelectFatura = (id: string) => {
-    const next = new Set(selectedHistory);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedHistory(next);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedHistory.size === historyFaturas.length) {
-      setSelectedHistory(new Set());
-    } else {
-      setSelectedHistory(new Set(historyFaturas.map(f => f.id)));
     }
   };
 
@@ -402,6 +444,7 @@ export default function CondominiosPage() {
 
   const handleUpdate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!editCondo) return;
     try {
       setCreating(true);
       const payload: any = {
@@ -417,6 +460,8 @@ export default function CondominiosPage() {
         payload.endereco = editCondo.endereco;
         payload.numero = editCondo.numero;
         payload.cnpj = editCondo.cnpj;
+        payload.administradora = editCondo.administradora;
+        payload.carteira = editCondo.carteira ? Number(editCondo.carteira) : null;
       }
 
       await api.updateCondominio(editCondo.id, payload);
@@ -453,12 +498,7 @@ export default function CondominiosPage() {
 
   const handleDownloadAll = async () => {
     try {
-      // Use current month automatically
-      const now = new Date();
-      const month = monthsList[now.getMonth()].label;
-      const year = now.getFullYear().toString();
-      const referencia = `${month}/${year}`;
-      await api.downloadAllInvoices(referencia);
+      await api.downloadAllInvoices(selectedReferencia);
     } catch (err: any) {
       alert(err.message || 'Erro ao baixar todas as faturas');
     }
@@ -483,6 +523,41 @@ export default function CondominiosPage() {
         </div>
       </div>
 
+      <div className="dc-stats-grid" style={{ marginBottom: 18 }}>
+        <div className="dc-stat-card">
+          <div className="dc-stat-top">
+            <div className="dc-stat-icon" style={{ background: '#eff6ff', color: '#2563eb' }}><Building2 size={20} /></div>
+            <div className="dc-stat-badge positive">Carteira</div>
+          </div>
+          <div className="dc-stat-label">Condomínios ativos</div>
+          <div className="dc-stat-value">{portfolioStats.total}</div>
+        </div>
+        <div className="dc-stat-card">
+          <div className="dc-stat-top">
+            <div className="dc-stat-icon" style={{ background: '#f0fdf4', color: '#16a34a' }}><CheckCircle2 size={20} /></div>
+            <div className="dc-stat-badge">{portfolioStats.received}/{portfolioStats.expected}</div>
+          </div>
+          <div className="dc-stat-label">Contas recebidas em {selectedReferencia}</div>
+          <div className="dc-stat-value">{portfolioStats.completion}%</div>
+        </div>
+        <div className="dc-stat-card">
+          <div className="dc-stat-top">
+            <div className="dc-stat-icon" style={{ background: '#fff7ed', color: '#ea580c' }}><AlertCircle size={20} /></div>
+            <div className="dc-stat-badge">Atenção</div>
+          </div>
+          <div className="dc-stat-label">Documentos ou mandatos críticos</div>
+          <div className="dc-stat-value">{portfolioStats.docAttention}</div>
+        </div>
+        <div className="dc-stat-card">
+          <div className="dc-stat-top">
+            <div className="dc-stat-icon" style={{ background: '#f8fafc', color: '#475569' }}><Zap size={20} /></div>
+            <div className="dc-stat-badge">Operação</div>
+          </div>
+          <div className="dc-stat-label">Leitura individualizada</div>
+          <div className="dc-stat-value">{portfolioStats.individualized}</div>
+        </div>
+      </div>
+
       {/* Filter bar */}
       <div className="dc-filter-bar">
         <div className="dc-filter-search">
@@ -500,6 +575,27 @@ export default function CondominiosPage() {
         >
           <Filter size={15} /> Filtro Síndicos {showFilters ? '✕' : ''}
         </button>
+        <select
+          className="dc-form-input"
+          style={{ width: 132, height: 40 }}
+          value={refMonth}
+          onChange={(e) => setRefMonth(e.target.value)}
+          aria-label="Mês de referência"
+        >
+          {monthsList.map((month) => (
+            <option key={month.value} value={month.value}>{month.label}</option>
+          ))}
+        </select>
+        <input
+          className="dc-form-input"
+          style={{ width: 92, height: 40 }}
+          type="number"
+          min="2020"
+          max="2100"
+          value={refYear}
+          onChange={(e) => setRefYear(e.target.value)}
+          aria-label="Ano de referência"
+        />
         <div className="dc-filter-divider" />
         <span className="dc-filter-count">
           {filtered.length} Condomínio{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
@@ -678,6 +774,16 @@ export default function CondominiosPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="dc-form-group">
+                  <label>Administradora</label>
+                  <input disabled={readOnly} value={newCondo.administradora} onChange={e => setNewCondo({ ...newCondo, administradora: e.target.value })} placeholder="Ex: Prop Starter" />
+                </div>
+                <div className="dc-form-group">
+                  <label>Carteira</label>
+                  <input type="number" min="0" disabled={readOnly} value={newCondo.carteira} onChange={e => setNewCondo({ ...newCondo, carteira: e.target.value })} placeholder="Ex: 1" />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="dc-form-group">
                   <label>Nome do Síndico</label>
                   <input required value={newCondo.sindico} onChange={e => setNewCondo({ ...newCondo, sindico: e.target.value })} placeholder="Nome completo" />
                 </div>
@@ -741,6 +847,16 @@ export default function CondominiosPage() {
               <div className="dc-form-group">
                 <label>Endereço Completo</label>
                 <input required disabled={!isAdmin} value={editCondo.endereco} onChange={e => setEditCondo({ ...editCondo, endereco: e.target.value })} className="dc-form-input" />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="dc-form-group">
+                  <label>Administradora</label>
+                  <input disabled={!isAdmin} value={editCondo.administradora || ''} onChange={e => setEditCondo({ ...editCondo, administradora: e.target.value })} className="dc-form-input" />
+                </div>
+                <div className="dc-form-group">
+                  <label>Carteira</label>
+                  <input type="number" min="0" disabled={!isAdmin} value={editCondo.carteira || ''} onChange={e => setEditCondo({ ...editCondo, carteira: e.target.value })} className="dc-form-input" />
+                </div>
               </div>
               <div className="dc-form-group">
                 <label>Leitura Individualizada</label>
@@ -844,12 +960,30 @@ export default function CondominiosPage() {
                         fontWeight: 700,
                         cursor: 'pointer',
                         transition: 'all 0.2s',
-                        background: '#fff',
-                        color: '#0f172a',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                        background: activeHistoryTab === 'sistema' ? '#fff' : 'transparent',
+                        color: activeHistoryTab === 'sistema' ? '#0f172a' : '#64748b',
+                        boxShadow: activeHistoryTab === 'sistema' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
                       }}
                     >
                       Faturas Registradas
+                    </button>
+                    <button
+                      onClick={() => setActiveHistoryTab('gmail')}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        border: 'none',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        background: activeHistoryTab === 'gmail' ? '#fff' : 'transparent',
+                        color: activeHistoryTab === 'gmail' ? '#0f172a' : '#64748b',
+                        boxShadow: activeHistoryTab === 'gmail' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                      }}
+                    >
+                      Gmail ({gmailHistory.length})
                     </button>
                   </div>
 
@@ -981,7 +1115,31 @@ export default function CondominiosPage() {
                         </div>
                       )}
                     </>
-                  ) : null}
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {gmailHistory.length === 0 ? (
+                        <div style={{ padding: 56, textAlign: 'center', color: '#94a3b8', background: '#fff', border: '1px solid #f3f4f6', borderRadius: 16 }}>
+                          <Mail size={42} style={{ margin: '0 auto 16px', opacity: 0.2 }} />
+                          <div style={{ fontWeight: 800, color: '#475569' }}>Nenhum documento localizado no Gmail</div>
+                          <div style={{ fontSize: '0.85rem', marginTop: 6 }}>O histórico aparecerá aqui quando houver mensagens compatíveis com a instalação.</div>
+                        </div>
+                      ) : gmailHistory.map((item: any, idx: number) => (
+                        <div key={item.id || idx} style={{ padding: 16, border: '1px solid #e2e8f0', borderRadius: 12, background: '#fff', display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 800, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.subject || item.assunto || 'Mensagem sem assunto'}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 4 }}>{item.from || item.remetente || 'Remetente não informado'}</div>
+                          </div>
+                          <button
+                            className="dc-icon-action"
+                            title="Baixar fatura do Gmail"
+                            onClick={() => handleDownloadFatura(item, item.filename || item.nome_arquivo || 'fatura.pdf', 'gmail')}
+                          >
+                            <Download size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
 
                 </div>
@@ -1011,6 +1169,14 @@ export default function CondominiosPage() {
                     <div>
                       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>ENDEREÇO</div>
                       <div style={{ fontWeight: 600, color: '#334155' }}>{detailsCondo.endereco}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>ADMINISTRADORA</div>
+                      <div style={{ fontWeight: 600, color: '#334155' }}>{detailsCondo.administradora || 'Não informada'}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>CARTEIRA</div>
+                      <div style={{ fontWeight: 600, color: '#334155' }}>{detailsCondo.carteira ?? 'Não informada'}</div>
                     </div>
                   </div>
 
@@ -1287,7 +1453,7 @@ export default function CondominiosPage() {
                 <div style={{ padding: 12, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Calendar size={16} color="#3b82f6" />
                   <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
-                    Referência (Vencimento): {format(new Date(), 'MMMM / yyyy', { locale: ptBR })}
+                    Referência (Vencimento): {selectedReferencia}
                   </span>
                 </div>
               </div>
@@ -1422,7 +1588,7 @@ export default function CondominiosPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, color: '#64748b' }}>
                         <Paperclip size={16} />
                         <span style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.025em' }}>
-                          Segundo faturamento para o mês de {format(new Date(), 'MMMM', { locale: ptBR })}
+                          Segundo faturamento para {selectedReferencia}
                         </span>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

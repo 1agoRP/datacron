@@ -66,13 +66,14 @@ export default function ContratosPage() {
   const [editing, setEditing] = useState<Contrato | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [paymentDraft, setPaymentDraft] = useState<Record<string, string>>({});
+  const isAdmin = user?.role === 'admin';
 
   const { data: contratos = [], isLoading, mutate } = useSWR(
-    ['contratos-dashboard', ano],
+    isAdmin ? ['contratos-dashboard', ano] : null,
     () => api.getContratosDashboard(ano)
   );
-  const { data: stats, mutate: mutateStats } = useSWR(['contratos-stats', ano], () => api.getContratoStats(ano));
-  const { data: condominios = [] } = useSWR('contratos-condominios', () => api.getCondominios() as Promise<Condominio[]>);
+  const { data: stats, mutate: mutateStats } = useSWR(isAdmin ? ['contratos-stats', ano] : null, () => api.getContratoStats(ano));
+  const { data: condominios = [] } = useSWR(isAdmin ? 'contratos-condominios' : null, () => api.getCondominios() as Promise<Condominio[]>);
 
   useEffect(() => {
     if (user && user.role !== 'admin') {
@@ -94,6 +95,10 @@ export default function ContratosPage() {
     if (!filtered.length) return null;
     return filtered.find((c) => c.id === selectedId) || filtered[0];
   }, [filtered, selectedId]);
+
+  if (user && !isAdmin) {
+    return null;
+  }
 
   const openCreate = () => {
     setEditing(null);

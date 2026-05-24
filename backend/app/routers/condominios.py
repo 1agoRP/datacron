@@ -6,7 +6,7 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func, and_, extract
+from sqlalchemy import select, func, and_, extract, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, defer
 
@@ -23,7 +23,7 @@ import io
 import base64
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/condominios", tags=["Condomínios"])
+router = APIRouter(prefix="/condominios", tags=["CondomÃ­nios"])
 
 
 
@@ -32,9 +32,51 @@ def _escape_like(value: str) -> str:
     return value.replace("%", r"\%").replace("_", r"\_")
 
 
+def _normalized_cnpj_column():
+    return func.replace(func.replace(func.replace(Condominio.cnpj, ".", ""), "/", ""), "-", "")
+
+
+def _ensure_condo_access(condominio_id: uuid.UUID, allowed_condo_ids: list | None) -> None:
+    if allowed_condo_ids is not None and condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomÃƒÂ­nio")
+
+
+async def _get_condominio_or_404(
+    db: AsyncSession,
+    condominio_id: uuid.UUID,
+    allowed_condo_ids: list | None = None,
+) -> Condominio:
+    _ensure_condo_access(condominio_id, allowed_condo_ids)
+    result = await db.execute(select(Condominio).where(Condominio.id == condominio_id))
+    condo = result.scalar_one_or_none()
+    if not condo:
+        raise HTTPException(status_code=404, detail="CondomÃƒÂ­nio nÃƒÂ£o encontrado")
+    return condo
+
+
+def _add_audit_log(
+    db: AsyncSession,
+    current_user: User,
+    acao: str,
+    entidade_id: uuid.UUID,
+    detalhes: dict,
+) -> None:
+    db.add(
+        AuditLog(
+            usuario_id=current_user.id,
+            usuario_nome=current_user.nome,
+            usuario_email=current_user.email,
+            acao=acao,
+            entidade_tipo="condominio",
+            entidade_id=entidade_id,
+            detalhes=detalhes,
+        )
+    )
+
+
 @router.get("", response_model=list[CondominioResponse])
 async def list_condominios(
-    search: Optional[str] = Query(None, description="Busca por nome, número ou CNPJ"),
+    search: Optional[str] = Query(None, description="Busca por nome, nÃºmero ou CNPJ"),
     ativo: bool = Query(True),
     skip: int = Query(0, ge=0),
     limit: int = Query(1000, le=2000),
@@ -54,11 +96,15 @@ async def list_condominios(
         stmt = stmt.where(Condominio.id.in_(allowed_condo_ids))
     if search:
         safe = _escape_like(search)
-        stmt = stmt.where(
-            Condominio.nome.ilike(f"%{safe}%")
-            | Condominio.numero.ilike(f"%{safe}%")
-            | Condominio.cnpj.ilike(f"%{safe}%")
-        )
+        safe_digits = "".join(filter(str.isdigit, search))
+        conditions = [
+            Condominio.nome.ilike(f"%{safe}%"),
+            Condominio.numero.ilike(f"%{safe}%"),
+            Condominio.cnpj.ilike(f"%{safe}%"),
+        ]
+        if safe_digits:
+            conditions.append(_normalized_cnpj_column().ilike(f"%{safe_digits}%"))
+        stmt = stmt.where(or_(*conditions))
     stmt = stmt.order_by(Condominio.nome).offset(skip).limit(limit)
     result = await db.execute(stmt)
     condominios = result.scalars().all()
@@ -68,7 +114,7 @@ async def list_condominios(
 
     condo_ids = [c.id for c in condominios]
 
-    # Query 2: Count active concessionárias per condo
+    # Query 2: Count active concessionÃ¡rias per condo
     try:
         conc_result = await db.execute(
             select(Concessionaria.condominio_id, func.count(Concessionaria.id))
@@ -80,7 +126,7 @@ async def list_condominios(
         )
         conc_counts = dict(conc_result.all())
     except Exception as e:
-        logger.warning(f"Failed to count concessionárias: {e}")
+        logger.warning(f"Failed to count concessionÃ¡rias: {e}")
         conc_counts = {}
 
     # Query 3: Count faturas received this month per condo
@@ -114,17 +160,19 @@ async def list_condominios(
 @router.get("/{id}/status-contas")
 async def get_status_contas(
     id: uuid.UUID,
+    mes: Optional[int] = Query(None, ge=1, le=12),
+    ano: Optional[int] = Query(None, ge=2000, le=2100),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Returns concessionárias with matched faturas for the current month (single query)."""
+    """Returns concessionÃ¡rias with matched faturas for the current month (single query)."""
     from app.models.concessionaria import Concessionaria
 
     if allowed_condo_ids is not None and id not in allowed_condo_ids:
-        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomÃ­nio")
 
-    # 1. Get active concessionárias for this condo
+    # 1. Get active concessionÃ¡rias for this condo
     conc_result = await db.execute(
         select(Concessionaria)
         .where(Concessionaria.condominio_id == id, Concessionaria.ativo == True)
@@ -137,12 +185,14 @@ async def get_status_contas(
 
     # 2. Get faturas for this condo, current month
     now = datetime.now()
+    ref_mes = mes or now.month
+    ref_ano = ano or now.year
     fat_result = await db.execute(
         select(Fatura)
         .where(
             Fatura.condominio_id == id,
-            extract("year", Fatura.vencimento) == now.year,
-            extract("month", Fatura.vencimento) == now.month,
+            extract("year", Fatura.vencimento) == ref_ano,
+            extract("month", Fatura.vencimento) == ref_mes,
         )
         .order_by(Fatura.created_at.desc())
     )
@@ -210,7 +260,7 @@ async def get_status_contas(
     return {
         "items": main_items,
         "extras": extra_items,
-        "referencia": now.strftime("%Y-%m")
+        "referencia": f"{ref_ano}-{ref_mes:02d}"
     }
 
 
@@ -225,26 +275,24 @@ async def create_condominio(
     # Check unique constraints
     existing = await db.execute(
         select(Condominio).where(
-            (Condominio.cnpj == body.cnpj) | (Condominio.numero == body.numero)
+            (Condominio.numero == body.numero)
+            | (_normalized_cnpj_column() == body.cnpj)
         )
     )
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Condomínio com este CNPJ ou número já existe")
+        raise HTTPException(status_code=409, detail="CondomÃ­nio com este CNPJ ou nÃºmero jÃ¡ existe")
 
     condominio = Condominio(**body.model_dump())
     db.add(condominio)
     
     # Audit Log
-    log = AuditLog(
-        usuario_id=current_user.id,
-        usuario_nome=current_user.nome,
-        usuario_email=current_user.email,
-        acao="inclusao",
-        entidade_tipo="condominio",
-        entidade_id=condominio.id,
-        detalhes={"nome": condominio.nome, "numero": condominio.numero}
+    _add_audit_log(
+        db,
+        current_user,
+        "inclusao",
+        condominio.id,
+        {"nome": condominio.nome, "numero": condominio.numero},
     )
-    db.add(log)
     
     await db.commit()
     await db.refresh(condominio)
@@ -254,7 +302,7 @@ async def create_condominio(
 
 @router.get("/download-all", status_code=200)
 async def download_all_faturas(
-    referencia: Optional[str] = Query(None, description="Referência (ex: Maio/2026)"),
+    referencia: Optional[str] = Query(None, description="ReferÃªncia (ex: Maio/2026)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
@@ -340,7 +388,7 @@ async def get_condominio(
 ):
     """Returns a single condominio by ID."""
     if allowed_condo_ids is not None and id not in allowed_condo_ids:
-        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomÃ­nio")
 
     result = await db.execute(
         select(Condominio)
@@ -351,7 +399,7 @@ async def get_condominio(
     )
     c = result.scalar_one_or_none()
     if not c:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+        raise HTTPException(status_code=404, detail="CondomÃ­nio nÃ£o encontrado")
     return c
 
 
@@ -364,33 +412,50 @@ async def update_condominio(
     allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Updates a condominio's data."""
-    if allowed_condo_ids is not None and id not in allowed_condo_ids:
-        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
-    
-    result = await db.execute(select(Condominio).where(Condominio.id == id))
-    c = result.scalar_one_or_none()
-    if not c:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
-    
-    # RBAC: Only admin can edit core fields
+    c = await _get_condominio_or_404(db, id, allowed_condo_ids)
+
     update_data = body.model_dump(exclude_none=True)
     if not current_user.is_admin:
-        allowed_for_manager = {"mandato_inicio", "mandato_fim", "leitura_individualizada_ativa", "sindico", "cpf_sindico"}
+        allowed_for_manager = {
+            "mandato_inicio",
+            "mandato_fim",
+            "leitura_individualizada_ativa",
+            "sindico",
+            "cpf_sindico",
+        }
         attempted_to_edit = set(update_data.keys())
         not_allowed = attempted_to_edit - allowed_for_manager
         if not_allowed:
             raise HTTPException(
-                status_code=403, 
-                detail=f"Permissão insuficiente para editar os campos: {', '.join(not_allowed)}. Contate o administrador."
+                status_code=403,
+                detail=f"Permissao insuficiente para editar os campos: {', '.join(not_allowed)}. Contate o administrador.",
             )
+
+    if current_user.is_admin and ("numero" in update_data or "cnpj" in update_data):
+        duplicate_conditions = []
+        if "numero" in update_data:
+            duplicate_conditions.append(Condominio.numero == update_data["numero"])
+        if "cnpj" in update_data:
+            duplicate_conditions.append(_normalized_cnpj_column() == update_data["cnpj"])
+        duplicate = await db.execute(
+            select(Condominio).where(Condominio.id != id, or_(*duplicate_conditions))
+        )
+        if duplicate.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="Condominio com este CNPJ ou numero ja existe")
 
     for field, value in update_data.items():
         setattr(c, field, value)
 
+    _add_audit_log(
+        db,
+        current_user,
+        "alteracao",
+        c.id,
+        {"nome": c.nome, "numero": c.numero, "campos": list(update_data.keys())},
+    )
     await db.commit()
     await db.refresh(c)
     return c
-
 
 @router.delete("/{id}", status_code=204)
 async def delete_condominio(
@@ -401,11 +466,11 @@ async def delete_condominio(
 ):
     """Soft-deletes a condominio (sets ativo=False)."""
     if allowed_condo_ids is not None and id not in allowed_condo_ids:
-        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomÃ­nio")
     result = await db.execute(select(Condominio).where(Condominio.id == id))
     c = result.scalar_one_or_none()
     if not c:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+        raise HTTPException(status_code=404, detail="CondomÃ­nio nÃ£o encontrado")
     c.ativo = False
     
     # Audit Log
@@ -433,7 +498,7 @@ async def get_condominio_faturas(
 ):
     """Returns all faturas for a specific condominio."""
     if allowed_condo_ids is not None and id not in allowed_condo_ids:
-        raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
+        raise HTTPException(status_code=403, detail="Acesso negado a este condomÃ­nio")
     stmt = select(Fatura).where(Fatura.condominio_id == id)
     if referencia:
         stmt = stmt.where(Fatura.referencia == referencia)
@@ -448,15 +513,11 @@ async def get_condominio_gmail_history(
     concessionaria_id: uuid.UUID = Query(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Fetches list of invoices directly from the Condominio's Gmail label."""
-    # 1. Obter Condomínio e Concessionária
-    result = await db.execute(
-        select(Condominio).where(Condominio.id == id)
-    )
-    condo = result.scalar_one_or_none()
-    if not condo:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    # 1. Obter CondomÃ­nio e ConcessionÃ¡ria
+    condo = await _get_condominio_or_404(db, id, allowed_condo_ids)
 
     from app.models.concessionaria import Concessionaria as ConcModel
     res_conc = await db.execute(
@@ -464,13 +525,15 @@ async def get_condominio_gmail_history(
     )
     conc = res_conc.scalar_one_or_none()
     if not conc:
-        raise HTTPException(status_code=404, detail="Concessionária não encontrada")
+        raise HTTPException(status_code=404, detail="ConcessionÃ¡ria nÃ£o encontrada")
+    if conc.condominio_id != id:
+        raise HTTPException(status_code=400, detail="ConcessionÃ¡ria nÃ£o pertence a este condomÃ­nio")
 
-    # 2. Construir nome da Label (Padrão: Datacron/XXXX - Nome)
+    # 2. Construir nome da Label (PadrÃ£o: Datacron/XXXX - Nome)
     numero_pad = str(condo.numero).zfill(4)
     label_name = f"Datacron/{numero_pad} - {condo.nome}"
 
-    # 3. Chamar função de busca IMAP
+    # 3. Chamar funÃ§Ã£o de busca IMAP
     from app.services.email_monitor import get_gmail_history
     history = get_gmail_history(label_name, conc.instalacao)
     return history
@@ -482,12 +545,10 @@ async def download_condo_file(
     file_type: str,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Downloads a condo document (ATA, AVCB, or Seguro) from Base64."""
-    result = await db.execute(select(Condominio).where(Condominio.id == id))
-    condo = result.scalar_one_or_none()
-    if not condo:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    condo = await _get_condominio_or_404(db, id, allowed_condo_ids)
     
     b64_data = None
     filename = f"{file_type}.pdf"
@@ -502,10 +563,10 @@ async def download_condo_file(
         b64_data = condo.apolice_seguro_url
         filename = "apolice_seguro.pdf"
     else:
-        raise HTTPException(status_code=400, detail="Tipo de arquivo inválido")
+        raise HTTPException(status_code=400, detail="Tipo de arquivo invÃ¡lido")
         
     if not b64_data:
-        raise HTTPException(status_code=404, detail="Documento não encontrado")
+        raise HTTPException(status_code=404, detail="Documento nÃ£o encontrado")
 
     import os
     from app.storage import LOCAL_STORAGE_DIR
@@ -559,20 +620,18 @@ async def save_ata_eleicao(
     data_inicio: Optional[str] = Form(None),
     data_fim: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Uploads and saves the ATA de Eleição in Base64 (max 10MB)."""
-    result = await db.execute(select(Condominio).where(Condominio.id == id))
-    condo = result.scalar_one_or_none()
-    if not condo:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    """Uploads and saves the ATA de EleiÃ§Ã£o in Base64 (max 10MB)."""
+    condo = await _get_condominio_or_404(db, id, allowed_condo_ids)
 
     if pdf_file.content_type != "application/pdf":
-        raise HTTPException(status_code=415, detail="Apenas arquivos PDF são permitidos")
+        raise HTTPException(status_code=415, detail="Apenas arquivos PDF sÃ£o permitidos")
 
     pdf_bytes = await pdf_file.read()
     if len(pdf_bytes) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
+        raise HTTPException(status_code=413, detail="O arquivo PDF nÃ£o pode exceder 10MB")
 
     # Save file to disk
     filename = f"ata_eleicao_{id}_{uuid.uuid4().hex[:8]}.pdf"
@@ -595,9 +654,17 @@ async def save_ata_eleicao(
         # Auto-preencher mandato
         condo.mandato_inicio = parsed_inicio
         condo.mandato_fim = parsed_fim
+
+        _add_audit_log(
+            db,
+            current_user,
+            "alteracao",
+            condo.id,
+            {"documento": "ata_eleicao", "arquivo": pdf_file.filename},
+        )
         
         await db.commit()
-        return {"mensagem": "ATA de Eleição salva com sucesso", "ata_eleicao_nome": pdf_file.filename}
+        return {"mensagem": "ATA de EleiÃ§Ã£o salva com sucesso", "ata_eleicao_nome": pdf_file.filename}
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"Erro ao salvar ATA: {str(e)}")
@@ -608,13 +675,13 @@ async def get_ata_eleicao_url(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Returns the ATA de Eleição Base64 data (or proxy URL)."""
-    result = await db.execute(select(Condominio).where(Condominio.id == id))
-    condo = result.scalar_one_or_none()
+    """Returns the ATA de EleiÃ§Ã£o Base64 data (or proxy URL)."""
+    condo = await _get_condominio_or_404(db, id, allowed_condo_ids)
     
     if not condo or not condo.ata_eleicao_url:
-        raise HTTPException(status_code=404, detail="ATA não encontrada")
+        raise HTTPException(status_code=404, detail="ATA nÃ£o encontrada")
         
     return {"url": condo.ata_eleicao_url, "filename": condo.ata_eleicao_nome}
 
@@ -626,19 +693,18 @@ async def save_avcb(
     data_inicio: Optional[str] = Form(None),
     data_fim: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Uploads and saves the AVCB in Base64 (max 10MB)."""
-    result = await db.execute(select(Condominio).where(Condominio.id == id))
-    condo = result.scalar_one_or_none()
-    if not condo: raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    condo = await _get_condominio_or_404(db, id, allowed_condo_ids)
 
     if pdf_file.content_type != "application/pdf":
-        raise HTTPException(status_code=415, detail="Apenas arquivos PDF são permitidos")
+        raise HTTPException(status_code=415, detail="Apenas arquivos PDF sÃ£o permitidos")
 
     pdf_bytes = await pdf_file.read()
     if len(pdf_bytes) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
+        raise HTTPException(status_code=413, detail="O arquivo PDF nÃ£o pode exceder 10MB")
 
     # Save file to disk
     filename = f"avcb_{id}_{uuid.uuid4().hex[:8]}.pdf"
@@ -653,6 +719,13 @@ async def save_avcb(
         condo.avcb_url = file_path
         condo.avcb_inicio = parse_date(data_inicio)
         condo.avcb_fim = parse_date(data_fim)
+        _add_audit_log(
+            db,
+            current_user,
+            "alteracao",
+            condo.id,
+            {"documento": "avcb", "arquivo": pdf_file.filename},
+        )
         await db.commit()
         return {"mensagem": "AVCB salvo com sucesso"}
     except Exception as e:
@@ -665,12 +738,12 @@ async def get_avcb_url(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     """Returns the AVCB Base64 data."""
-    result = await db.execute(select(Condominio).where(Condominio.id == id))
-    condo = result.scalar_one_or_none()
+    condo = await _get_condominio_or_404(db, id, allowed_condo_ids)
     if not condo or not condo.avcb_url:
-        raise HTTPException(status_code=404, detail="AVCB não encontrado")
+        raise HTTPException(status_code=404, detail="AVCB nÃ£o encontrado")
     return {"url": condo.avcb_url}
 
 
@@ -681,19 +754,18 @@ async def save_apolice(
     data_inicio: Optional[str] = Form(None),
     data_fim: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Uploads and saves the Apólice de Seguro in Base64 (max 10MB)."""
-    result = await db.execute(select(Condominio).where(Condominio.id == id))
-    condo = result.scalar_one_or_none()
-    if not condo: raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    """Uploads and saves the ApÃ³lice de Seguro in Base64 (max 10MB)."""
+    condo = await _get_condominio_or_404(db, id, allowed_condo_ids)
 
     if pdf_file.content_type != "application/pdf":
-        raise HTTPException(status_code=415, detail="Apenas arquivos PDF são permitidos")
+        raise HTTPException(status_code=415, detail="Apenas arquivos PDF sÃ£o permitidos")
 
     pdf_bytes = await pdf_file.read()
     if len(pdf_bytes) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
+        raise HTTPException(status_code=413, detail="O arquivo PDF nÃ£o pode exceder 10MB")
 
     # Save file to disk
     filename = f"apolice_{id}_{uuid.uuid4().hex[:8]}.pdf"
@@ -708,11 +780,18 @@ async def save_apolice(
         condo.apolice_seguro_url = file_path
         condo.apolice_seguro_inicio = parse_date(data_inicio)
         condo.apolice_seguro_fim = parse_date(data_fim)
+        _add_audit_log(
+            db,
+            current_user,
+            "alteracao",
+            condo.id,
+            {"documento": "apolice", "arquivo": pdf_file.filename},
+        )
         await db.commit()
-        return {"mensagem": "Apólice salva com sucesso"}
+        return {"mensagem": "ApÃ³lice salva com sucesso"}
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Erro ao salvar Apólice: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar ApÃ³lice: {str(e)}")
 
 
 @router.get("/{id}/apolice")
@@ -720,62 +799,59 @@ async def get_apolice_url(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Returns the Apólice de Seguro Base64 data."""
-    result = await db.execute(select(Condominio).where(Condominio.id == id))
-    condo = result.scalar_one_or_none()
+    """Returns the ApÃ³lice de Seguro Base64 data."""
+    condo = await _get_condominio_or_404(db, id, allowed_condo_ids)
     if not condo or not condo.apolice_seguro_url:
-        raise HTTPException(status_code=404, detail="Apólice não encontrada")
+        raise HTTPException(status_code=404, detail="ApÃ³lice nÃ£o encontrada")
     return {"url": condo.apolice_seguro_url}
 
 @router.delete("/{id}/ata-eleicao", status_code=204)
 async def delete_ata_eleicao(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Exclui a ATA de Eleição do condomínio."""
-    result = await db.execute(select(Condominio).where(Condominio.id == id))
-    condo = result.scalar_one_or_none()
-    if not condo:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    """Exclui a ATA de EleiÃ§Ã£o do condomÃ­nio."""
+    condo = await _get_condominio_or_404(db, id, allowed_condo_ids)
     
     condo.ata_eleicao_url = None
     condo.ata_eleicao_nome = None
     condo.ata_eleicao_inicio = None
     condo.ata_eleicao_fim = None
+    _add_audit_log(db, current_user, "alteracao", condo.id, {"documento": "ata_eleicao", "acao": "remocao"})
     await db.commit()
 
 @router.delete("/{id}/avcb", status_code=204)
 async def delete_avcb(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Exclui o AVCB do condomínio."""
-    result = await db.execute(select(Condominio).where(Condominio.id == id))
-    condo = result.scalar_one_or_none()
-    if not condo:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    """Exclui o AVCB do condomÃ­nio."""
+    condo = await _get_condominio_or_404(db, id, allowed_condo_ids)
     
     condo.avcb_url = None
     condo.avcb_inicio = None
     condo.avcb_fim = None
+    _add_audit_log(db, current_user, "alteracao", condo.id, {"documento": "avcb", "acao": "remocao"})
     await db.commit()
 
 @router.delete("/{id}/apolice", status_code=204)
 async def delete_apolice(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_write()),
+    current_user: User = Depends(require_write()),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
-    """Exclui a Apólice de Seguro do condomínio."""
-    result = await db.execute(select(Condominio).where(Condominio.id == id))
-    condo = result.scalar_one_or_none()
-    if not condo:
-        raise HTTPException(status_code=404, detail="Condomínio não encontrado")
+    """Exclui a ApÃ³lice de Seguro do condomÃ­nio."""
+    condo = await _get_condominio_or_404(db, id, allowed_condo_ids)
     
     condo.apolice_seguro_url = None
     condo.apolice_seguro_inicio = None
     condo.apolice_seguro_fim = None
+    _add_audit_log(db, current_user, "alteracao", condo.id, {"documento": "apolice", "acao": "remocao"})
     await db.commit()
