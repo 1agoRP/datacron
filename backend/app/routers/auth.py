@@ -297,7 +297,7 @@ async def register(
 
     exists = await db.execute(select(User).where(User.email == body.email))
     if exists.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="E-mail jÃ¡ cadastrado")
+        raise HTTPException(status_code=409, detail="E-mail já cadastrado")
 
     user = User(
         nome=body.nome,

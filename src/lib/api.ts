@@ -866,8 +866,26 @@ class ApiClient {
     return this.request<Contrato[]>(`/contratos${query ? `?${query}` : ''}`);
   }
 
-  async getContratoStats() {
-    return this.request<{ total: number; ativos: number; a_vencer: number; vencidos: number; valor_mensal: number }>('/contratos/stats');
+  async getContratosDashboard(ano: number = new Date().getFullYear(), params: Record<string, string | number> = {}) {
+    const safeParams: Record<string, string> = { ano: String(ano) };
+    for (const [k, v] of Object.entries(params)) safeParams[k] = String(v);
+    const query = new URLSearchParams(safeParams).toString();
+    return this.request<Contrato[]>(`/contratos/dashboard?${query}`);
+  }
+
+  async getContratoStats(ano: number = new Date().getFullYear()) {
+    return this.request<{
+      total: number;
+      ativos: number;
+      a_vencer: number;
+      vencidos: number;
+      nao_assinados: number;
+      valor_mensal: number;
+      total_previsto_ano: number;
+      total_recebido_ano: number;
+      mensalidades_pendentes: number;
+      mensalidades_vencidas: number;
+    }>(`/contratos/stats?ano=${ano}`);
   }
 
   async createContrato(data: Partial<Contrato>) {
@@ -888,9 +906,21 @@ class ApiClient {
     return this.request(`/contratos/${id}`, { method: 'DELETE' });
   }
 
-  async exportContratos(formato: 'excel' | 'csv' = 'excel') {
+  async updateContratoPagamento(
+    contratoId: string,
+    mes: number,
+    data: { valor_previsto?: number; valor_recebido?: number; recebido: boolean; data_recebimento?: string | null; observacoes?: string | null },
+    ano: number = new Date().getFullYear()
+  ) {
+    return this.request(`/contratos/${contratoId}/pagamentos/${mes}?ano=${ano}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async exportContratos(formato: 'excel' | 'csv' = 'excel', ano: number = new Date().getFullYear()) {
     const token = this.getToken();
-    const response = await fetchWithRetry(`${API_BASE_URL}/contratos/exportar?formato=${formato}`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/contratos/exportar?formato=${formato}&ano=${ano}`, {
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     });
     if (!response.ok) throw new Error('Falha ao exportar contratos');

@@ -121,18 +121,17 @@ async def dashboard_stats(
     # Serialization using schemas
     from app.schemas import FaturaResponse, AlertaResponse
 
-    return {
-        "kpis": {
-            "condominios_count": condominios_count,
-            "recebidas_hoje": recebidas_mes,
-            "active_alerts": active_alerts,
-            "critical_alerts": critical_alerts,
-            "total_faturado": round(float(total_faturado), 2),
-            "condos_sem_ata": condos_sem_ata,
-            "faturas": [FaturaResponse.model_validate(f) for f in recent_faturas],
-            "alertas": [AlertaResponse.model_validate(a) for a in recent_alertas],
-        }
+    kpis = {
+        "condominios_count": condominios_count,
+        "recebidas_hoje": recebidas_mes,
+        "active_alerts": active_alerts,
+        "critical_alerts": critical_alerts,
+        "total_faturado": round(float(total_faturado), 2),
+        "condos_sem_ata": condos_sem_ata,
+        "faturas": [FaturaResponse.model_validate(f) for f in recent_faturas],
+        "alertas": [AlertaResponse.model_validate(a) for a in recent_alertas],
     }
+    return {**kpis, "kpis": kpis}
 
 
 @router.get("/contas-esperadas")

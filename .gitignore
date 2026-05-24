@@ -82,6 +82,7 @@ datacron-landing.html
 
 # Local PDF storage
 pdfs_storage/
+backend/database.db
 
 # Cache and generated files
 graphify-out/

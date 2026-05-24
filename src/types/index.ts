@@ -115,16 +115,24 @@ export interface Contrato {
   id: string;
   condominio_id: string;
   empresa: string;
+  razao_social?: string | null;
+  cnpj_empresa?: string | null;
+  email_contato?: string | null;
+  telefone_contato?: string | null;
   tipo_contrato: string;
   tipo_personalizado: string | null;
   data_inicio: string;
   data_fim: string | null;
+  assinado?: boolean;
+  data_assinatura?: string | null;
   valor_inicial: number;
   valor_atual: number;
   data_reajuste: string | null;
   indice_reajuste: string | null;
   ultimo_reajuste: string | null;
   periodicidade: string;
+  dia_vencimento?: number | null;
+  pagamento_recebido?: boolean;
   arquivo_path: string | null;
   observacoes: string | null;
   status: string;
@@ -132,6 +140,26 @@ export interface Contrato {
   created_by_id?: string | null;
   created_at: string;
   updated_at: string;
+  pagamentos?: ContratoPagamento[];
+  pagamentos_recebidos?: number;
+  pagamentos_pendentes?: number;
+  total_previsto_ano?: number;
+  total_recebido_ano?: number;
+}
+
+export interface ContratoPagamento {
+  id?: string | null;
+  contrato_id: string;
+  ano: number;
+  mes: number;
+  mes_label: string;
+  valor_previsto: number;
+  valor_recebido?: number | null;
+  recebido: boolean;
+  data_recebimento?: string | null;
+  observacoes?: string | null;
+  pendente: boolean;
+  vencido: boolean;
 }
 
 export interface ReajusteConcessionaria {

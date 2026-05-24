@@ -178,7 +178,7 @@ async def _send_error_webhook(data: dict):
 async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
     # Só envia ao webhook erros genuinamente inesperados (5xx)
     # 401/403 são respostas normais de autenticação/autorização — não são falhas do servidor
-    if exc.status_code >= 500:
+    if exc.status_code not in (401, 403):
         asyncio.create_task(_send_error_webhook({
             "type": "HTTPException",
             "status_code": exc.status_code,

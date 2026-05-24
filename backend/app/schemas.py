@@ -392,6 +392,8 @@ class ContratoCreate(BaseModel):
     tipo_personalizado: Optional[str] = None
     data_inicio: date
     data_fim: Optional[date] = None
+    assinado: bool = False
+    data_assinatura: Optional[date] = None
     valor_inicial: float = 0.0
     valor_atual: float = 0.0
     data_reajuste: Optional[date] = None
@@ -413,6 +415,8 @@ class ContratoUpdate(BaseModel):
     tipo_personalizado: Optional[str] = None
     data_inicio: Optional[date] = None
     data_fim: Optional[date] = None
+    assinado: Optional[bool] = None
+    data_assinatura: Optional[date] = None
     valor_inicial: Optional[float] = None
     valor_atual: Optional[float] = None
     data_reajuste: Optional[date] = None
@@ -436,6 +440,8 @@ class ContratoResponse(BaseModel):
     tipo_personalizado: Optional[str] = None
     data_inicio: date
     data_fim: Optional[date] = None
+    assinado: bool = False
+    data_assinatura: Optional[date] = None
     valor_inicial: float
     valor_atual: float
     data_reajuste: Optional[date] = None
@@ -452,6 +458,37 @@ class ContratoResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     model_config = {"from_attributes": True}
+
+
+class ContratoPagamentoUpdate(BaseModel):
+    valor_previsto: Optional[float] = None
+    valor_recebido: Optional[float] = None
+    recebido: bool = False
+    data_recebimento: Optional[date] = None
+    observacoes: Optional[str] = None
+
+
+class ContratoPagamentoResponse(BaseModel):
+    id: Optional[uuid.UUID] = None
+    contrato_id: uuid.UUID
+    ano: int
+    mes: int
+    mes_label: str
+    valor_previsto: float
+    valor_recebido: Optional[float] = None
+    recebido: bool = False
+    data_recebimento: Optional[date] = None
+    observacoes: Optional[str] = None
+    pendente: bool = False
+    vencido: bool = False
+
+
+class ContratoDashboardItem(ContratoResponse):
+    pagamentos: list[ContratoPagamentoResponse] = []
+    pagamentos_recebidos: int = 0
+    pagamentos_pendentes: int = 0
+    total_previsto_ano: float = 0.0
+    total_recebido_ano: float = 0.0
 
 
 # ─── Reajuste Concessionária ──────────────────────────────────
