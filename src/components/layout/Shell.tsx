@@ -27,6 +27,7 @@ const allNav = [
 ];
 
 const ADMIN_ONLY_MODULES = new Set(['relatorios', 'importacoes', 'gmail', 'auditoria', 'contratos', 'previsao']);
+const SUPERVISOR_ALLOWED_MODULES = new Set(['auditoria', 'relatorios']);
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrador',
@@ -58,7 +59,11 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
     const role = user?.role || 'geral';
     if (role === 'admin') return allNav;
     return allNav.filter(item => {
-      if (item.module && ADMIN_ONLY_MODULES.has(item.module)) return false;
+      if (
+        item.module &&
+        ADMIN_ONLY_MODULES.has(item.module) &&
+        !(role === 'supervisor' && SUPERVISOR_ALLOWED_MODULES.has(item.module))
+      ) return false;
       
       const adminSupervisorOnly = ['/reajustes'];
       if (adminSupervisorOnly.includes(item.href) && role !== 'supervisor') {

@@ -36,11 +36,11 @@ async def list_audit_logs(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, le=500),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_role("admin")),
+    _: User = Depends(require_role("admin", "supervisor")),
 ):
     """
     Returns global audit logs (condominios and accounts inclusions/deletions).
-    Only for admin.
+    Only for admin and supervisor.
     """
     stmt = select(AuditLog)
     

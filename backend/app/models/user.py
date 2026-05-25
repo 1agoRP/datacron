@@ -22,6 +22,9 @@ ROLES_READ_ONLY = {"concessionarias", "contabilidade", "orçamento", "emissao", 
 # Modules restricted to admin only
 ADMIN_ONLY_MODULES = {"relatorios", "importacoes", "notificacoes", "gmail"}
 
+# Modules available to supervisor in addition to unrestricted modules
+SUPERVISOR_ALLOWED_MODULES = {"relatorios"}
+
 
 class User(Base):
     __tablename__ = "users"
@@ -74,6 +77,8 @@ class User(Base):
 
     def has_module_access(self, module: str) -> bool:
         if self.role == "admin":
+            return True
+        if self.role == "supervisor" and module in SUPERVISOR_ALLOWED_MODULES:
             return True
         if module == "gmail" and self.role in ("gerencia", "assistente"):
             return True

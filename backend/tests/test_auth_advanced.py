@@ -49,6 +49,13 @@ class TestUserModel:
         assert user.has_module_access("gmail") is True
         assert user.has_module_access("notificacoes") is True
 
+    def test_supervisor_has_relatorios_access(self):
+        user = User(id=uuid.uuid4(), nome="Supervisor", email="supervisor@test.com",
+                    senha_hash="hash", role="supervisor")
+        assert user.has_module_access("relatorios") is True
+        assert user.has_module_access("importacoes") is False
+        assert user.has_module_access("gmail") is False
+
     def test_geral_blocked_from_admin_modules(self):
         user = User(id=uuid.uuid4(), nome="User", email="user@test.com",
                     senha_hash="hash", role="geral")
@@ -252,4 +259,3 @@ async def test_logout_clears_refresh_token(client: AsyncClient, auth_client: Asy
     # 3. Refresh should now fail
     refresh_resp = await client.post("/api/auth/refresh")
     assert refresh_resp.status_code == 401
-
