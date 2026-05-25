@@ -547,9 +547,9 @@ async def list_audit_logs(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, le=500),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_role("admin")),
+    _: User = Depends(require_role("admin", "supervisor")),
 ):
-    """Lista o histórico de ações em alertas (apenas admin)."""
+    """Lista o histórico de ações em alertas (admin e supervisor)."""
     stmt = (
         select(AlertaAuditLog)
         .order_by(AlertaAuditLog.created_at.desc())

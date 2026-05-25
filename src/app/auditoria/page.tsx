@@ -11,11 +11,11 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function AuditoriaPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const canAccessAudit = user?.role === 'admin' || user?.role === 'supervisor';
 
   // Initial load
   useSWR(
-    isAdmin ? 'alertas-audit-log' : null,
+    canAccessAudit ? 'alertas-audit-log' : null,
     () => api.getAlertasAuditLog(),
     { revalidateOnFocus: false }
   );
@@ -26,19 +26,19 @@ export default function AuditoriaPage() {
 
   // Alert Logs
   const { data: alertLogs = [], isLoading: loadingAlerts } = useSWR(
-    isAdmin && activeTab === 'alertas' ? 'alertas-audit-log' : null,
+    canAccessAudit && activeTab === 'alertas' ? 'alertas-audit-log' : null,
     () => api.getAlertasAuditLog(),
     { revalidateOnFocus: false }
   );
 
   // System Logs
   const { data: systemLogs = [], isLoading: loadingSystem } = useSWR(
-    isAdmin && activeTab === 'sistema' ? 'system-audit-log' : null,
+    canAccessAudit && activeTab === 'sistema' ? 'system-audit-log' : null,
     () => api.getAuditLogs(),
     { revalidateOnFocus: false }
   );
 
-  if (!isAdmin) {
+  if (!canAccessAudit) {
     return (
       <Shell>
         <div style={{ textAlign: 'center', padding: '120px 40px', color: '#94a3b8' }}>
