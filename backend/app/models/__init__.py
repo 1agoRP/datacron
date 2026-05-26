@@ -11,9 +11,11 @@ from app.models.reajuste_concessionaria import ReajusteConcessionaria
 from app.models.historico_fatura import HistoricoFatura
 from app.models.audit_log import AuditLog
 from app.models.refresh_token import RefreshToken
+from app.models.alert_webhook_delivery import AlertWebhookDelivery
 
 __all__ = [
     "User", "UserCondominio", "Condominio", "Concessionaria", "Fatura", "Alerta",
     "RelatorioGerado", "Contrato", "ContratoPagamento", "ContractFile",
-    "ReajusteConcessionaria", "HistoricoFatura", "AuditLog", "RefreshToken"
+    "ReajusteConcessionaria", "HistoricoFatura", "AuditLog", "RefreshToken",
+    "AlertWebhookDelivery"
 ]

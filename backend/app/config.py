@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # ─── App ──────────────────────────────────────────────────
     ENVIRONMENT: str = "development"
     ALERT_VARIATION_THRESHOLD: float = 0.15
-    N8N_WEBHOOK_URL: str = ""
+    N8N_WEBHOOK_URL: str = "https://n8n-n8n.7vjfup.easypanel.host/webhook/datacron-outbound-email"
 
     @property
     def allowed_origins_list(self) -> list[str]:

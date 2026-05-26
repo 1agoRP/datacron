@@ -8,17 +8,20 @@ Analyzes new faturas and generates alerts based on business rules:
 """
 
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.encoders import jsonable_encoder
 
 from app.config import settings
 from app.models.alerta import Alerta
+from app.models.alert_webhook_delivery import AlertWebhookDelivery
 from app.models.concessionaria import Concessionaria
 from app.models.fatura import Fatura
 from app.models.condominio import Condominio
-from app.services.email_sender import send_notification_email, render_alert_email
+from app.services.email_sender import render_alert_email
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +189,7 @@ async def check_missing_bills(db: AsyncSession) -> None:
             select(Alerta).where(
                 Alerta.condominio_id == conc.condominio_id,
                 Alerta.tipo == tipo_alerta,
-                func.date(Alerta.data_criacao) == today,
+                func.date(Alerta.created_at) == today,
                 Alerta.mensagem.ilike(f"%{conc.instalacao}%"),
             )
         )
@@ -229,6 +232,116 @@ async def check_missing_bills(db: AsyncSession) -> None:
 
 # Roles authorized to receive alert email notifications
 ALERT_NOTIFICATION_ROLES = {"admin", "assistente", "supervisor", "gerencia"}
+ALERT_WEBHOOK_SCHEMA_VERSION = "2026-05-26"
+MAX_ALERT_WEBHOOK_ATTEMPTS = 5
+
+
+def _next_retry_at(attempts: int) -> datetime:
+    minutes = min(60, 2 ** max(attempts - 1, 0))
+    return datetime.now(timezone.utc) + timedelta(minutes=minutes)
+
+
+async def _attempt_alert_webhook_delivery(
+    db: AsyncSession,
+    delivery: AlertWebhookDelivery,
+) -> None:
+    import httpx
+
+    delivery.attempts += 1
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                delivery.target_url,
+                json=jsonable_encoder(delivery.payload),
+                headers={"X-Idempotency-Key": delivery.idempotency_key},
+                timeout=15.0,
+            )
+        delivery.last_status_code = response.status_code
+        response.raise_for_status()
+        delivery.status = "sent"
+        delivery.sent_at = datetime.now(timezone.utc)
+        delivery.last_error = None
+        delivery.next_attempt_at = None
+        logger.info(f"Alert webhook delivered: {delivery.idempotency_key}")
+    except Exception as exc:
+        delivery.status = "failed"
+        delivery.last_error = str(exc)[:2000]
+        delivery.next_attempt_at = _next_retry_at(delivery.attempts)
+        logger.error(f"Alert webhook delivery failed: {delivery.idempotency_key}: {exc}")
+
+    db.add(delivery)
+    await db.flush()
+
+
+async def _enqueue_and_send_alert_webhook(
+    db: AsyncSession,
+    alert: Alerta,
+    payload: dict,
+) -> None:
+    if not settings.N8N_WEBHOOK_URL:
+        logger.warning(
+            f"N8N_WEBHOOK_URL not configured; alert {alert.id or alert.tipo} was saved without webhook dispatch."
+        )
+        return
+
+    await db.flush()
+    alerta_id = str(alert.id) if alert.id else "sem-id"
+    idempotency_key = f"alert:{alerta_id}:{alert.tipo}"
+
+    result = await db.execute(
+        select(AlertWebhookDelivery).where(
+            AlertWebhookDelivery.idempotency_key == idempotency_key
+        )
+    )
+    delivery = result.scalar_one_or_none()
+
+    if delivery and delivery.status == "sent":
+        logger.info(f"Alert webhook already sent: {idempotency_key}")
+        return
+
+    if not delivery:
+        delivery = AlertWebhookDelivery(
+            alerta_id=alert.id,
+            event_type="alert.created",
+            target_url=settings.N8N_WEBHOOK_URL,
+            idempotency_key=idempotency_key,
+            payload=payload,
+            status="pending",
+            attempts=0,
+        )
+        db.add(delivery)
+        await db.flush()
+    else:
+        delivery.payload = payload
+        delivery.target_url = settings.N8N_WEBHOOK_URL
+
+    await _attempt_alert_webhook_delivery(db, delivery)
+
+
+async def retry_pending_alert_webhooks(db: AsyncSession, limit: int = 50) -> int:
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(AlertWebhookDelivery)
+        .where(
+            AlertWebhookDelivery.status.in_(["pending", "failed"]),
+            AlertWebhookDelivery.attempts < MAX_ALERT_WEBHOOK_ATTEMPTS,
+            or_(
+                AlertWebhookDelivery.next_attempt_at.is_(None),
+                AlertWebhookDelivery.next_attempt_at <= now,
+            ),
+        )
+        .order_by(AlertWebhookDelivery.next_attempt_at.asc())
+        .limit(limit)
+    )
+    deliveries = result.scalars().all()
+
+    for delivery in deliveries:
+        await _attempt_alert_webhook_delivery(db, delivery)
+
+    await db.commit()
+    if deliveries:
+        logger.info(f"Retried {len(deliveries)} alert webhook delivery/deliveries.")
+    return len(deliveries)
 
 
 async def notify_alert(
@@ -305,23 +418,24 @@ async def notify_alert(
             )
         )
         potential_users = res_carteira.scalars().all()
-        condo_num = str(condo.numero).strip()
-        
-        for u in potential_users:
-            codigo_str = u.codigo_condominio or ""
-            if "todos" in codigo_str.lower():
-                carteira_users.append(u)
-            else:
-                codes = [c.strip() for c in codigo_str.split(",") if c.strip()]
-                # Check with common padding variations
-                all_codes = set(codes)
-                for c in codes:
-                    if c.isdigit():
-                        all_codes.add(c.zfill(2))
-                        all_codes.add(c.zfill(3))
-                        all_codes.add(c.zfill(4))
-                if condo_num in all_codes:
+        if condo:
+            condo_num = str(condo.numero).strip()
+
+            for u in potential_users:
+                codigo_str = u.codigo_condominio or ""
+                if "todos" in codigo_str.lower():
                     carteira_users.append(u)
+                else:
+                    codes = [c.strip() for c in codigo_str.split(",") if c.strip()]
+                    # Check with common padding variations
+                    all_codes = set(codes)
+                    for c in codes:
+                        if c.isdigit():
+                            all_codes.add(c.zfill(2))
+                            all_codes.add(c.zfill(3))
+                            all_codes.add(c.zfill(4))
+                    if condo_num in all_codes:
+                        carteira_users.append(u)
 
     # 3. Montar lista de destinatários (de-duplicar por email)
     recipients = set()
@@ -341,7 +455,6 @@ async def notify_alert(
 
     if not recipients:
         logger.warning(f"No recipients found for alert {alert.id or 'NEW'} on condo {alert.condominio_id}")
-        return
 
     alert_desc = f"ID:{alert.id}" if alert.id else f"Type:{alert.tipo}"
     logger.info(f"Alert {alert_desc}: sending to {len(recipients)} recipients: {recipients}")
@@ -435,6 +548,63 @@ async def notify_alert(
                 logger.error(f"Failed to read PDF for attachment: {e}")
 
     # 7. Webhook N8N ou E-mail Clássico
+    import base64
+
+    pdf_base64 = None
+    if fatura and fatura.pdf_path and os.path.exists(fatura.pdf_path):
+        try:
+            with open(fatura.pdf_path, "rb") as f:
+                pdf_base64 = base64.b64encode(f.read()).decode("utf-8")
+        except Exception as e:
+            logger.error(f"Failed to read PDF for alert webhook: {e}")
+
+    payload = {
+        "schema_version": ALERT_WEBHOOK_SCHEMA_VERSION,
+        "event_type": "alert.created",
+        "alerta": {
+            "id": str(alert.id) if alert.id else None,
+            "tipo": alert.tipo,
+            "gravidade": alert.gravidade,
+            "mensagem": alert.mensagem,
+            "created_at": alert.created_at,
+            "email_remetente": getattr(alert, "email_remetente", None),
+            "email_assunto": getattr(alert, "email_assunto", None),
+            "email_data": getattr(alert, "email_data", None),
+        },
+        "condominio": {
+            "id": str(alert.condominio_id) if alert.condominio_id else None,
+            "nome": condo_name,
+            "numero": condo_num_str,
+        },
+        "concessionaria": {
+            "id": str(conc.id) if conc else None,
+            "tipo": tipo_conta,
+            "codigo_identificacao": cod_conta,
+            "valor_medio": conc.valor_medio if conc else None,
+        },
+        "fatura": {
+            "id": str(fatura.id) if fatura else None,
+            "referencia": fatura_referencia,
+            "vencimento": fatura_vencimento,
+            "valor": fatura_valor,
+            "valor_formatado": valor_str,
+            "gmail_message_id": fatura.gmail_message_id if fatura else None,
+            "pdf_nome_original": fatura.pdf_nome_original if fatura else None,
+            "pdf_desbloqueado": fatura.pdf_desbloqueado if fatura else None,
+            "pdf_base64": pdf_base64,
+        },
+        "usuarios_responsaveis": sorted(recipients),
+        "email": {
+            "subject": subject,
+            "text": message_text,
+            "html": html_body,
+        },
+        "source": "datacron.backend",
+    }
+
+    await _enqueue_and_send_alert_webhook(db, alert, payload)
+    return
+
     target_tags = ["Nao_Recebida", "Mandato_a_Vencer", "Fatura_Sem_Debito_Automatico", "Variacao_Valor_Mais", "Variacao_Valor_Menos"]
     
     if alert.tipo in target_tags and settings.N8N_WEBHOOK_URL:
@@ -540,6 +710,7 @@ async def check_mandate_expirations(db: AsyncSession) -> None:
                     await notify_alert(db, alert)
                 except Exception as ne:
                     logger.error(f"Mandate alert saved but notification failed for condo {condo.id}: {ne}")
+                continue
 
                 # Send Email to all concessionaire contacts (Legacy/Specific logic)
                 # Fetch email recipients from related concessionaires

@@ -19,7 +19,12 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import settings
 from app.services.email_monitor import run_email_scan
-from app.services.alert_manager import check_missing_bills, check_mandate_expirations, check_document_expirations_and_clean
+from app.services.alert_manager import (
+    check_missing_bills,
+    check_mandate_expirations,
+    check_document_expirations_and_clean,
+    retry_pending_alert_webhooks,
+)
 from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -63,6 +68,15 @@ async def _run_document_clean_check():
             await check_document_expirations_and_clean(db)
     except Exception as e:
         logger.error(f"Document expiration clean check failed: {e}")
+
+
+async def _run_alert_webhook_retry():
+    """Retries failed alert webhook deliveries."""
+    try:
+        async with AsyncSessionLocal() as db:
+            await retry_pending_alert_webhooks(db)
+    except Exception as e:
+        logger.error(f"Alert webhook retry failed: {e}")
 
 
 def start_scheduler():
@@ -139,6 +153,15 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    scheduler.add_job(
+        _run_alert_webhook_retry,
+        trigger=IntervalTrigger(minutes=5),
+        id="alert_webhook_retry",
+        name="Alert Webhook Retry",
+        replace_existing=True,
+        max_instances=1,
+    )
+
     scheduler.start()
     logger.info(
         "Scheduler started with lock. Email scan scheduled 3 times a day (08:00, 14:00, 20:00)."
@@ -163,4 +186,3 @@ def stop_scheduler():
         except:
             pass
         _scheduler_lock_fd = None
-

@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
+from app.workers.scheduler import start_scheduler, stop_scheduler
 
 from app.config import settings
 from app.database import engine, Base
@@ -125,9 +126,12 @@ async def lifespan(app: FastAPI):
             "Deploy cancelado por segurança. Defina ALLOWED_ORIGINS corretamente."
         )
 
+    start_scheduler()
+
     yield  # ← Application is running here
 
     # Shutdown
+    stop_scheduler()
     await engine.dispose()
     logger.info("Datacron API shut down")
 

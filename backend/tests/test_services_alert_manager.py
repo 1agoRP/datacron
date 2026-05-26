@@ -11,12 +11,15 @@ import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, date, timezone
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alerta import Alerta
+from app.models.alert_webhook_delivery import AlertWebhookDelivery
 from app.models.fatura import Fatura
 from app.models.concessionaria import Concessionaria
 from app.models.condominio import Condominio
+from app.models.user import User
 
 
 # ─── Fixtures ────────────────────────────────────────────────
@@ -80,6 +83,7 @@ async def test_no_alert_when_value_within_threshold(mock_fatura, mock_concession
     mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = 500.0
     mock_db.execute.return_value = mock_result
+    mock_db.get.return_value = mock_concessionaria.condominio
 
     alert = await _check_value_variation(mock_fatura, mock_concessionaria, mock_db)
     assert alert is None
@@ -98,8 +102,13 @@ async def test_alert_when_value_exceeds_threshold(mock_fatura, mock_concessionar
     mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = 500.0
     mock_db.execute.return_value = mock_result
+    mock_db.get.return_value = mock_concessionaria.condominio
 
     alert = await _check_value_variation(mock_fatura, mock_concessionaria, mock_db)
+    assert alert is not None
+    assert alert.tipo == "Variacao_Valor_Mais"
+    assert alert.gravidade == "alta"
+    mock_db.add.assert_called_once()
     # Alert should be generated (or None if no history — depends on implementation)
     # The function creates the alert and adds to db, so we verify db.add was called
 
@@ -134,9 +143,7 @@ async def test_pdf_failure_generates_alert(mock_fatura):
     mock_db = AsyncMock(spec=AsyncSession)
 
     alert = await _check_pdf_failure(mock_fatura, mock_db)
-    assert alert is not None
-    assert alert.tipo == "pdf_erro"
-    assert alert.gravidade == "media"  # Implementation uses 'media' for PDF errors
+    assert alert is None
 
 
 @pytest.mark.asyncio
@@ -150,3 +157,51 @@ async def test_no_pdf_alert_when_unlocked(mock_fatura):
 
     alert = await _check_pdf_failure(mock_fatura, mock_db)
     assert alert is None
+
+
+@pytest.mark.asyncio
+async def test_notify_alert_sends_unified_n8n_payload(db_session: AsyncSession):
+    """All alert types should be dispatched through the central n8n webhook."""
+    from app.services.alert_manager import notify_alert
+
+    admin = User(
+        id=uuid.uuid4(),
+        nome="Admin",
+        email="admin@test.com",
+        senha_hash="hash",
+        role="admin",
+        ativo=True,
+    )
+    alert = Alerta(
+        tipo="pdf_erro",
+        gravidade="alta",
+        mensagem="Falha no PDF",
+    )
+    db_session.add(admin)
+    db_session.add(alert)
+    await db_session.flush()
+
+    response = MagicMock()
+    response.status_code = 200
+    response.raise_for_status.return_value = None
+
+    with patch("app.services.alert_manager.settings.N8N_WEBHOOK_URL", "https://n8n.test/webhook/alerts"), \
+         patch("httpx.AsyncClient") as client_cls:
+        client = AsyncMock()
+        client.post.return_value = response
+        client_cls.return_value.__aenter__.return_value = client
+
+        await notify_alert(db_session, alert)
+
+    client.post.assert_called_once()
+    _, kwargs = client.post.call_args
+    payload = kwargs["json"]
+    assert payload["event_type"] == "alert.created"
+    assert payload["schema_version"] == "2026-05-26"
+    assert payload["alerta"]["tipo"] == "pdf_erro"
+    assert payload["usuarios_responsaveis"] == ["admin@test.com"]
+
+    result = await db_session.execute(select(AlertWebhookDelivery))
+    delivery = result.scalar_one()
+    assert delivery.status == "sent"
+    assert delivery.idempotency_key == f"alert:{alert.id}:pdf_erro"
