@@ -15,10 +15,8 @@ except ImportError:
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import settings
-from app.services.email_monitor import run_email_scan
 from app.services.alert_manager import (
     check_missing_bills,
     check_mandate_expirations,
@@ -34,14 +32,6 @@ scheduler = AsyncIOScheduler(timezone="America/Sao_Paulo")
 
 # Global flag to track if this process owns the scheduler lock
 _scheduler_lock_fd = None
-
-
-async def _run_email_scan_job():
-    """Wrapper for the email scan job with error handling."""
-    try:
-        await run_email_scan()
-    except Exception as e:
-        logger.error(f"Email scan job failed: {e}")
 
 
 async def _run_missing_bills_check():
@@ -116,38 +106,28 @@ def start_scheduler():
 
 
     # If we got here, we own the lock
-    # Email scan — 3 times a day (08:00, 14:00, 20:00)
-    scheduler.add_job(
-        _run_email_scan_job,
-        trigger=CronTrigger(hour='8,14,20', minute=0),
-        id="email_scan",
-        name="Gmail Inbox Scan",
-        replace_existing=True,
-        misfire_grace_time=60,
-    )
-
-    # Missing bills check — daily at 08:00 BRT
+    # Missing bills check - daily at 06:00 BRT
     scheduler.add_job(
         _run_missing_bills_check,
-        trigger=CronTrigger(hour=8, minute=0),
+        trigger=CronTrigger(hour=6, minute=0),
         id="missing_bills_check",
         name="Missing Bills Daily Check",
         replace_existing=True,
     )
 
-    # Mandate check — daily at 08:00 BRT
+    # Mandate check - daily at 06:00 BRT
     scheduler.add_job(
         _run_mandate_check,
-        trigger=CronTrigger(hour=8, minute=5), # Run 5 mins after missing bills
+        trigger=CronTrigger(hour=6, minute=0),
         id="mandate_check",
         name="Mandate Expiration Check",
         replace_existing=True,
     )
 
-    # Document expiration cleaner — daily at 00:05 BRT
+    # Document expiration cleaner - daily at 06:00 BRT
     scheduler.add_job(
         _run_document_clean_check,
-        trigger=CronTrigger(hour=0, minute=5),
+        trigger=CronTrigger(hour=6, minute=0),
         id="document_clean_check",
         name="Document Expiration Cleaner",
         replace_existing=True,
@@ -155,7 +135,7 @@ def start_scheduler():
 
     scheduler.add_job(
         _run_alert_webhook_retry,
-        trigger=IntervalTrigger(minutes=5),
+        trigger=CronTrigger(hour=6, minute=0),
         id="alert_webhook_retry",
         name="Alert Webhook Retry",
         replace_existing=True,
@@ -164,7 +144,7 @@ def start_scheduler():
 
     scheduler.start()
     logger.info(
-        "Scheduler started with lock. Email scan scheduled 3 times a day (08:00, 14:00, 20:00)."
+        "Scheduler started with lock. Daily jobs scheduled once a day at 06:00 BRT."
     )
 
 

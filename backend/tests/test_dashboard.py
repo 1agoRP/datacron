@@ -6,7 +6,12 @@ Tests the dashboard statistics, chart data, and contas esperadas endpoints.
 
 import pytest
 import uuid
+from datetime import date
 from httpx import AsyncClient
+
+from app.models.condominio import Condominio
+from app.models.concessionaria import Concessionaria
+from app.models.fatura import Fatura
 
 
 @pytest.mark.asyncio
@@ -45,6 +50,53 @@ async def test_dashboard_contas_esperadas(auth_client: AsyncClient):
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, (list, dict))
+
+
+@pytest.mark.asyncio
+async def test_dashboard_contas_esperadas_counts_distinct_concessionarias(
+    auth_client: AsyncClient,
+    db_session,
+):
+    """Duplicate faturas for the same concessionaria should count as one received account."""
+    condo = Condominio(
+        nome="Dashboard Distinct",
+        numero=f"DD{uuid.uuid4().hex[:4]}",
+        endereco="Av. Teste",
+        cnpj=f"11.222.{uuid.uuid4().hex[:3]}.0001-81",
+        sindico="Teste",
+    )
+    db_session.add(condo)
+    await db_session.flush()
+
+    conc = Concessionaria(
+        condominio_id=condo.id,
+        tipo="Sabesp",
+        instalacao="UC-DISTINCT",
+        dia_vencimento=15,
+        valor_medio=100.0,
+        ativo=True,
+    )
+    db_session.add(conc)
+    await db_session.flush()
+
+    for _ in range(2):
+        db_session.add(
+            Fatura(
+                condominio_id=condo.id,
+                concessionaria_id=conc.id,
+                referencia="Maio/2026",
+                valor=100.0,
+                vencimento=date(2026, 5, 15),
+                status="processada",
+            )
+        )
+    await db_session.commit()
+
+    resp = await auth_client.get("/api/dashboard/contas-esperadas?mes=2026-05")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_esperadas"] == 1
+    assert data["recebidas"] == 1
 
 
 @pytest.mark.asyncio

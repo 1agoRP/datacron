@@ -18,6 +18,7 @@ from app.models.condominio import Condominio
 from app.models.concessionaria import Concessionaria
 from app.models.audit_log import AuditLog
 from app.schemas import FaturaResponse
+from app.services.fatura_duplicates import find_duplicate_fatura
 from app.services.pdf_processor import generate_standard_filename
 
 
@@ -136,22 +137,15 @@ async def create_fatura_manual(
         ano = vencimento.year
         referencia = f"{mes_nome[mes - 1]}/{ano}"
 
-    # Check for existing duplicate in Fatura or HistoricoFatura
-    # We join with Concessionaria to ensure the same 'instalacao' is checked, as requested by the user.
-    from app.models.concessionaria import Concessionaria as ConcModel
-    from app.models.historico_fatura import HistoricoFatura
-
-    async def check_duplicate(model):
-        stmt = select(model).join(ConcModel, model.concessionaria_id == ConcModel.id).where(
-            model.condominio_id == condominio_id,
-            ConcModel.instalacao == conc.instalacao,
-            model.valor == valor,
-            model.vencimento == vencimento
-        )
-        res = await db.execute(stmt)
-        return res.scalar_one_or_none()
-
-    if await check_duplicate(Fatura) or await check_duplicate(HistoricoFatura):
+    duplicate = await find_duplicate_fatura(
+        db,
+        condominio_id=condominio_id,
+        tipo_conta=conc.tipo,
+        codigo_conta=conc.instalacao,
+        valor=valor,
+        vencimento=vencimento,
+    )
+    if duplicate:
         raise HTTPException(
             status_code=400,
             detail=f"Erro: Já existe uma fatura idêntica (Valor: R$ {valor}, Vencimento: {vencimento}, UC: {conc.instalacao}) registrada no sistema ou no histórico."

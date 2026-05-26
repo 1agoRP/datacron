@@ -36,6 +36,7 @@ from app.models.alerta import Alerta, EmailLog
 from app.models.concessionaria import Concessionaria
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
+from app.services.fatura_duplicates import find_duplicate_fatura
 from app.services.pdf_processor import unlock_pdf, extract_data, save_pdf, generate_standard_filename
 from app.database import AsyncSessionLocal
 
@@ -438,15 +439,15 @@ async def _process_pdf_attachments(attachments, password, conc, condo, db, body_
         referencia = _standardize_referencia(extracted.get("referencia"), vencimento)
 
         if conc:
-            existing_fatura = await db.execute(
-                select(Fatura).where(
-                    Fatura.condominio_id == conc.condominio_id,
-                    Fatura.concessionaria_id == conc.id,
-                    Fatura.valor == valor,
-                    Fatura.vencimento == vencimento
-                )
+            duplicate = await find_duplicate_fatura(
+                db,
+                condominio_id=conc.condominio_id,
+                tipo_conta=conc.tipo,
+                codigo_conta=conc.instalacao,
+                valor=valor,
+                vencimento=vencimento,
             )
-            if existing_fatura.scalar_one_or_none():
+            if duplicate:
                 logger.info(f"Fatura already exists for {conc.tipo} (Valor: {valor}, Vencimento: {vencimento}), skipping duplicate.")
                 continue
 

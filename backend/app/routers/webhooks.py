@@ -18,6 +18,7 @@ from app.services.pdf_processor import (
     extract_data,
     generate_standard_filename
 )
+from app.services.fatura_duplicates import find_duplicate_fatura
 from app.models.alerta import EmailLog
 from app.models.condominio import Condominio
 from app.models.fatura import Fatura
@@ -190,18 +191,16 @@ async def n8n_email_invoice(
 
         referencia = _standardize_referencia(extracted.get("referencia"), vencimento)
         
-        # ── Check for existing duplicate Fatura ──
         if conc:
-            # Duplicate criteria: mesmo valor, mesmo Condomínio, mesmo vencimento e mesma concessionária
-            existing_fatura = await db.execute(
-                select(Fatura).where(
-                    Fatura.condominio_id == conc.condominio_id,
-                    Fatura.concessionaria_id == conc.id,
-                    Fatura.valor == valor,
-                    Fatura.vencimento == vencimento
-                )
+            duplicate = await find_duplicate_fatura(
+                db,
+                condominio_id=conc.condominio_id,
+                tipo_conta=conc.tipo,
+                codigo_conta=conc.instalacao,
+                valor=valor,
+                vencimento=vencimento,
             )
-            if existing_fatura.scalar_one_or_none():
+            if duplicate:
                 logger.info(f"Fatura already exists for {conc.tipo} (Valor: {valor}, Vencimento: {vencimento}), skipping duplicate.")
                 # We still update the log to point to the existing fatura if we want, or just return.
                 # Here we just stop processing to avoid duplicates.
@@ -356,4 +355,3 @@ async def n8n_email_invoice(
             logger.error(f"Failed to update EmailLog after rollback: {inner_e}")
             await db.rollback()
         return {"status": "error", "message": str(e), "msg_id": msg_id}
-

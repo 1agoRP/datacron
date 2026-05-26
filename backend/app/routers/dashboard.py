@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import datetime, date
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func, extract, cast, String, case, Date, Integer
+from sqlalchemy import select, func, extract, cast, String, case, Date, Integer, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -38,10 +38,20 @@ async def dashboard_stats(
     result = await db.execute(condo_stmt)
     condominios_count = result.scalar_one()
 
-    # Faturas received in Current Month (KPI is more useful than just 'today')
-    fatura_count_stmt = select(func.count(Fatura.id)).where(
-        extract("month", Fatura.vencimento) == today.month,
-        extract("year", Fatura.vencimento) == today.year,
+    # Received accounts in current month: one received account per active concessionaria
+    fatura_count_stmt = (
+        select(func.count(func.distinct(Fatura.concessionaria_id)))
+        .join(
+            Concessionaria,
+            and_(
+                Fatura.concessionaria_id == Concessionaria.id,
+                Concessionaria.ativo == True,
+            ),
+        )
+        .where(
+            extract("month", Fatura.vencimento) == today.month,
+            extract("year", Fatura.vencimento) == today.year,
+        )
     )
     if allowed_condo_ids is not None:
         fatura_count_stmt = fatura_count_stmt.where(
@@ -157,7 +167,7 @@ async def contas_esperadas(
     total_result = await db.execute(total_stmt)
     total = total_result.scalar_one()
 
-    # Received in month = faturas created in that month
+    # Received in month = distinct active concessionarias with fatura in that month
     if mes:
         try:
             year, month = mes.split("-")
@@ -167,9 +177,19 @@ async def contas_esperadas(
     else:
         y, m = datetime.now().year, datetime.now().month
 
-    recebidas_stmt = select(func.count(Fatura.id)).where(
-        extract("year", Fatura.vencimento) == y,
-        extract("month", Fatura.vencimento) == m,
+    recebidas_stmt = (
+        select(func.count(func.distinct(Fatura.concessionaria_id)))
+        .join(
+            Concessionaria,
+            and_(
+                Fatura.concessionaria_id == Concessionaria.id,
+                Concessionaria.ativo == True,
+            ),
+        )
+        .where(
+            extract("year", Fatura.vencimento) == y,
+            extract("month", Fatura.vencimento) == m,
+        )
     )
     if allowed_condo_ids is not None:
         recebidas_stmt = recebidas_stmt.where(
@@ -219,7 +239,17 @@ async def contas_por_condominio(
 
     # Subquery for received counts per condo in the target month
     received_sub = (
-        select(Fatura.condominio_id, func.count(Fatura.id).label("recebidas"))
+        select(
+            Fatura.condominio_id,
+            func.count(func.distinct(Fatura.concessionaria_id)).label("recebidas"),
+        )
+        .join(
+            Concessionaria,
+            and_(
+                Fatura.concessionaria_id == Concessionaria.id,
+                Concessionaria.ativo == True,
+            ),
+        )
         .where(
             extract("year", Fatura.vencimento) == y,
             extract("month", Fatura.vencimento) == m,
@@ -394,8 +424,15 @@ async def portfolio_stats(
 
     # 2. Received in month per portfolio
     received_stmt = (
-        select(Condominio.carteira, func.count(Fatura.id))
+        select(Condominio.carteira, func.count(func.distinct(Fatura.concessionaria_id)))
         .join(Fatura, Condominio.id == Fatura.condominio_id)
+        .join(
+            Concessionaria,
+            and_(
+                Fatura.concessionaria_id == Concessionaria.id,
+                Concessionaria.ativo == True,
+            ),
+        )
         .where(
             Condominio.ativo == True,
             Condominio.carteira != None,

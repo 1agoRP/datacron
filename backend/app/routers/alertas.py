@@ -16,6 +16,7 @@ from app.models.alerta_audit_log import AlertaAuditLog
 from app.schemas import AlertaResponse
 from app.services.email_sender import send_notification_email, render_resolution_email, render_unidentified_sender_email
 from app.services.alert_manager import notify_alert
+from app.services.fatura_duplicates import find_duplicate_fatura
 
 
 class JustificativaBody(BaseModel):
@@ -415,6 +416,23 @@ async def resolver_alerta_com_pdf(
         "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
     ]
     referencia = extracted.get("referencia") or f"{mes_nome[vencimento.month - 1]}/{vencimento.year}"
+
+    duplicate = await find_duplicate_fatura(
+        db,
+        condominio_id=a.condominio_id,
+        tipo_conta=conc.tipo,
+        codigo_conta=conc.instalacao,
+        valor=valor,
+        vencimento=vencimento,
+    )
+    if duplicate:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Fatura duplicada: ja existe uma conta registrada para este "
+                f"condominio, tipo {conc.tipo}, codigo {conc.instalacao}, valor R$ {valor} e vencimento {vencimento}."
+            ),
+        )
 
     # 9. Create Fatura
     nova_fatura = Fatura(
