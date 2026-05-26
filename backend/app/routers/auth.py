@@ -24,6 +24,22 @@ router = APIRouter(prefix="/auth", tags=["AutenticaÃ§Ã£o"])
 MIN_PASSWORD_LENGTH = 8
 
 
+def _auth_expires_delta() -> timedelta:
+    return timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+
+def _auth_expires_in_seconds() -> int:
+    return settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+
+
+def _refresh_expires_delta() -> timedelta:
+    return timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+
+
+def _refresh_max_age_seconds() -> int:
+    return settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60
+
+
 class RegisterRequest(BaseModel):
     nome: str
     email: EmailStr
@@ -73,12 +89,12 @@ async def login(request: Request, response: Response, body: LoginRequest, db: As
             "role": user.role, 
             "nome": user.nome, 
         },
-        expires_delta=timedelta(minutes=30),
+        expires_delta=_auth_expires_delta(),
     )
     
     # Gerar Refresh Token
     refresh_token_str = secrets.token_urlsafe(32)
-    refresh_expires = datetime.now(timezone.utc) + timedelta(days=30)
+    refresh_expires = datetime.now(timezone.utc) + _refresh_expires_delta()
     
     new_rt = RefreshToken(
         token=refresh_token_str,
@@ -93,7 +109,7 @@ async def login(request: Request, response: Response, body: LoginRequest, db: As
         key="datacron_refresh_token",
         value=refresh_token_str,
         httponly=True,
-        max_age=30 * 24 * 60 * 60,
+        max_age=_refresh_max_age_seconds(),
         expires=refresh_expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
         samesite="lax",
         secure=settings.ENVIRONMENT == "production",
@@ -101,7 +117,7 @@ async def login(request: Request, response: Response, body: LoginRequest, db: As
 
     return TokenResponse(
         access_token=token,
-        expires_in=1800,
+        expires_in=_auth_expires_in_seconds(),
         user=UserInToken(
             id=str(user.id),
             nome=user.nome,
@@ -149,7 +165,7 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
     await db.delete(rt)
     
     new_refresh_str = secrets.token_urlsafe(32)
-    new_refresh_expires = datetime.now(timezone.utc) + timedelta(days=30)
+    new_refresh_expires = datetime.now(timezone.utc) + _refresh_expires_delta()
     new_rt = RefreshToken(
         token=new_refresh_str,
         user_id=user.id,
@@ -162,7 +178,7 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
         key="datacron_refresh_token",
         value=new_refresh_str,
         httponly=True,
-        max_age=30 * 24 * 60 * 60,
+        max_age=_refresh_max_age_seconds(),
         expires=new_refresh_expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
         samesite="lax",
         secure=settings.ENVIRONMENT == "production",
@@ -178,12 +194,12 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
             "role": user.role, 
             "nome": user.nome, 
         },
-        expires_delta=timedelta(minutes=30),
+        expires_delta=_auth_expires_delta(),
     )
     
     return TokenResponse(
         access_token=access_token,
-        expires_in=1800,
+        expires_in=_auth_expires_in_seconds(),
         user=UserInToken(
             id=str(user.id),
             nome=user.nome,

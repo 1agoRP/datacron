@@ -6,6 +6,7 @@
 import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData, ReajusteConcessionaria, Contrato, PrevisaoAnalysis } from '@/types';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 48;
 
 /**
  * Custom fetch wrapper with automatic retries for network-level failures ('Failed to fetch').
@@ -62,7 +63,8 @@ class ApiClient {
         
         if (typeof window !== 'undefined') {
           localStorage.setItem('datacron_token', newToken);
-          document.cookie = `datacron_token=${newToken}; path=/; max-age=2592000; SameSite=Lax`;
+          const maxAge = data.expires_in || SESSION_MAX_AGE_SECONDS;
+          document.cookie = `datacron_token=${newToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
         }
         return newToken;
       } catch (e) {
@@ -201,7 +203,7 @@ class ApiClient {
 
   // Auth
   async login(credentials: any) {
-    const data = await this.request<{ access_token: string; user: User }>('/auth/login', {
+    const data = await this.request<{ access_token: string; expires_in: number; user: User }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({
         email: credentials.email,
@@ -211,9 +213,7 @@ class ApiClient {
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('datacron_token', data.access_token);
-      // Cookie expiry alinhado ao JWT: 30 dias (ACCESS_TOKEN_EXPIRE_MINUTES = 43200)
-      const thirtyDays = 60 * 60 * 24 * 30;
-      document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Lax; max-age=${thirtyDays}`;
+      document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Lax; max-age=${data.expires_in || SESSION_MAX_AGE_SECONDS}`;
     }
     return data;
   }
