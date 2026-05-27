@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Shell from '@/components/layout/Shell';
 import { Plus, Search, Filter, Building2, MapPin, ExternalLink, MoreVertical, X, Zap, Trash2, Calendar, FileText, ArrowUpDown, Download, ChevronLeft, History, Upload, FileSignature, Mail, CreditCard, CheckCircle2, AlertCircle, Clock, Paperclip } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -22,6 +22,16 @@ type CondoDraft = Omit<Pick<Condominio, 'nome' | 'numero' | 'endereco' | 'cnpj' 
   leitura_individualizada_ativa: boolean;
 };
 type EditableCondo = Omit<Condominio, 'carteira'> & { carteira?: number | string | null };
+type CriticalDocumentIssue = {
+  documento: string;
+  status: 'Ausente' | 'Vencido' | 'A vencer';
+  detalhe: string;
+  dias?: number;
+};
+type CriticalDocumentCondo = {
+  condo: Condominio;
+  issues: CriticalDocumentIssue[];
+};
 
 const MONTHS_LIST = [
   { value: '01', label: 'Janeiro' }, { value: '02', label: 'Fevereiro' }, { value: '03', label: 'Março' },
@@ -76,6 +86,7 @@ export default function CondominiosPage() {
   const [editCondo, setEditCondo] = useState<EditableCondo | null>(null);
   const [condoConcs, setCondoConcs] = useState<Concessionaria[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [isDocsCriticalModalOpen, setIsDocsCriticalModalOpen] = useState(false);
   const [docUploadModal, setDocUploadModal] = useState<{ type: 'ata' | 'avcb' | 'apolice', condoId: string } | null>(null);
   const [docUploadFile, setDocUploadFile] = useState<File | null>(null);
   const [docDates, setDocDates] = useState({ inicio: '', fim: '' });
@@ -99,6 +110,7 @@ export default function CondominiosPage() {
   const [manualFaturaPdf, setManualFaturaPdf] = useState<File | null>(null);
   const [savingManualFatura, setSavingManualFatura] = useState(false);
   const [isDraggingFatura, setIsDraggingFatura] = useState(false);
+  const manualFaturaInputRef = useRef<HTMLInputElement | null>(null);
 
   // Removed manual fetchData in favor of useSWR
 
@@ -163,32 +175,72 @@ export default function CondominiosPage() {
     return `${month}/${refYear}`;
   }, [monthsList, refMonth, refYear]);
 
-  const portfolioStats = useMemo(() => {
+  const getCriticalDocumentIssues = useCallback((condo: Condominio): CriticalDocumentIssue[] => {
     const now = new Date();
-    const inNext45Days = (dateValue?: string | null) => {
-      if (!dateValue) return false;
+    const issues: CriticalDocumentIssue[] = [];
+    const addDateIssue = (documento: string, dateValue?: string | null) => {
+      if (!dateValue) return;
       const target = new Date(String(dateValue).substring(0, 10) + 'T12:00:00');
       const days = Math.ceil((target.getTime() - now.getTime()) / 86400000);
-      return days >= 0 && days <= 45;
-    };
-    const expired = (dateValue?: string | null) => {
-      if (!dateValue) return false;
-      return new Date(String(dateValue).substring(0, 10) + 'T12:00:00') < now;
+
+      if (days < 0) {
+        issues.push({
+          documento,
+          status: 'Vencido',
+          detalhe: `Vencido em ${format(target, 'dd/MM/yyyy')}`,
+          dias: Math.abs(days),
+        });
+      } else if (days <= 45) {
+        issues.push({
+          documento,
+          status: 'A vencer',
+          detalhe: `Vence em ${format(target, 'dd/MM/yyyy')}`,
+          dias: days,
+        });
+      }
     };
 
+    if (!condo.ata_eleicao_nome) {
+      issues.push({
+        documento: 'ATA de eleição',
+        status: 'Ausente',
+        detalhe: 'Nenhum arquivo vinculado',
+      });
+    }
+    if (!condo.avcb_url) {
+      issues.push({
+        documento: 'AVCB',
+        status: 'Ausente',
+        detalhe: 'Nenhum arquivo vinculado',
+      });
+    }
+    if (!condo.apolice_seguro_url) {
+      issues.push({
+        documento: 'Apólice de seguro',
+        status: 'Ausente',
+        detalhe: 'Nenhum arquivo vinculado',
+      });
+    }
+
+    addDateIssue('Mandato do síndico', condo.mandato_fim);
+    addDateIssue('AVCB', condo.avcb_fim);
+    addDateIssue('Apólice de seguro', condo.apolice_seguro_fim);
+
+    return issues;
+  }, []);
+
+  const criticalDocuments = useMemo<CriticalDocumentCondo[]>(() =>
+    condos
+      .map((condo) => ({ condo, issues: getCriticalDocumentIssues(condo) }))
+      .filter((item) => item.issues.length > 0)
+      .sort((a, b) => b.issues.length - a.issues.length || a.condo.nome.localeCompare(b.condo.nome, 'pt-BR')),
+    [condos, getCriticalDocumentIssues]
+  );
+
+  const portfolioStats = useMemo(() => {
     const expected = condos.reduce((acc, condo) => acc + (condo.contas_esperadas || 0), 0);
     const received = condos.reduce((acc, condo) => acc + (condo.contas_recebidas || 0), 0);
-    const docAttention = condos.filter((condo) =>
-      !condo.ata_eleicao_nome ||
-      !condo.avcb_url ||
-      !condo.apolice_seguro_url ||
-      expired(condo.mandato_fim) ||
-      expired(condo.avcb_fim) ||
-      expired(condo.apolice_seguro_fim) ||
-      inNext45Days(condo.mandato_fim) ||
-      inNext45Days(condo.avcb_fim) ||
-      inNext45Days(condo.apolice_seguro_fim)
-    ).length;
+    const docAttention = criticalDocuments.length;
 
     return {
       total: condos.length,
@@ -198,7 +250,7 @@ export default function CondominiosPage() {
       individualized: condos.filter((condo) => condo.leitura_individualizada_ativa).length,
       docAttention,
     };
-  }, [condos]);
+  }, [condos, criticalDocuments.length]);
 
   const handleOpenDetails = async (condo: any) => {
     setDetailsCondo(condo);
@@ -609,12 +661,24 @@ export default function CondominiosPage() {
         </div>
 
         {/* Card 3: Atenção Docs */}
-        <div style={{
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setIsDocsCriticalModalOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsDocsCriticalModalOpen(true);
+            }
+          }}
+          style={{
           background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0',
           padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
           boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
           borderTop: `3px solid ${portfolioStats.docAttention > 0 ? '#f59e0b' : '#10b981'}`,
           transition: 'transform 0.2s, box-shadow 0.2s',
+          cursor: 'pointer',
+          outline: 'none',
         }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.08)'; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'none'; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
@@ -623,10 +687,17 @@ export default function CondominiosPage() {
             <div style={{ width: 44, height: 44, borderRadius: 12, background: portfolioStats.docAttention > 0 ? '#fffbeb' : '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: portfolioStats.docAttention > 0 ? '#d97706' : '#16a34a' }}>
               <AlertCircle size={20} />
             </div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '3px 10px', borderRadius: 20,
-              background: portfolioStats.docAttention > 0 ? '#fffbeb' : '#f0fdf4',
-              color: portfolioStats.docAttention > 0 ? '#d97706' : '#16a34a',
-            }}>DOCS</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '3px 10px', borderRadius: 20,
+                background: '#ecfdf5',
+                color: '#059669',
+                border: '1px solid #bbf7d0',
+              }}>Clique Aqui</span>
+              <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '3px 10px', borderRadius: 20,
+                background: portfolioStats.docAttention > 0 ? '#fffbeb' : '#f0fdf4',
+                color: portfolioStats.docAttention > 0 ? '#d97706' : '#16a34a',
+              }}>DOCS</span>
+            </div>
           </div>
           <div>
             <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Documentos críticos</div>
@@ -1031,6 +1102,173 @@ export default function CondominiosPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Documentos CrÃ­ticos */}
+      {isDocsCriticalModalOpen && (
+        <div className="dc-modal-overlay">
+          <div className="dc-modal-content" style={{ maxWidth: 860 }}>
+            <div className="dc-modal-header" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  background: portfolioStats.docAttention > 0 ? '#fffbeb' : '#f0fdf4',
+                  color: portfolioStats.docAttention > 0 ? '#d97706' : '#16a34a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <AlertCircle size={22} />
+                </div>
+                <div>
+                  <h2 className="dc-modal-title" style={{ margin: 0 }}>Documentos críticos</h2>
+                  <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600, marginTop: 2 }}>
+                    {criticalDocuments.length} condomínio{criticalDocuments.length !== 1 ? 's' : ''} com atenção documental
+                  </div>
+                </div>
+              </div>
+              <button className="dc-modal-close" onClick={() => setIsDocsCriticalModalOpen(false)}><X size={20} /></button>
+            </div>
+
+            <div className="dc-modal-body" style={{ padding: '22px 24px', maxHeight: '70vh', overflowY: 'auto' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: 12,
+                marginBottom: 18,
+              }}>
+                <div style={{ padding: 14, borderRadius: 12, background: '#fff7ed', border: '1px solid #fed7aa' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#c2410c', textTransform: 'uppercase' }}>Ausentes</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>
+                    {criticalDocuments.reduce((acc, item) => acc + item.issues.filter(issue => issue.status === 'Ausente').length, 0)}
+                  </div>
+                </div>
+                <div style={{ padding: 14, borderRadius: 12, background: '#fef2f2', border: '1px solid #fecaca' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#dc2626', textTransform: 'uppercase' }}>Vencidos</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>
+                    {criticalDocuments.reduce((acc, item) => acc + item.issues.filter(issue => issue.status === 'Vencido').length, 0)}
+                  </div>
+                </div>
+                <div style={{ padding: 14, borderRadius: 12, background: '#fffbeb', border: '1px solid #fde68a' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase' }}>A vencer</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>
+                    {criticalDocuments.reduce((acc, item) => acc + item.issues.filter(issue => issue.status === 'A vencer').length, 0)}
+                  </div>
+                </div>
+              </div>
+
+              {criticalDocuments.length === 0 ? (
+                <div style={{ padding: 56, textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: 14, border: '1px dashed #cbd5e1' }}>
+                  <ShieldCheck size={38} style={{ margin: '0 auto 12px', color: '#16a34a' }} />
+                  <div style={{ fontWeight: 800, color: '#0f172a' }}>Nenhuma pendência documental</div>
+                  <div style={{ fontSize: '0.85rem', marginTop: 6 }}>Todos os documentos monitorados estão vinculados e fora da janela crítica.</div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {criticalDocuments.map(({ condo, issues }) => (
+                    <div key={condo.id} style={{
+                      background: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 14,
+                      padding: 16,
+                      boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0 }}>
+                          <div style={{
+                            width: 42,
+                            height: 42,
+                            borderRadius: 12,
+                            background: '#eff6ff',
+                            color: '#2563eb',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}>
+                            <Building2 size={20} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.2 }}>
+                              {condo.nome}
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 6, fontSize: '0.76rem', color: '#64748b', fontWeight: 700 }}>
+                              <span>#{condo.numero}</span>
+                              <span>{condo.sindico || 'Síndico não informado'}</span>
+                              {condo.carteira && <span>Carteira {condo.carteira}</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          className="dc-btn dc-btn-secondary"
+                          style={{ height: 36, fontSize: '0.78rem', gap: 7, flexShrink: 0 }}
+                          onClick={() => {
+                            setIsDocsCriticalModalOpen(false);
+                            handleOpenDetails(condo);
+                          }}
+                        >
+                          <ExternalLink size={14} /> Abrir detalhes
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginTop: 14 }}>
+                        {issues.map((issue, idx) => {
+                          const tone = issue.status === 'Vencido'
+                            ? { bg: '#fef2f2', border: '#fecaca', color: '#dc2626' }
+                            : issue.status === 'A vencer'
+                              ? { bg: '#fffbeb', border: '#fde68a', color: '#d97706' }
+                              : { bg: '#fff7ed', border: '#fed7aa', color: '#c2410c' };
+                          return (
+                            <div key={`${condo.id}-${issue.documento}-${idx}`} style={{
+                              padding: '10px 12px',
+                              borderRadius: 10,
+                              background: tone.bg,
+                              border: `1px solid ${tone.border}`,
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: 9,
+                            }}>
+                              <Paperclip size={15} style={{ color: tone.color, marginTop: 1, flexShrink: 0 }} />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: 850, color: '#0f172a', fontSize: '0.82rem' }}>{issue.documento}</span>
+                                  <span style={{
+                                    fontSize: '0.64rem',
+                                    fontWeight: 900,
+                                    color: tone.color,
+                                    background: '#fff',
+                                    border: `1px solid ${tone.border}`,
+                                    borderRadius: 999,
+                                    padding: '2px 7px',
+                                  }}>
+                                    {issue.status}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4, fontWeight: 600 }}>
+                                  {issue.dias !== undefined && issue.status === 'Vencido'
+                                    ? `${issue.detalhe} · ${issue.dias} dia${issue.dias !== 1 ? 's' : ''} em atraso`
+                                    : issue.dias !== undefined && issue.status === 'A vencer'
+                                      ? `${issue.detalhe} · faltam ${issue.dias} dia${issue.dias !== 1 ? 's' : ''}`
+                                      : issue.detalhe}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="dc-modal-footer">
+              <button className="dc-btn dc-btn-secondary" onClick={() => setIsDocsCriticalModalOpen(false)}>Fechar</button>
+            </div>
           </div>
         </div>
       )}
@@ -1978,7 +2216,7 @@ export default function CondominiosPage() {
                       setManualFaturaPdf(file);
                     }
                   }}
-                  onClick={() => document.getElementById('manual-fatura-upload')?.click()}
+                  onClick={() => manualFaturaInputRef.current?.click()}
                   style={{
                     position: 'relative',
                     border: `2px dashed ${manualFaturaPdf ? '#10b981' : isDraggingFatura ? '#3b82f6' : '#cbd5e1'}`,
@@ -1992,11 +2230,16 @@ export default function CondominiosPage() {
                   }}
                 >
                   <input
+                    ref={manualFaturaInputRef}
                     type="file"
                     id="manual-fatura-upload"
                     accept="application/pdf"
                     style={{ display: 'none' }}
-                    onChange={(e) => setManualFaturaPdf(e.target.files?.[0] || null)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      setManualFaturaPdf(e.target.files?.[0] || null);
+                      e.target.value = '';
+                    }}
                   />
                   {manualFaturaPdf ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -2019,20 +2262,11 @@ export default function CondominiosPage() {
                       </button>
                     </div>
                   ) : (
-                    <label style={{ cursor: 'pointer', display: 'block' }}>
+                    <div style={{ cursor: 'pointer' }}>
                       <Upload size={24} style={{ margin: '0 auto 8px', color: '#94a3b8' }} />
                       <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#475569' }}>Clique para selecionar um PDF</div>
                       <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 4 }}>Máx. 10 MB • Formato PDF</div>
-                      <input
-                        type="file"
-                        accept="application/pdf"
-                        style={{ display: 'none' }}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) setManualFaturaPdf(file);
-                        }}
-                      />
-                    </label>
+                    </div>
                   )}
                 </div>
                 <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 4 }}>Opcional — o arquivo ficará vinculado à fatura.</div>
