@@ -552,20 +552,19 @@ class ApiClient {
   // Reports
   async generateReport(
     tipo: string, 
-    formato: 'excel' | 'csv' | 'pdf' = 'excel',
-    periodo?: string,
-    condominio_id?: string
+    data_inicio?: string,
+    data_fim?: string
   ) {
     const token = this.getToken();
     const params = new URLSearchParams();
-    params.set('formato', formato === 'pdf' ? 'excel' : formato); 
-    if (periodo) params.set('referencia', periodo);
-    if (condominio_id) params.set('condominio_id', condominio_id);
+    if (data_inicio) params.set('data_inicio', data_inicio);
+    if (data_fim) params.set('data_fim', data_fim);
 
     const headers: any = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const response = await fetchWithRetry(`${API_BASE_URL}/relatorios/exportar?${params.toString()}`, {
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetchWithRetry(`${API_BASE_URL}/relatorios/${tipo}/download${suffix}`, {
       headers
     });
 
@@ -577,9 +576,8 @@ class ApiClient {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const ext = formato === 'csv' ? 'csv' : 'xlsx';
     const safeTipo = tipo.replace(/\s+/g, '_').toLowerCase();
-    a.download = `relatorio_${safeTipo}.${ext}`;
+    a.download = `relatorio_${safeTipo}.pdf`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
@@ -591,7 +589,7 @@ class ApiClient {
     return this.request<any[]>('/relatorios/historico');
   }
 
-  async registerReport(data: { nome: string; tipo_relatorio: string; formato: string; usuario?: string }) {
+  async registerReport(data: { nome: string; tipo_relatorio: string; formato: string; usuario?: string; data_inicio?: string; data_fim?: string }) {
     return this.request('/relatorios/registrar', {
       method: 'POST',
       body: JSON.stringify(data),

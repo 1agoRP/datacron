@@ -396,10 +396,12 @@ class ImportConfirmRequest(BaseModel):
 class RelatorioGeradoCreate(BaseModel):
     nome: str
     tipo_relatorio: (
-        str  # relatorio_analitico | por_condominio | por_concessionaria | ...
+        str  # briefing_executivo | mesa_operacional | variacao_risco | ...
     )
-    formato: str  # pdf | excel | csv
+    formato: str  # pdf
     usuario: str = "Operador"
+    data_inicio: Optional[date] = None
+    data_fim: Optional[date] = None
 
 
 class RelatorioGeradoResponse(BaseModel):
@@ -408,6 +410,16 @@ class RelatorioGeradoResponse(BaseModel):
     tipo_relatorio: str
     formato: str
     usuario: str
+    data_inicio: Optional[date] = None
+    data_fim: Optional[date] = None
+    notebooklm_status: str = "pending"
+    notebooklm_artifact_type: Optional[str] = None
+    notebooklm_notebook_id: Optional[str] = None
+    notebooklm_artifact_id: Optional[str] = None
+    notebooklm_export_url: Optional[str] = None
+    notebooklm_error: Optional[str] = None
+    notebooklm_attempts: int = 0
+    notebooklm_processed_at: Optional[datetime] = None
     created_at: datetime
     model_config = {"from_attributes": True}
 

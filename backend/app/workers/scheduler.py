@@ -15,6 +15,7 @@ except ImportError:
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import settings
 from app.services.alert_manager import (
@@ -23,6 +24,7 @@ from app.services.alert_manager import (
     check_document_expirations_and_clean,
     retry_pending_alert_webhooks,
 )
+from app.services.notebooklm_reports import process_pending_notebooklm_reports
 from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -67,6 +69,17 @@ async def _run_alert_webhook_retry():
             await retry_pending_alert_webhooks(db)
     except Exception as e:
         logger.error(f"Alert webhook retry failed: {e}")
+
+
+async def _run_notebooklm_report_worker():
+    """Processes pending NotebookLM report artifacts outside the request flow."""
+    try:
+        async with AsyncSessionLocal() as db:
+            processed = await process_pending_notebooklm_reports(db)
+            if processed:
+                logger.info("NotebookLM report worker processed %s report(s).", processed)
+    except Exception as e:
+        logger.error(f"NotebookLM report worker failed: {e}")
 
 
 def start_scheduler():
@@ -141,6 +154,16 @@ def start_scheduler():
         replace_existing=True,
         max_instances=1,
     )
+
+    if settings.NOTEBOOKLM_ENABLED:
+        scheduler.add_job(
+            _run_notebooklm_report_worker,
+            trigger=IntervalTrigger(minutes=max(1, settings.NOTEBOOKLM_WORKER_INTERVAL_MINUTES)),
+            id="notebooklm_report_worker",
+            name="NotebookLM Report Worker",
+            replace_existing=True,
+            max_instances=1,
+        )
 
     scheduler.start()
     logger.info(

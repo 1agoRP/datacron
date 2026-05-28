@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     ALERT_VARIATION_THRESHOLD: float = 0.15
     N8N_WEBHOOK_URL: str = "https://n8n-n8n.7vjfup.easypanel.host/webhook/datacron-outbound-email"
+    NOTEBOOKLM_ENABLED: bool = False
+    NOTEBOOKLM_AUTH_JSON: str = ""
+    NOTEBOOKLM_STORAGE_PATH: str = ""
+    NOTEBOOKLM_WORKER_INTERVAL_MINUTES: int = 10
+    NOTEBOOKLM_MAX_ATTEMPTS: int = 3
 
     @property
     def allowed_origins_list(self) -> list[str]:
