@@ -36,6 +36,7 @@ from app.routers import (
     faturas,
     auditoria,
     previsao,
+    scripts,
 )
 
 # ─── Logging ────────────────────────────────────────────────
@@ -270,6 +271,7 @@ app.include_router(cron.router, prefix=API_PREFIX)
 app.include_router(faturas.router, prefix=API_PREFIX)
 app.include_router(auditoria.router, prefix=API_PREFIX)
 app.include_router(previsao.router, prefix=API_PREFIX)
+app.include_router(scripts.router, prefix=API_PREFIX)
 
 
 # ─── Health check ───────────────────────────────────────────
