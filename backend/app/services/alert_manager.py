@@ -299,20 +299,22 @@ async def _enqueue_and_send_alert_webhook(
         logger.info(f"Alert webhook already sent: {idempotency_key}")
         return
 
+    serialized_payload = jsonable_encoder(payload)
+
     if not delivery:
         delivery = AlertWebhookDelivery(
             alerta_id=alert.id,
             event_type="alert.created",
             target_url=settings.N8N_WEBHOOK_URL,
             idempotency_key=idempotency_key,
-            payload=payload,
+            payload=serialized_payload,
             status="pending",
             attempts=0,
         )
         db.add(delivery)
         await db.flush()
     else:
-        delivery.payload = payload
+        delivery.payload = serialized_payload
         delivery.target_url = settings.N8N_WEBHOOK_URL
 
     await _attempt_alert_webhook_delivery(db, delivery)
