@@ -87,6 +87,7 @@ backend/database.db
 # Cache and generated files
 graphify-out/
 .cache/
+.codex-temp/
 .pytest_cache/
 .ruff_cache/
 .graphify_*/

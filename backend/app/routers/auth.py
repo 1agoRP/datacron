@@ -22,6 +22,17 @@ from app.models.refresh_token import RefreshToken
 router = APIRouter(prefix="/auth", tags=["AutenticaÃ§Ã£o"])
 
 MIN_PASSWORD_LENGTH = 8
+ACCESS_COOKIE_NAME = "datacron_token"
+REFRESH_COOKIE_NAME = "datacron_refresh_token"
+
+
+def _cookie_settings() -> dict:
+    return {
+        "httponly": True,
+        "samesite": "lax",
+        "secure": settings.secure_cookies,
+        "path": "/",
+    }
 
 
 def _auth_expires_delta() -> timedelta:
@@ -38,6 +49,31 @@ def _refresh_expires_delta() -> timedelta:
 
 def _refresh_max_age_seconds() -> int:
     return settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60
+
+
+def _set_access_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=ACCESS_COOKIE_NAME,
+        value=token,
+        max_age=_auth_expires_in_seconds(),
+        **_cookie_settings(),
+    )
+
+
+def _set_refresh_cookie(response: Response, token: str, expires: datetime) -> None:
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=token,
+        max_age=_refresh_max_age_seconds(),
+        expires=expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
+        **_cookie_settings(),
+    )
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    cookie_settings = _cookie_settings()
+    response.delete_cookie(ACCESS_COOKIE_NAME, path=cookie_settings["path"], samesite=cookie_settings["samesite"], secure=cookie_settings["secure"])
+    response.delete_cookie(REFRESH_COOKIE_NAME, path=cookie_settings["path"], samesite=cookie_settings["samesite"], secure=cookie_settings["secure"])
 
 
 class RegisterRequest(BaseModel):
@@ -104,16 +140,8 @@ async def login(request: Request, response: Response, body: LoginRequest, db: As
     db.add(new_rt)
     await db.commit()
     
-    # Definir cookie HttpOnly
-    response.set_cookie(
-        key="datacron_refresh_token",
-        value=refresh_token_str,
-        httponly=True,
-        max_age=_refresh_max_age_seconds(),
-        expires=refresh_expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
-        samesite="lax",
-        secure=settings.ENVIRONMENT == "production",
-    )
+    _set_access_cookie(response, token)
+    _set_refresh_cookie(response, refresh_token_str, refresh_expires)
 
     return TokenResponse(
         access_token=token,
@@ -133,7 +161,7 @@ async def login(request: Request, response: Response, body: LoginRequest, db: As
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     """Refreshes the access token using a valid HttpOnly refresh token cookie."""
-    token_str = request.cookies.get("datacron_refresh_token")
+    token_str = request.cookies.get(REFRESH_COOKIE_NAME)
     if not token_str:
         raise HTTPException(status_code=401, detail="Refresh token nÃ£o encontrado")
         
@@ -141,7 +169,7 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
     rt = result.scalar_one_or_none()
     
     if not rt:
-        response.delete_cookie("datacron_refresh_token")
+        _clear_auth_cookies(response)
         raise HTTPException(status_code=401, detail="Refresh token invÃ¡lido")
         
     # Ensure timezone info is present (SQLite often drops it)
@@ -152,7 +180,7 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
     if rt_expires < datetime.now(timezone.utc):
         await db.delete(rt)
         await db.commit()
-        response.delete_cookie("datacron_refresh_token")
+        _clear_auth_cookies(response)
         raise HTTPException(status_code=401, detail="Refresh token expirado")
         
     user_result = await db.execute(select(User).where(User.id == rt.user_id))
@@ -174,16 +202,6 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
     db.add(new_rt)
     await db.commit()
     
-    response.set_cookie(
-        key="datacron_refresh_token",
-        value=new_refresh_str,
-        httponly=True,
-        max_age=_refresh_max_age_seconds(),
-        expires=new_refresh_expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
-        samesite="lax",
-        secure=settings.ENVIRONMENT == "production",
-    )
-    
     condo_uuid_list = await get_user_condo_ids(user, db)
     condo_ids = [str(cid) for cid in condo_uuid_list] if condo_uuid_list is not None else []
     
@@ -196,6 +214,8 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
         },
         expires_delta=_auth_expires_delta(),
     )
+    _set_access_cookie(response, access_token)
+    _set_refresh_cookie(response, new_refresh_str, new_refresh_expires)
     
     return TokenResponse(
         access_token=access_token,
@@ -215,7 +235,7 @@ async def refresh_token(request: Request, response: Response, db: AsyncSession =
 @router.post("/logout")
 async def logout(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     """Logs out the user and invalidates their refresh token."""
-    token_str = request.cookies.get("datacron_refresh_token")
+    token_str = request.cookies.get(REFRESH_COOKIE_NAME)
     if token_str:
         result = await db.execute(select(RefreshToken).where(RefreshToken.token == token_str))
         rt = result.scalar_one_or_none()
@@ -223,7 +243,7 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
             await db.delete(rt)
             await db.commit()
             
-    response.delete_cookie("datacron_refresh_token")
+    _clear_auth_cookies(response)
     return {"message": "Logout realizado com sucesso"}
 
 

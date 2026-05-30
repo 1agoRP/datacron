@@ -13,6 +13,7 @@ from typing import Optional
 from fastapi import HTTPException
 
 import aiofiles
+from app.security import resolve_storage_path
 
 logger = logging.getLogger(__name__)
 
@@ -62,13 +63,14 @@ async def get_file_content(file_path: str) -> Optional[bytes]:
     """
     Reads file content from local disk.
     """
-    if os.path.exists(file_path):
-        async with aiofiles.open(file_path, "rb") as f:
+    safe_path = resolve_storage_path(file_path)
+    if safe_path.exists():
+        async with aiofiles.open(safe_path, "rb") as f:
             return await f.read()
 
     # Try relative to storage dir
-    alt_path = os.path.join(LOCAL_STORAGE_DIR, os.path.basename(file_path))
-    if os.path.exists(alt_path):
+    alt_path = resolve_storage_path(os.path.basename(file_path))
+    if alt_path.exists():
         async with aiofiles.open(alt_path, "rb") as f:
             return await f.read()
 

@@ -4,6 +4,7 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import StaticPool
 import uuid
+from datetime import datetime, timezone
 
 from app.main import app
 from app.database import Base, get_db
@@ -49,7 +50,7 @@ async def client(db_session: AsyncSession) -> AsyncClient:
     app.dependency_overrides[get_db] = override_get_db
 
     async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
+        transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
     ) as c:
         yield c
 
@@ -65,6 +66,8 @@ def test_user():
         senha_hash="dummy_hash",
         role="admin",
         ativo=True,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
 
 @pytest.fixture

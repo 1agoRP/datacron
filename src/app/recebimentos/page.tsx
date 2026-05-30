@@ -362,9 +362,8 @@ export default function RecebimentosPage() {
                     border: `1px solid ${item.fatura_desbloqueada ? '#bbf7d0' : '#e2e8f0'}`,
                   }}
                   onClick={() => {
-                    const token = localStorage.getItem('datacron_token');
                     fetch(`${API_BASE_URL}${item.fatura_url.replace('/api', '')}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
+                        credentials: 'include'
                     }).then(resp => {
                         if (!resp.ok) throw new Error('PDF não encontrado');
                         return resp.blob();

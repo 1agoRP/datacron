@@ -2,6 +2,9 @@ import pytest
 from httpx import AsyncClient
 from unittest.mock import patch
 
+from app.dependencies import get_current_user
+from app.main import app
+
 @pytest.mark.asyncio
 async def test_error_webhook_404(auth_client: AsyncClient):
     """
@@ -51,8 +54,12 @@ async def test_error_webhook_500(auth_client: AsyncClient):
     Test that an unhandled exception triggers the webhook with status 500.
     """
     with patch("app.main._send_error_webhook") as mock_webhook:
-        # We need an endpoint that raises an exception. We can mock one temporarily.
-        with patch("app.routers.auth.get_current_user", side_effect=Exception("Simulated 500 error")):
+        async def raise_auth_error():
+            raise Exception("Simulated 500 error")
+
+        original_override = app.dependency_overrides.get(get_current_user)
+        app.dependency_overrides[get_current_user] = raise_auth_error
+        try:
             resp = await auth_client.get("/api/auth/me")
             assert resp.status_code == 500
             
@@ -66,6 +73,11 @@ async def test_error_webhook_500(auth_client: AsyncClient):
             assert error_data["type"] == "UnhandledException"
             assert "Simulated 500 error" in error_data["exception"]
             assert "traceback" in error_data
+        finally:
+            if original_override is not None:
+                app.dependency_overrides[get_current_user] = original_override
+            else:
+                app.dependency_overrides.pop(get_current_user, None)
 
 @pytest.mark.asyncio
 async def test_error_webhook_logging():

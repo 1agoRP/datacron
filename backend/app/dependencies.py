@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 import uuid
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -19,7 +19,7 @@ pwd_context = CryptContext(
     schemes=["pbkdf2_sha256", "bcrypt"], 
     deprecated="auto"
 )
-bearer_scheme = HTTPBearer()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def hash_password(password: str) -> str:
@@ -63,10 +63,18 @@ def decode_token(token: str) -> dict:
 # ─── Dependency: current user ────────────────────────────────
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    payload = decode_token(credentials.credentials)
+    token = credentials.credentials if credentials else request.cookies.get("datacron_token")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token não informado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    payload = decode_token(token)
     user_id: Optional[str] = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=401, detail="Token inválido")

@@ -6,7 +6,6 @@
 import { Condominio, Concessionaria, Fatura, Alerta, User, DashboardStats, ChartData, ReajusteConcessionaria, Contrato, PrevisaoAnalysis } from '@/types';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 48;
 
 /**
  * Custom fetch wrapper with automatic retries for network-level failures ('Failed to fetch').
@@ -41,9 +40,9 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
 }
 
 class ApiClient {
-  private refreshTokenPromise: Promise<string> | null = null;
+  private refreshTokenPromise: Promise<void> | null = null;
 
-  private async attemptRefresh(): Promise<string> {
+  private async attemptRefresh(): Promise<void> {
     if (this.refreshTokenPromise) {
       return this.refreshTokenPromise;
     }
@@ -58,22 +57,8 @@ class ApiClient {
         
         if (!res.ok) throw new Error('Refresh failed');
         
-        const data = await res.json();
-        const newToken = data.access_token;
-        
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('datacron_token', newToken);
-          const maxAge = data.expires_in || SESSION_MAX_AGE_SECONDS;
-          document.cookie = `datacron_token=${newToken}; path=/; max-age=${maxAge}; SameSite=Lax`;
-        }
-        return newToken;
+        await res.json().catch(() => undefined);
       } catch (e) {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('datacron_token');
-          document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
-          document.cookie = 'datacron_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
-          window.location.href = '/';
-        }
         throw e;
       } finally {
         this.refreshTokenPromise = null;
@@ -83,21 +68,11 @@ class ApiClient {
     return this.refreshTokenPromise;
   }
 
-  private getToken(): string | null {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('datacron_token');
-  }
-
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = this.getToken();
     const headers = {
       'Content-Type': 'application/json',
       ...options.headers,
     } as any;
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
 
     const finalUrl = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`.replace(/([^:])\/\//g, '$1/');
 
@@ -110,8 +85,7 @@ class ApiClient {
 
     if (response.status === 401 && typeof window !== 'undefined' && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh')) {
       try {
-        const newToken = await this.attemptRefresh();
-        headers['Authorization'] = `Bearer ${newToken}`;
+        await this.attemptRefresh();
         response = await fetchWithRetry(finalUrl, {
           ...options,
           mode: 'cors',
@@ -119,7 +93,9 @@ class ApiClient {
           headers,
         });
       } catch (refreshError) {
-        // attemptRefresh will handle logout on failure
+        if (typeof window !== 'undefined' && endpoint !== '/auth/me') {
+          window.location.href = '/';
+        }
         throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
     }
@@ -152,14 +128,10 @@ class ApiClient {
 
   private async requestMultipart<T>(endpoint: string, formData: FormData, options: RequestInit = {}): Promise<T> {
     const finalUrl = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`.replace(/([^:])\/\//g, '$1/');
-    const token = typeof window !== 'undefined' ? localStorage.getItem('datacron_token') : null;
 
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
     };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
 
     let response = await fetch(finalUrl, {
       ...options,
@@ -171,8 +143,7 @@ class ApiClient {
 
     if (response.status === 401 && typeof window !== 'undefined' && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh')) {
       try {
-        const newToken = await this.attemptRefresh();
-        headers['Authorization'] = `Bearer ${newToken}`;
+        await this.attemptRefresh();
         response = await fetch(finalUrl, {
           ...options,
           method: options.method || 'POST',
@@ -181,6 +152,9 @@ class ApiClient {
           body: formData,
         });
       } catch (refreshError) {
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
         throw new Error('Sessão expirada. Por favor, faça login novamente.');
       }
     }
@@ -211,10 +185,6 @@ class ApiClient {
       }),
     });
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('datacron_token', data.access_token);
-      document.cookie = `datacron_token=${data.access_token}; path=/; SameSite=Lax; max-age=${data.expires_in || SESSION_MAX_AGE_SECONDS}`;
-    }
     return data;
   }
 
@@ -225,9 +195,6 @@ class ApiClient {
       console.warn('Backend logout failed or ignored', e);
     }
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('datacron_token');
-      document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
-      document.cookie = 'datacron_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
       window.location.href = '/';
     }
   }
@@ -303,9 +270,8 @@ class ApiClient {
   }
 
   async downloadAtaEleicao(id: string) {
-    const token = this.getToken();
     const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/download/ata_eleicao`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      credentials: 'include'
     });
     if (!response.ok) throw new Error('Falha ao baixar ATA de Eleição');
     
@@ -343,9 +309,8 @@ class ApiClient {
   }
 
   async downloadAvcb(id: string) {
-    const token = this.getToken();
     const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/download/avcb`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      credentials: 'include'
     });
     if (!response.ok) throw new Error('Falha ao baixar AVCB');
     
@@ -382,9 +347,8 @@ class ApiClient {
   }
 
   async downloadApolice(id: string) {
-    const token = this.getToken();
     const response = await fetchWithRetry(`${API_BASE_URL}/condominios/${id}/download/apolice`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      credentials: 'include'
     });
     if (!response.ok) throw new Error('Falha ao baixar Apólice');
     
@@ -527,11 +491,8 @@ class ApiClient {
   }
 
   async downloadTemplate(tipo: 'condominios' | 'concessionarias') {
-    const token = this.getToken();
     const response = await fetchWithRetry(`${API_BASE_URL}/importacoes/template/${tipo}`, {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -555,17 +516,13 @@ class ApiClient {
     data_inicio?: string,
     data_fim?: string
   ) {
-    const token = this.getToken();
     const params = new URLSearchParams();
     if (data_inicio) params.set('data_inicio', data_inicio);
     if (data_fim) params.set('data_fim', data_fim);
 
-    const headers: any = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const response = await fetchWithRetry(`${API_BASE_URL}/relatorios/${tipo}/download${suffix}`, {
-      headers
+      credentials: 'include'
     });
 
     if (!response.ok) {
@@ -655,9 +612,7 @@ class ApiClient {
 
   async downloadGmailFatura(messageId: string, filename: string) {
     const response = await fetch(`${API_BASE_URL}/emails/gmail-download/${messageId}`, {
-      headers: {
-        'Authorization': `Bearer ${this.getToken()}`
-      }
+      credentials: 'include'
     });
 
     if (!response.ok) throw new Error('Não foi possível baixar o arquivo do Gmail');
@@ -674,11 +629,8 @@ class ApiClient {
   }
 
   async downloadFatura(id: string) {
-    const token = this.getToken();
     const response = await fetchWithRetry(`${API_BASE_URL}/relatorios/faturas/${id}/pdf`, {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
+      credentials: 'include'
     });
     if (!response.ok) throw new Error('Falha ao baixar fatura');
     const blob = await response.blob();
@@ -719,11 +671,8 @@ class ApiClient {
 
 
   async downloadDocumentoReajusteConcessionaria(id: string) {
-    const token = this.getToken();
     const response = await fetchWithRetry(`${API_BASE_URL}/concessionarias/reajustes/${id}/documento`, {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
+      credentials: 'include'
     });
     if (!response.ok) throw new Error('Falha ao baixar documento');
     const blob = await response.blob();
@@ -756,13 +705,12 @@ class ApiClient {
   }
 
   async downloadLoteFaturas(ids: string[]) {
-    const token = this.getToken();
     const response = await fetchWithRetry(`${API_BASE_URL}/relatorios/download-lote`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
+      credentials: 'include',
       body: JSON.stringify(ids)
     });
     if (!response.ok) throw new Error('Falha ao baixar faturas em lote');
@@ -828,10 +776,9 @@ class ApiClient {
   }
 
   async downloadAllInvoices(referencia?: string) {
-    const token = this.getToken();
     const params = referencia ? `?referencia=${encodeURIComponent(referencia)}` : '';
     const response = await fetchWithRetry(`${API_BASE_URL}/condominios/download-all${params}`, {
-      headers: { ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      credentials: 'include'
     });
     
     if (!response.ok) {
@@ -921,9 +868,8 @@ class ApiClient {
   }
 
   async exportContratos(formato: 'excel' | 'csv' = 'excel', ano: number = new Date().getFullYear()) {
-    const token = this.getToken();
     const response = await fetchWithRetry(`${API_BASE_URL}/contratos/exportar?formato=${formato}&ano=${ano}`, {
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      credentials: 'include',
     });
     if (!response.ok) throw new Error('Falha ao exportar contratos');
     const blob = await response.blob();

@@ -10,18 +10,21 @@ const relaxedProjectRules = {
 };
 
 const eslintConfig = [
-  ...nextCoreWebVitals,
-  ...nextTypescript,
   {
     ignores: [
       '.next/**',
+      '.pytest_cache/**',
+      '.ruff_cache/**',
       'node_modules/**',
       'graphify-out/**',
       'backend/**',
+      'scratch/**',
       '*.html',
       'next-env.d.ts',
     ],
   },
+  ...nextCoreWebVitals,
+  ...nextTypescript,
   {
     files: ['src/**/*.{ts,tsx}', 'middleware.ts'],
     rules: relaxedProjectRules,

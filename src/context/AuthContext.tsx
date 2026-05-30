@@ -13,38 +13,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/**
- * Decodes a JWT payload without verification (for local instant render).
- * Use only for non-sensitive UI state. Backend verifies the actual token.
- */
-function decodeJwtPayload(token: string): Partial<User> | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    
-    // Using Buffer-like approach for cross-environment compatibility if needed, 
-    // but atob is standard in modern browsers.
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(atob(base64));
-    
-    // Expiration check (exp is in seconds)
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-      return null;
-    }
-    
-    return {
-      id: payload.sub,
-      email: payload.email,
-      role: payload.role,
-      nome: payload.nome || payload.email?.split('@')[0] || 'Usuário',
-      condominios_ids: payload.condominios_ids || [],
-    };
-  } catch (error) {
-    console.error('JWT Decode Error:', error);
-    return null;
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,38 +20,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const token = localStorage.getItem('datacron_token');
-        if (!token) {
-          setLoading(false);
-          return;
-        }
-
-        // 1. Instant local decode for UI snappiness
-        const payload = decodeJwtPayload(token);
-        if (payload) {
-          // Temporarily set user from token info
-          setUser(payload as User);
-          setLoading(false); // UI is now interactive
-
-          // 2. Background sync with server for full profile & security check
-          try {
-            const userData = await api.getMe();
-            setUser(userData);
-          } catch (err: any) {
-            // Only logout if it's explicitly an auth error (401 is handled by api interceptor, 
-            // but we check here if the token is definitely rejected by server)
-            if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('não autorizado') || err.message.toLowerCase().includes('expirado'))) {
-              console.warn('Sessão inválida, limpando:', err);
-              handleLogoutCleanup();
-            } else {
-              console.warn('Falha na sincronização (rede/servidor), mantendo sessão local:', err);
-            }
-          }
-        } else {
+        const userData = await api.getMe();
+        setUser(userData);
+      } catch (err: any) {
+        if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('não autorizado') || err.message.toLowerCase().includes('expirado'))) {
           handleLogoutCleanup();
+        } else {
+          console.warn('Falha na sincronização da sessão:', err);
         }
-      } catch (err) {
-        console.error('Auth initialization error:', err);
       } finally {
         setLoading(false);
       }
@@ -93,8 +37,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleLogoutCleanup = () => {
-    localStorage.removeItem('datacron_token');
-    document.cookie = 'datacron_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict';
     setUser(null);
   };
 

@@ -82,10 +82,10 @@ class TestUserModel:
 
 
 @pytest.mark.asyncio
-async def test_unauthenticated_request_returns_403(client: AsyncClient):
+async def test_unauthenticated_request_returns_401(client: AsyncClient):
     """Requests without token should be rejected."""
     resp = await client.get("/api/condominios")
-    assert resp.status_code == 403  # Bearer scheme returns 403 when no token
+    assert resp.status_code == 401
 
 
 @pytest.mark.asyncio

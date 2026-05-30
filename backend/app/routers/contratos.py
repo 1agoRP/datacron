@@ -26,6 +26,7 @@ from app.schemas import (
     ContratoResponse,
     ContratoUpdate,
 )
+from app.security import read_pdf_upload
 
 router = APIRouter(prefix="/contratos", tags=["Contratos"])
 
@@ -379,13 +380,11 @@ async def upload_contrato_arquivo(
     _: User = Depends(require_role("admin")),
 ):
     contrato = await _get_contrato_or_404(db, contrato_id)
-    content = await file.read()
-    if len(content) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="Arquivo muito grande (max. 10MB)")
+    content = await read_pdf_upload(file)
     contract_file = ContractFile(
         contract_id=contrato.id,
         file_name=file.filename or "contrato.pdf",
-        file_type=file.content_type or "application/octet-stream",
+        file_type="application/pdf",
         file_base64=base64.b64encode(content).decode("utf-8"),
     )
     db.add(contract_file)

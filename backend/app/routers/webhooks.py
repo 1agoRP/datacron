@@ -27,6 +27,7 @@ from sqlalchemy import select
 from datetime import datetime, timezone
 import base64
 import io
+from app.security import require_inbound_webhook_secret, validate_pdf_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,8 @@ async def n8n_email_invoice(
     body: str = Form(...),
     msg_id: str = Form(...),
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_inbound_webhook_secret),
 ):
     """
     Webhook endpoint for n8n to send parsed emails with PDF attachments.
@@ -71,6 +73,7 @@ async def n8n_email_invoice(
         # Read file content
         pdf_bytes = await file.read()
         filename = file.filename
+        validate_pdf_bytes(pdf_bytes, filename)
 
         # ── GATE: verify sender ──────────────────────────────────────────
         is_known_user = await _is_known_user_sender(sender, db)
@@ -354,4 +357,4 @@ async def n8n_email_invoice(
         except Exception as inner_e:
             logger.error(f"Failed to update EmailLog after rollback: {inner_e}")
             await db.rollback()
-        return {"status": "error", "message": str(e), "msg_id": msg_id}
+        return {"status": "error", "message": "Erro ao processar fatura", "msg_id": msg_id}

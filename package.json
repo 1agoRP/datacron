@@ -15,9 +15,9 @@
     "date-fns": "latest",
     "framer-motion": "latest",
     "lucide-react": "latest",
-    "next": "canary",
-    "react": "rc",
-    "react-dom": "rc",
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
     "react-select": "^5.10.2",
     "recharts": "latest",
     "swr": "^2.4.1",
@@ -31,5 +31,8 @@
     "eslint": "latest",
     "eslint-config-next": "latest",
     "typescript": "latest"
+  },
+  "overrides": {
+    "postcss": "8.5.10"
   }
 }

@@ -202,6 +202,6 @@ def test_generate_standard_filename():
     assert "CondoWithInvalidChars" in filename2
     assert "Sabesp" in filename2
     assert "ND12" in filename2
-    assert "00-00-0000" in filename2
+    assert "sem-vencimento" in filename2
     assert "R$ 0,00" in filename2
-    assert filename2 == "A-1 - CondoWithInvalidChars - Sabesp - ND12 - 00-00-0000 - R$ 0,00.pdf"
+    assert filename2 == "A-1 - CondoWithInvalidChars - Sabesp - ND12 - sem-vencimento - R$ 0,00.pdf"

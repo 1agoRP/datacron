@@ -18,6 +18,7 @@ from app.models.condominio import Condominio
 from app.models.concessionaria import Concessionaria
 from app.models.audit_log import AuditLog
 from app.schemas import FaturaResponse
+from app.security import read_pdf_upload
 from app.services.fatura_duplicates import find_duplicate_fatura
 from app.services.pdf_processor import generate_standard_filename
 
@@ -156,9 +157,7 @@ async def create_fatura_manual(
     pdf_nome_original = None
     pdf_desbloqueado = False
     if pdf_file and pdf_file.filename:
-        content = await pdf_file.read()
-        if len(content) > 10 * 1024 * 1024:  # 10MB limit
-            raise HTTPException(status_code=413, detail="Arquivo PDF muito grande (máx. 10MB)")
+        content = await read_pdf_upload(pdf_file)
         pdf_base64 = base64.b64encode(content).decode("utf-8")
         
         # Generate standardized filename
@@ -239,9 +238,7 @@ async def upload_pdf_to_fatura(
     if allowed_condo_ids is not None and fatura.condominio_id not in allowed_condo_ids:
         raise HTTPException(status_code=403, detail="Acesso negado a este condomínio")
 
-    content = await pdf_file.read()
-    if len(content) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="Arquivo PDF muito grande (máx. 10MB)")
+    content = await read_pdf_upload(pdf_file)
 
     # Fetch context for filename
     condo = None

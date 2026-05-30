@@ -182,10 +182,9 @@ export default function RelatoriosPage() {
 
     try {
       setGeneratingReport(report.key);
-      const token = localStorage.getItem('datacron_token');
       const params = new URLSearchParams({ data_inicio: dataInicio, data_fim: dataFim });
       const response = await fetch(`${API_BASE_URL}/relatorios/${report.key}/download?${params.toString()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
       });
 
       if (!response.ok) {

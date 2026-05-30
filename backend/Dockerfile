@@ -22,6 +22,10 @@ COPY . .
 
 # Create storage dir
 RUN mkdir -p pdfs_storage
+RUN addgroup --system datacron && adduser --system --ingroup datacron datacron \
+    && chown -R datacron:datacron /app
+
+USER datacron
 
 EXPOSE 8000
 

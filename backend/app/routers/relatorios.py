@@ -325,12 +325,15 @@ async def download_lote(
     ids: list[str],
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     import base64
     import zipfile
     from app.storage import get_file_content
 
     stmt = select(Fatura).where(Fatura.id.in_(ids))
+    if allowed_condo_ids is not None:
+        stmt = stmt.where(Fatura.condominio_id.in_(allowed_condo_ids))
     result = await db.execute(stmt)
     faturas = result.scalars().all()
     if not faturas:
@@ -361,6 +364,7 @@ async def download_fatura_pdf(
     id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
+    allowed_condo_ids: list | None = Depends(get_user_condo_ids),
 ):
     import base64
     import os
@@ -370,6 +374,8 @@ async def download_fatura_pdf(
     f = result.scalar_one_or_none()
     if not f:
         raise HTTPException(status_code=404, detail="Fatura nao encontrada")
+    if allowed_condo_ids is not None and f.condominio_id not in allowed_condo_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado a esta fatura")
 
     filename = f.pdf_nome_original or f"fatura_{id}.pdf"
     if f.storage_path:

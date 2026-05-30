@@ -44,9 +44,21 @@ import asyncio
 import httpx
 import logging
 
-WEBHOOK_ERROR_URL = "https://n8n-n8n.7vjfup.easypanel.host/webhook/74119710-e3ca-44af-ab61-b7e5189e48d2"
+SENSITIVE_HEADER_NAMES = {"authorization", "cookie", "set-cookie", "x-api-key", "x-webhook-secret", "x-cron-secret"}
+
+
+def _safe_headers(headers) -> dict:
+    return {
+        key: ("[REDACTED]" if key.lower() in SENSITIVE_HEADER_NAMES else value)
+        for key, value in dict(headers).items()
+    }
+
+
+WEBHOOK_ERROR_URL = settings.ERROR_WEBHOOK_URL
 
 async def _send_log_webhook(data: dict):
+    if not WEBHOOK_ERROR_URL:
+        return
     async with httpx.AsyncClient() as client:
         try:
             await client.post(WEBHOOK_ERROR_URL, json=data)
@@ -159,8 +171,21 @@ app.add_middleware(
     allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "X-Webhook-Secret", "X-Cron-Secret"],
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'")
+    if settings.ENVIRONMENT.lower() == "production":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+    return response
 
 # ─── Webhook Error Forwarding ───────────────────────────────
 import asyncio
@@ -170,9 +195,11 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.responses import JSONResponse
 
-WEBHOOK_ERROR_URL = "https://n8n-n8n.7vjfup.easypanel.host/webhook/74119710-e3ca-44af-ab61-b7e5189e48d2"
+WEBHOOK_ERROR_URL = settings.ERROR_WEBHOOK_URL
 
 async def _send_error_webhook(data: dict):
+    if not WEBHOOK_ERROR_URL:
+        return
     async with httpx.AsyncClient() as client:
         try:
             await client.post(WEBHOOK_ERROR_URL, json=data)
@@ -190,7 +217,7 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
             "method": request.method,
             "url": str(request.url),
             "detail": exc.detail,
-            "headers": dict(request.headers),
+            "headers": _safe_headers(request.headers),
             "client_ip": request.client.host if request.client else "unknown"
         }))
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
@@ -204,7 +231,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         "method": request.method,
         "url": str(request.url),
         "errors": errors,
-        "headers": dict(request.headers),
+        "headers": _safe_headers(request.headers),
         "client_ip": request.client.host if request.client else "unknown"
     }))
     return JSONResponse(status_code=422, content={"detail": errors})
@@ -218,7 +245,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
         "url": str(request.url),
         "exception": str(exc),
         "traceback": traceback.format_exc(),
-        "headers": dict(request.headers),
+        "headers": _safe_headers(request.headers),
         "client_ip": request.client.host if request.client else "unknown"
     }))
     return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})

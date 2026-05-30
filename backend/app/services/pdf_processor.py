@@ -74,7 +74,7 @@ def generate_standard_filename(
         except:
             venc_str = vencimento
     else:
-        venc_str = "00-00-0000"
+        venc_str = "sem-vencimento"
         
     valor_str = f"{valor:.2f}".replace(".", ",")
     

@@ -2,6 +2,7 @@ import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
+from app.security import require_cron_secret
 
 from app.services.alert_manager import (
     check_missing_bills,
@@ -14,7 +15,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/cron", tags=["CRON"])
 
 @router.get("/daily-checks")
-async def run_daily_checks(db: AsyncSession = Depends(get_db)):
+async def run_daily_checks(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
+):
     """
     Endpoint triggered by an external scheduler (like n8n) daily 
     to run routine checks (missing bills, mandate expirations, etc.).

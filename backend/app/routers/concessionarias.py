@@ -18,6 +18,7 @@ from app.schemas import (
     ReajusteConcessionariaCreate, ReajusteConcessionariaResponse
 )
 from app.services.pdf_processor import test_pdf_password, extract_data
+from app.security import read_pdf_upload
 from app.storage import save_file, get_file_content
 import base64
 import io
@@ -235,7 +236,7 @@ async def test_password_rule(
     condo = condo_result.scalar_one_or_none()
 
     password = conc.gerar_senha_pdf(condo.cnpj_digits if condo else "")
-    pdf_bytes = await pdf_file.read()
+    pdf_bytes = await read_pdf_upload(pdf_file)
     if len(pdf_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
 
@@ -255,7 +256,7 @@ async def extrair_dados_fatura(
     current_user: User = Depends(get_current_user),
 ):
     """Parses an uploaded PDF invoice to suggest fields for the concessionária."""
-    pdf_bytes = await pdf_file.read()
+    pdf_bytes = await read_pdf_upload(pdf_file)
     if len(pdf_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="O arquivo PDF não pode exceder 10MB")
     extracted = extract_data(pdf_bytes)
@@ -312,7 +313,7 @@ async def aplicar_reajuste(
     pdf_path = None
     pdf_name = None
     if pdf_file:
-        pdf_bytes = await pdf_file.read()
+        pdf_bytes = await read_pdf_upload(pdf_file)
         
         # 10MB limit
         if len(pdf_bytes) > 10 * 1024 * 1024:

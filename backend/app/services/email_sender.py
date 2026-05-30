@@ -1,7 +1,5 @@
 import logging
-import smtplib
 from datetime import datetime, date
-from email.message import EmailMessage
 from typing import Optional
 from app.config import settings
 
@@ -408,7 +406,10 @@ async def send_notification_email(
     import base64
     import httpx
     
-    url = "https://n8n-n8n.7vjfup.easypanel.host/webhook/datacron-outbound-email"
+    url = settings.OUTBOUND_EMAIL_WEBHOOK_URL
+    if not url:
+        logger.warning("Outbound email webhook is not configured")
+        return False
     
     payload = {
         "tipo": tipo,
@@ -438,8 +439,12 @@ async def send_notification_email(
         payload["anexos"] = anexos_list
 
     try:
+        headers = {}
+        if settings.OUTBOUND_EMAIL_WEBHOOK_SECRET:
+            headers["X-Webhook-Secret"] = settings.OUTBOUND_EMAIL_WEBHOOK_SECRET
+
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, timeout=15.0)
+            response = await client.post(url, json=payload, headers=headers, timeout=15.0)
             response.raise_for_status()
         logger.info(f"Successfully triggered n8n email webhook for {to} (Tipo: {tipo})")
         return True

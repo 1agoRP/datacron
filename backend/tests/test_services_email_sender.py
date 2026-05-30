@@ -1,11 +1,11 @@
 """
 Tests for Email Sender Service
 ================================
-Tests email rendering and send logic with mocked SMTP.
+Tests email rendering and send logic with mocked outbound webhook.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 
 from app.services.email_sender import (
@@ -96,69 +96,78 @@ class TestEmailTemplates:
 
 class TestSendNotificationEmail:
 
-    @patch("app.services.email_sender.smtplib.SMTP_SSL")
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient")
     @patch("app.services.email_sender.settings")
-    def test_send_email_success(self, mock_settings, mock_smtp_class):
+    async def test_send_email_success(self, mock_settings, mock_client_class):
         """Should return True when email is sent successfully."""
-        mock_settings.GMAIL_USER = "test@gmail.com"
-        mock_settings.GMAIL_PASSWORD = "apppassword"
+        mock_settings.OUTBOUND_EMAIL_WEBHOOK_URL = "https://example.test/webhook"
+        mock_settings.OUTBOUND_EMAIL_WEBHOOK_SECRET = "secret"
 
-        mock_server = MagicMock()
-        mock_smtp_class.return_value.__enter__ = MagicMock(return_value=mock_server)
-        mock_smtp_class.return_value.__exit__ = MagicMock(return_value=False)
+        mock_response = MagicMock()
+        mock_client = mock_client_class.return_value.__aenter__.return_value
+        mock_client.post = AsyncMock(return_value=mock_response)
 
-        result = send_notification_email(
+        result = await send_notification_email(
             to="user@example.com",
             subject="Test Subject",
             message_text="Test body",
         )
         assert result is True
-        mock_server.login.assert_called_once_with("test@gmail.com", "apppassword")
-        mock_server.send_message.assert_called_once()
+        mock_client.post.assert_awaited_once()
+        _, kwargs = mock_client.post.call_args
+        assert kwargs["json"]["destinatario"] == "user@example.com"
+        assert kwargs["headers"]["X-Webhook-Secret"] == "secret"
+        mock_response.raise_for_status.assert_called_once()
 
     @patch("app.services.email_sender.settings")
-    def test_send_email_no_credentials(self, mock_settings):
-        """Should return False when Gmail credentials are missing."""
-        mock_settings.GMAIL_USER = ""
-        mock_settings.GMAIL_PASSWORD = ""
+    @pytest.mark.asyncio
+    async def test_send_email_no_webhook_url(self, mock_settings):
+        """Should return False when the outbound webhook is missing."""
+        mock_settings.OUTBOUND_EMAIL_WEBHOOK_URL = ""
+        mock_settings.OUTBOUND_EMAIL_WEBHOOK_SECRET = ""
 
-        result = send_notification_email(
+        result = await send_notification_email(
             to="user@example.com",
             subject="Test",
             message_text="Test",
         )
         assert result is False
 
-    @patch("app.services.email_sender.smtplib.SMTP_SSL")
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient")
     @patch("app.services.email_sender.settings")
-    def test_send_email_with_reply_to(self, mock_settings, mock_smtp_class):
-        """Reply emails should have In-Reply-To header."""
-        mock_settings.GMAIL_USER = "test@gmail.com"
-        mock_settings.GMAIL_PASSWORD = "apppassword"
+    async def test_send_email_with_reply_to(self, mock_settings, mock_client_class):
+        """Reply emails should include in_reply_to in the webhook payload."""
+        mock_settings.OUTBOUND_EMAIL_WEBHOOK_URL = "https://example.test/webhook"
+        mock_settings.OUTBOUND_EMAIL_WEBHOOK_SECRET = ""
 
-        mock_server = MagicMock()
-        mock_smtp_class.return_value.__enter__ = MagicMock(return_value=mock_server)
-        mock_smtp_class.return_value.__exit__ = MagicMock(return_value=False)
+        mock_response = MagicMock()
+        mock_client = mock_client_class.return_value.__aenter__.return_value
+        mock_client.post = AsyncMock(return_value=mock_response)
 
-        # Use a subject that already starts with Re: to avoid duplicate header issue
-        result = send_notification_email(
+        result = await send_notification_email(
             to="user@example.com",
             subject="Re: Original Subject",
             message_text="Reply body",
             in_reply_to="msg123@gmail.com",
         )
         assert result is True
+        _, kwargs = mock_client.post.call_args
+        assert kwargs["json"]["in_reply_to"] == "msg123@gmail.com"
 
-    @patch("app.services.email_sender.smtplib.SMTP_SSL")
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient")
     @patch("app.services.email_sender.settings")
-    def test_send_email_smtp_failure(self, mock_settings, mock_smtp_class):
-        """Should return False and not crash on SMTP errors."""
-        mock_settings.GMAIL_USER = "test@gmail.com"
-        mock_settings.GMAIL_PASSWORD = "apppassword"
+    async def test_send_email_webhook_failure(self, mock_settings, mock_client_class):
+        """Should return False and not crash on webhook errors."""
+        mock_settings.OUTBOUND_EMAIL_WEBHOOK_URL = "https://example.test/webhook"
+        mock_settings.OUTBOUND_EMAIL_WEBHOOK_SECRET = ""
 
-        mock_smtp_class.side_effect = Exception("Connection refused")
+        mock_client = mock_client_class.return_value.__aenter__.return_value
+        mock_client.post = AsyncMock(side_effect=Exception("Connection refused"))
 
-        result = send_notification_email(
+        result = await send_notification_email(
             to="user@example.com",
             subject="Test",
             message_text="Test",

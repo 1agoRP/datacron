@@ -39,7 +39,7 @@ async def test_fatura_manual_rejects_duplicate_same_account(auth_client: AsyncCl
         "nome": f"Fatura Dup {uid}",
         "numero": f"FD{uid}",
         "endereco": "F",
-        "cnpj": f"22.333.{uid[:3]}/0001-81",
+        "cnpj": "11.222.333/0001-81",
         "sindico": "F"
     })
     assert c_resp.status_code == 201
@@ -75,7 +75,7 @@ async def test_fatura_manual_allows_same_code_for_different_account_type(auth_cl
         "nome": f"Fatura Tipo {uid}",
         "numero": f"FT{uid}",
         "endereco": "F",
-        "cnpj": f"33.444.{uid[:3]}/0001-81",
+        "cnpj": "11.222.333/0001-81",
         "sindico": "F"
     })
     assert c_resp.status_code == 201

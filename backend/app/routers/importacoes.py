@@ -12,6 +12,7 @@ from app.models.user import User
 from app.models.condominio import Condominio
 from app.models.concessionaria import Concessionaria
 from app.schemas import ImportPreviewResponse, ImportPreviewRow, ImportConfirmResponse, ImportConfirmRequest
+from app.security import validate_spreadsheet_bytes
 
 router = APIRouter(prefix="/importacoes", tags=["Importações"])
 
@@ -85,6 +86,7 @@ async def preview_import(
     ALLOWED_EXTENSIONS = (".csv", ".xls", ".xlsx")
     if not file.filename.lower().endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=415, detail="Apenas planilhas (CSV, XLS, XLSX) são permitidas")
+    validate_spreadsheet_bytes(content, file.filename)
 
     rows = _parse_excel_or_csv(content, file.filename)
     preview_rows: list[ImportPreviewRow] = []

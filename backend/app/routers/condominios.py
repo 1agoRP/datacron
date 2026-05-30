@@ -18,6 +18,7 @@ from app.models.fatura import Fatura
 from app.models.audit_log import AuditLog
 from app.schemas import CondominioCreate, CondominioUpdate, CondominioResponse, FaturaResponse
 from app.config import settings
+from app.security import read_pdf_upload
 from app.storage import save_file, get_file_content
 import io
 import base64
@@ -633,7 +634,7 @@ async def save_ata_eleicao(
     if pdf_file.content_type != "application/pdf":
         raise HTTPException(status_code=415, detail="Apenas arquivos PDF sÃ£o permitidos")
 
-    pdf_bytes = await pdf_file.read()
+    pdf_bytes = await read_pdf_upload(pdf_file)
     if len(pdf_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="O arquivo PDF nÃ£o pode exceder 10MB")
 
@@ -706,7 +707,7 @@ async def save_avcb(
     if pdf_file.content_type != "application/pdf":
         raise HTTPException(status_code=415, detail="Apenas arquivos PDF sÃ£o permitidos")
 
-    pdf_bytes = await pdf_file.read()
+    pdf_bytes = await read_pdf_upload(pdf_file)
     if len(pdf_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="O arquivo PDF nÃ£o pode exceder 10MB")
 
@@ -767,7 +768,7 @@ async def save_apolice(
     if pdf_file.content_type != "application/pdf":
         raise HTTPException(status_code=415, detail="Apenas arquivos PDF sÃ£o permitidos")
 
-    pdf_bytes = await pdf_file.read()
+    pdf_bytes = await read_pdf_upload(pdf_file)
     if len(pdf_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="O arquivo PDF nÃ£o pode exceder 10MB")
 

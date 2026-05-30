@@ -17,6 +17,7 @@ from app.schemas import AlertaResponse
 from app.services.email_sender import send_notification_email, render_resolution_email, render_unidentified_sender_email
 from app.services.alert_manager import notify_alert
 from app.services.fatura_duplicates import find_duplicate_fatura
+from app.security import read_pdf_upload
 
 
 class JustificativaBody(BaseModel):
@@ -373,7 +374,7 @@ async def resolver_alerta_com_pdf(
         )
 
     # 4. Read PDF
-    pdf_bytes = await pdf_file.read()
+    pdf_bytes = await read_pdf_upload(pdf_file)
     if len(pdf_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Arquivo PDF muito grande (max. 10MB)")
 

@@ -1,5 +1,7 @@
+import secrets
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import AnyUrl, field_validator
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -15,13 +17,14 @@ class Settings(BaseSettings):
     # ─── Auth ──────────────────────────────────────────────────
     SECRET_KEY: str  # REQUIRED — no default, crashes on startup if missing
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 2880  # 48 hours
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 2880  # 48 hours
 
     @field_validator("SECRET_KEY")
     @classmethod
     def secret_key_must_be_strong(cls, v: str) -> str:
-        if v in ("changeme-in-production", "", "secret", "changeme"):
+        weak_values = {"changeme-in-production", "", "secret", "changeme", "supersecret-datacron-2026-key"}
+        if v in weak_values or len(v) < 32 or len(set(v)) < 12:
             raise ValueError(
                 "SECRET_KEY inválida. Defina uma chave segura (ex: openssl rand -hex 32)"
             )
@@ -44,7 +47,12 @@ class Settings(BaseSettings):
     # ─── App ──────────────────────────────────────────────────
     ENVIRONMENT: str = "development"
     ALERT_VARIATION_THRESHOLD: float = 0.15
-    N8N_WEBHOOK_URL: str = "https://n8n-n8n.7vjfup.easypanel.host/webhook/datacron-outbound-email"
+    N8N_WEBHOOK_URL: str = ""
+    OUTBOUND_EMAIL_WEBHOOK_URL: str = ""
+    OUTBOUND_EMAIL_WEBHOOK_SECRET: str = ""
+    ERROR_WEBHOOK_URL: str = ""
+    INBOUND_WEBHOOK_SECRET: str = ""
+    CRON_SECRET: str = ""
     NOTEBOOKLM_ENABLED: bool = False
     NOTEBOOKLM_AUTH_JSON: str = ""
     NOTEBOOKLM_STORAGE_PATH: str = ""
@@ -54,6 +62,17 @@ class Settings(BaseSettings):
     @property
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]
+
+    @property
+    def secure_cookies(self) -> bool:
+        return self.ENVIRONMENT.lower() == "production"
+
+    def require_secret(self, name: str, value: str) -> str:
+        if value:
+            return value
+        if self.ENVIRONMENT.lower() == "production":
+            raise ValueError(f"{name} deve ser configurado em produção")
+        return secrets.token_urlsafe(32)
 
 
 settings = Settings()
