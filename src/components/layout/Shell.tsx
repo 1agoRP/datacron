@@ -90,9 +90,8 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
         {/* Logo */}
         <div className="dc-sidebar-logo">
           <div className="dc-sidebar-logo-icon">
-            <Image src="/fox-logo.png" alt="FOX" width={34} height={34} priority />
+            <Image src="/fox-logo.png" alt="FOX" width={52} height={52} priority />
           </div>
-          {!collapsed && <span className="dc-sidebar-logo-name">FOX</span>}
         </div>
 
         {/* Nav */}
