@@ -8,6 +8,7 @@ Analyzes new faturas and generates alerts based on business rules:
 """
 
 import logging
+import base64
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -21,6 +22,7 @@ from app.models.alert_webhook_delivery import AlertWebhookDelivery
 from app.models.concessionaria import Concessionaria
 from app.models.fatura import Fatura
 from app.models.condominio import Condominio
+from app.security import resolve_storage_path
 from app.services.email_sender import render_alert_email
 
 logger = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ async def check_and_create_alerts(
     fatura: Fatura,
     conc: Concessionaria,
     db: AsyncSession,
-) -> None:
+) -> list[dict]:
     """
     Runs all alert checks for a newly processed fatura.
     Adds any generated alerts to the DB session (caller must commit).
@@ -49,8 +51,12 @@ async def check_and_create_alerts(
         alerts.append(pdf_alert)
 
     # 3. Send emails for any new alerts
+    payloads = []
     for alert in alerts:
-        await notify_alert(db, alert, fatura)
+        payload = await notify_alert(db, alert, fatura, conc)
+        if payload:
+            payloads.append(payload)
+    return payloads
 
 
 
@@ -134,7 +140,7 @@ async def _check_pdf_failure(fatura: Fatura, db: AsyncSession) -> Optional[Alert
 
 
 
-async def check_missing_bills(db: AsyncSession) -> None:
+async def check_missing_bills(db: AsyncSession) -> list[dict]:
     """
     Scheduled job: checks if any expected bill has not arrived.
     Run once per day. Generates 'conta_nao_recebida' alerts.
@@ -155,6 +161,8 @@ async def check_missing_bills(db: AsyncSession) -> None:
         .where(Concessionaria.ativo == True)
     )
     all_conc = result.scalars().all()
+
+    payloads = []
 
     for conc in all_conc:
         # Check if fatura exists for the current month using vencimento date
@@ -218,7 +226,9 @@ async def check_missing_bills(db: AsyncSession) -> None:
             
             # Notify (Side-effect)
             try:
-                await notify_alert(db, alert, conc=conc)
+                payload = await notify_alert(db, alert, conc=conc)
+                if payload:
+                    payloads.append(payload)
                 logger.info(f"Alert created and notified: {tipo_alerta} for conc {conc.id}")
             except Exception as notify_err:
                 logger.error(f"Alert saved but notification failed for conc {conc.id}: {notify_err}")
@@ -228,12 +238,74 @@ async def check_missing_bills(db: AsyncSession) -> None:
             logger.error(f"Failed to create alert for concessionaria {conc.id}: {e}")
 
     logger.info("Finished check_missing_bills.")
+    return payloads
 
 
 # Roles authorized to receive alert email notifications
 ALERT_NOTIFICATION_ROLES = {"admin", "assistente", "supervisor", "gerencia"}
-ALERT_WEBHOOK_SCHEMA_VERSION = "2026-05-26"
+ALERT_WEBHOOK_SCHEMA_VERSION = "2026-05-30"
 MAX_ALERT_WEBHOOK_ATTEMPTS = 5
+ALERT_TYPES_WITH_PDF_CONTEXT = {
+    "pdf_erro",
+    "Variacao_Valor_Mais",
+    "Variacao_Valor_Menos",
+    "Fatura_Sem_Debito_Automatico",
+}
+
+
+def _format_brl(value: float | None) -> str | None:
+    if value is None:
+        return None
+    return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _iso(value) -> str | None:
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def _read_fatura_pdf_base64(alert: Alerta, fatura: Fatura | None) -> str | None:
+    if not fatura or alert.tipo not in ALERT_TYPES_WITH_PDF_CONTEXT:
+        return None
+    if fatura.pdf_base64:
+        return fatura.pdf_base64
+    if not fatura.pdf_path:
+        return None
+    try:
+        pdf_path = resolve_storage_path(fatura.pdf_path)
+        if not pdf_path.exists():
+            return None
+        return base64.b64encode(pdf_path.read_bytes()).decode("utf-8")
+    except Exception as exc:
+        logger.error(f"Failed to read PDF for alert payload: {exc}")
+        return None
+
+
+async def _get_alert_concessionaria(
+    db: AsyncSession,
+    fatura: Fatura | None,
+    conc: Concessionaria | None,
+) -> Concessionaria | None:
+    if conc:
+        return conc
+    if fatura and fatura.concessionaria_id:
+        result = await db.execute(
+            select(Concessionaria).where(Concessionaria.id == fatura.concessionaria_id)
+        )
+        return result.scalar_one_or_none()
+    return None
+
+
+def _responsavel_fields(recipients: set[str]) -> dict:
+    ordered = sorted(recipients)
+    payload = {f"usuarios_responsaveis{i}": None for i in range(5)}
+    for index, email in enumerate(ordered[:5]):
+        payload[f"usuarios_responsaveis{index}"] = email
+    payload["usuarios_responsaveis"] = ordered
+    return payload
 
 
 def _next_retry_at(attempts: int) -> datetime:
@@ -351,13 +423,12 @@ async def notify_alert(
     alert: Alerta, 
     fatura: Optional[Fatura] = None,
     conc: Optional[Concessionaria] = None
-) -> None:
+) -> dict | None:
     """
     Sends alert notification emails to authorized users.
     Only sends to users with roles: admin, assistente, concessionarias, gerencia.
     For non-admin roles, only sends to users who have access to the condomínio.
     """
-    import os
     from sqlalchemy import select, or_
     from app.models.condominio import Condominio
     from app.models.user import User
@@ -473,16 +544,10 @@ async def notify_alert(
     fatura_valor = None
     fatura_vencimento = None
 
+    conc = await _get_alert_concessionaria(db, fatura, conc)
     if conc:
         tipo_conta = conc.tipo
         cod_conta = conc.instalacao
-    elif fatura:
-        from app.models.concessionaria import Concessionaria
-        conc_res = await db.execute(select(Concessionaria).where(Concessionaria.id == fatura.concessionaria_id))
-        conc_obj = conc_res.scalar_one_or_none()
-        if conc_obj:
-            tipo_conta = conc_obj.tipo
-            cod_conta = conc_obj.instalacao
     
     # Try to extract code from message if still N/A (for manual alerts or conta_nao_recebida)
     if cod_conta == "N/A":
@@ -537,131 +602,51 @@ async def notify_alert(
     )
 
     # 6. Anexar PDF se disponível
-    attachments = []
-    in_reply_to = None
-    if fatura:
-        in_reply_to = fatura.gmail_message_id
-        # Modificado: Anexar PDF se desbloqueado OU se for um erro de PDF (precisamos do anexo para análise)
-        if (fatura.pdf_desbloqueado or alert.tipo == "pdf_erro") and fatura.pdf_path and os.path.exists(fatura.pdf_path):
-            try:
-                with open(fatura.pdf_path, "rb") as f:
-                    attachments.append((fatura.pdf_nome_original or "fatura.pdf", f.read()))
-            except Exception as e:
-                logger.error(f"Failed to read PDF for attachment: {e}")
-
-    # 7. Webhook N8N ou E-mail Clássico
-    import base64
-
-    pdf_base64 = None
-    if fatura and fatura.pdf_path and os.path.exists(fatura.pdf_path):
-        try:
-            with open(fatura.pdf_path, "rb") as f:
-                pdf_base64 = base64.b64encode(f.read()).decode("utf-8")
-        except Exception as e:
-            logger.error(f"Failed to read PDF for alert webhook: {e}")
-
+    pdf_base64 = _read_fatura_pdf_base64(alert, fatura)
     payload = {
         "schema_version": ALERT_WEBHOOK_SCHEMA_VERSION,
         "event_type": "alert.created",
-        "alerta": {
-            "id": str(alert.id) if alert.id else None,
-            "tipo": alert.tipo,
-            "gravidade": alert.gravidade,
+        "id_alerta": str(alert.id) if alert.id else None,
+        "tipo_de_alerta": alert.tipo,
+        "gravidade": alert.gravidade,
+        "contexto": {
             "mensagem": alert.mensagem,
-            "created_at": alert.created_at,
-            "email_remetente": getattr(alert, "email_remetente", None),
-            "email_assunto": getattr(alert, "email_assunto", None),
-            "email_data": getattr(alert, "email_data", None),
+            "email_assunto": getattr(alert, "email_assunto", None) or (fatura.email_assunto if fatura else None),
+            "fatura_referencia": fatura_referencia,
+            "subject_sugerido": subject,
+            "texto_sugerido": message_text,
+            "html_sugerido": html_body,
         },
-        "condominio": {
-            "id": str(alert.condominio_id) if alert.condominio_id else None,
-            "nome": condo_name,
-            "numero": condo_num_str,
-        },
-        "concessionaria": {
-            "id": str(conc.id) if conc else None,
-            "tipo": tipo_conta,
-            "codigo_identificacao": cod_conta,
-            "valor_medio": conc.valor_medio if conc else None,
-        },
-        "fatura": {
-            "id": str(fatura.id) if fatura else None,
-            "referencia": fatura_referencia,
-            "vencimento": fatura_vencimento,
-            "valor": fatura_valor,
-            "valor_formatado": valor_str,
-            "gmail_message_id": fatura.gmail_message_id if fatura else None,
-            "pdf_nome_original": fatura.pdf_nome_original if fatura else None,
-            "pdf_desbloqueado": fatura.pdf_desbloqueado if fatura else None,
-            "pdf_base64": pdf_base64,
-        },
-        "usuarios_responsaveis": sorted(recipients),
-        "email": {
-            "subject": subject,
-            "text": message_text,
-            "html": html_body,
-        },
+        "created_at": _iso(alert.created_at),
+        "email_remetente": getattr(alert, "email_remetente", None) or (fatura.email_remetente if fatura else None),
+        "id_email_original": fatura.gmail_message_id if fatura else None,
+        "email_data": _iso(getattr(alert, "email_data", None) or (fatura.created_at if fatura else None)),
+        "condominio_id": str(alert.condominio_id) if alert.condominio_id else None,
+        "condominio_nome": condo.nome if condo else None,
+        "condominio_numero": str(condo.numero) if condo else None,
+        "condominio_carteira": condo.carteira if condo else None,
+        "concessionaria_id": str(conc.id) if conc else None,
+        "concessionaria_tipo": conc.tipo if conc else None,
+        "concessionaria_cod_identificacao": conc.instalacao if conc else (cod_conta if cod_conta != "N/A" else None),
+        "concessionaria_valor_medio": conc.valor_medio if conc else None,
+        "fatura_id": str(fatura.id) if fatura else None,
+        "fatura_vencimento": _iso(fatura.vencimento if fatura else None),
+        "fatura_valor": fatura.valor if fatura else None,
+        "fatura_valor_formatado": _format_brl(fatura.valor if fatura else None),
+        "fatura_debauto": bool(fatura.debito_automatico) if fatura else False,
+        "fatura_gmail_message_id": fatura.gmail_message_id if fatura else None,
+        "fatura_pdf_nome": fatura.pdf_nome_original if fatura else None,
+        "fatura_pdf_desbloqueado": bool(fatura.pdf_desbloqueado) if fatura else False,
+        "fatura_pdf_base64": pdf_base64,
         "source": "datacron.backend",
     }
+    payload.update(_responsavel_fields(recipients))
 
     await _enqueue_and_send_alert_webhook(db, alert, payload)
-    return
-
-    target_tags = ["Nao_Recebida", "Mandato_a_Vencer", "Fatura_Sem_Debito_Automatico", "Variacao_Valor_Mais", "Variacao_Valor_Menos"]
-    
-    if alert.tipo in target_tags and settings.N8N_WEBHOOK_URL:
-        import httpx
-        import base64
-        
-        pdf_base64 = None
-        if fatura and fatura.pdf_path and os.path.exists(fatura.pdf_path):
-            try:
-                with open(fatura.pdf_path, "rb") as f:
-                    pdf_base64 = base64.b64encode(f.read()).decode("utf-8")
-            except Exception as e:
-                logger.error(f"Failed to read PDF for webhook: {e}")
-
-        payload = {
-            "Condominio": condo_name,
-            "Codigo_Identificacao": cod_conta,
-            "Tipo_Alerta": alert.tipo,
-            "Vencimento_Esperado": vencimento_str,
-            "Valor_Medio": conc.valor_medio if conc else None,
-            "Valor_Atual": fatura.valor if fatura else None,
-            "Usuarios_Responsaveis": list(recipients),
-            "Mensagem": alert.mensagem,
-            "PDF_Base64": pdf_base64
-        }
-        
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(settings.N8N_WEBHOOK_URL, json=payload, timeout=10.0)
-                resp.raise_for_status()
-                logger.info(f"N8N Webhook sent successfully for {alert.tipo}")
-        except Exception as e:
-            logger.error(f"Failed to send webhook to N8N: {e}")
-            
-        # O usuário pediu para o webhook gerenciar os e-mails para essas tags, 
-        # então pulamos o envio de e-mail direto do Datacron para evitar duplicidade
-        return
-
-    # Fallback/Padrão para outros alertas (ex: pdf_erro)
-    for email in recipients:
-        success = await send_notification_email(
-            to=email,
-            subject=subject,
-            message_text=message_text,
-            html_body=html_body,
-            in_reply_to=in_reply_to,
-            attachments=attachments if attachments else None,
-        )
-        if success:
-            logger.info(f"Alert notification sent to {email} for alert {alert.id}.")
-        else:
-            logger.error(f"Failed to send alert notification to {email}.")
+    return payload
 
 
-async def check_mandate_expirations(db: AsyncSession) -> None:
+async def check_mandate_expirations(db: AsyncSession) -> list[dict]:
     """
     Scheduled job: checks for mandate expirations (60, 30, 15 days before).
     """
@@ -677,6 +662,8 @@ async def check_mandate_expirations(db: AsyncSession) -> None:
     )
     condos = result.scalars().all()
     
+    payloads = []
+
     for condo in condos:
         days_left = (condo.mandato_fim.date() - today).days
         
@@ -709,7 +696,9 @@ async def check_mandate_expirations(db: AsyncSession) -> None:
                 
                 # Notify authorized users
                 try:
-                    await notify_alert(db, alert)
+                    payload = await notify_alert(db, alert)
+                    if payload:
+                        payloads.append(payload)
                 except Exception as ne:
                     logger.error(f"Mandate alert saved but notification failed for condo {condo.id}: {ne}")
                 continue
@@ -741,6 +730,7 @@ async def check_mandate_expirations(db: AsyncSession) -> None:
                 logger.error(f"Failed to create mandate alert for condo {condo.id}: {e}")
 
     logger.info("Finished check_mandate_expirations.")
+    return payloads
 
 async def check_document_expirations_and_clean(db: AsyncSession) -> None:
     """

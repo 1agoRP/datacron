@@ -26,12 +26,18 @@ async def run_daily_checks(
     logger.info("Starting daily CRON checks via webhook...")
     
     try:
-        await check_missing_bills(db)
-        await check_mandate_expirations(db)
+        alert_payloads = []
+        alert_payloads.extend(await check_missing_bills(db))
+        alert_payloads.extend(await check_mandate_expirations(db))
         await check_document_expirations_and_clean(db)
         
         logger.info("Daily CRON checks completed successfully.")
-        return {"status": "success", "message": "Daily checks completed."}
+        return {
+            "status": "success",
+            "message": "Daily checks completed.",
+            "total_alertas": len(alert_payloads),
+            "alertas": alert_payloads,
+        }
     except Exception as e:
         logger.error(f"Error during daily CRON checks: {str(e)}", exc_info=True)
         return {"status": "error", "message": str(e)}

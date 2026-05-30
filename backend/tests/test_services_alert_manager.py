@@ -197,11 +197,120 @@ async def test_notify_alert_sends_unified_n8n_payload(db_session: AsyncSession):
     _, kwargs = client.post.call_args
     payload = kwargs["json"]
     assert payload["event_type"] == "alert.created"
-    assert payload["schema_version"] == "2026-05-26"
-    assert payload["alerta"]["tipo"] == "pdf_erro"
+    assert payload["schema_version"] == "2026-05-30"
+    assert payload["tipo_de_alerta"] == "pdf_erro"
     assert payload["usuarios_responsaveis"] == ["admin@test.com"]
+    assert payload["usuarios_responsaveis0"] == "admin@test.com"
+    assert payload["usuarios_responsaveis1"] is None
 
     result = await db_session.execute(select(AlertWebhookDelivery))
     delivery = result.scalar_one()
     assert delivery.status == "sent"
     assert delivery.idempotency_key == f"alert:{alert.id}:pdf_erro"
+
+
+@pytest.mark.asyncio
+async def test_notify_alert_payload_includes_flat_context_and_pdf_base64(
+    db_session: AsyncSession,
+    tmp_path,
+    monkeypatch,
+):
+    """Webhook payload should be flat for n8n and include PDF base64 when relevant."""
+    from app.services.alert_manager import notify_alert
+
+    pdf_path = tmp_path / "fatura.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\nfake test pdf")
+    monkeypatch.setenv("PDF_STORAGE_PATH", str(tmp_path))
+
+    condo = Condominio(
+        id=uuid.uuid4(),
+        nome="Edificio Central",
+        numero="42",
+        endereco="Rua Teste",
+        cnpj="11.222.333/0001-81",
+        sindico="Maria",
+        carteira=7,
+        ativo=True,
+    )
+    conc = Concessionaria(
+        id=uuid.uuid4(),
+        condominio_id=condo.id,
+        tipo="Enel",
+        instalacao="UC-123",
+        dia_vencimento=15,
+        valor_medio=100.0,
+        ativo=True,
+    )
+    fatura = Fatura(
+        id=uuid.uuid4(),
+        condominio_id=condo.id,
+        concessionaria_id=conc.id,
+        referencia="Maio/2026",
+        valor=150.25,
+        vencimento=date(2026, 5, 10),
+        status="processada",
+        email_remetente="contas@enel.test",
+        email_assunto="Fatura Enel",
+        gmail_message_id="gmail-123",
+        pdf_path=str(pdf_path),
+        pdf_desbloqueado=True,
+        pdf_nome_original="enel.pdf",
+        debito_automatico=True,
+    )
+    alert = Alerta(
+        id=uuid.uuid4(),
+        condominio_id=condo.id,
+        fatura_id=fatura.id,
+        tipo="Variacao_Valor_Mais",
+        gravidade="alta",
+        mensagem="Valor acima da media",
+    )
+    admin = User(
+        id=uuid.uuid4(),
+        nome="Admin",
+        email="admin@test.com",
+        senha_hash="hash",
+        role="admin",
+        ativo=True,
+    )
+    db_session.add_all([condo, conc, fatura, alert, admin])
+    await db_session.flush()
+
+    response = MagicMock()
+    response.status_code = 200
+    response.raise_for_status.return_value = None
+
+    with patch("app.services.alert_manager.settings.N8N_WEBHOOK_URL", "https://n8n.test/webhook/alerts"), \
+         patch("httpx.AsyncClient") as client_cls:
+        client = AsyncMock()
+        client.post.return_value = response
+        client_cls.return_value.__aenter__.return_value = client
+
+        payload = await notify_alert(db_session, alert, fatura=fatura, conc=conc)
+
+    assert payload["id_alerta"] == str(alert.id)
+    assert payload["tipo_de_alerta"] == "Variacao_Valor_Mais"
+    assert payload["contexto"]["mensagem"] == "Valor acima da media"
+    assert payload["email_remetente"] == "contas@enel.test"
+    assert payload["id_email_original"] == "gmail-123"
+    assert payload["condominio_id"] == str(condo.id)
+    assert payload["condominio_nome"] == "Edificio Central"
+    assert payload["condominio_numero"] == "42"
+    assert payload["condominio_carteira"] == 7
+    assert payload["concessionaria_id"] == str(conc.id)
+    assert payload["concessionaria_tipo"] == "Enel"
+    assert payload["concessionaria_cod_identificacao"] == "UC-123"
+    assert payload["concessionaria_valor_medio"] == 100.0
+    assert payload["fatura_id"] == str(fatura.id)
+    assert payload["fatura_vencimento"] == "2026-05-10"
+    assert payload["fatura_valor"] == 150.25
+    assert payload["fatura_valor_formatado"] == "R$ 150,25"
+    assert payload["fatura_debauto"] is True
+    assert payload["fatura_gmail_message_id"] == "gmail-123"
+    assert payload["fatura_pdf_nome"] == "enel.pdf"
+    assert payload["fatura_pdf_desbloqueado"] is True
+    assert payload["fatura_pdf_base64"] == "JVBERi0xLjQKZmFrZSB0ZXN0IHBkZg=="
+    assert payload["usuarios_responsaveis0"] == "admin@test.com"
+
+    _, kwargs = client.post.call_args
+    assert kwargs["json"]["fatura_pdf_base64"] == payload["fatura_pdf_base64"]
