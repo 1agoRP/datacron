@@ -1,840 +1,1522 @@
 'use client';
 
-import { useState, FormEvent, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, X, AlertTriangle, ChevronDown, Check, Zap, Shield, Bell, Database, BarChart3, Mail, Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { FormEvent, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  Building2,
+  Check,
+  Clock,
+  DatabaseZap,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Mail,
+  MessageCircle,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
-/* ─── CSS VARIABLES ─── */
 const globalStyles = `
   :root {
-    --bg: #0a0b0f;
-    --bg2: #0f1117;
-    --bg3: #161820;
-    --card: #13151e;
-    --border: rgba(255,255,255,0.07);
-    --border-hover: rgba(255,255,255,0.14);
-    --accent: #4f6ef7;
-    --accent2: #6b84f8;
-    --accent-glow: rgba(79,110,247,0.15);
-    --green: #22c55e;
-    --green-bg: rgba(34,197,94,0.1);
-    --amber: #f59e0b;
-    --amber-bg: rgba(245,158,11,0.1);
-    --danger: #ef4444;
-    --danger-bg: rgba(239,68,68,0.1);
-    --text: #f0f1f5;
-    --text2: #8b8fa8;
-    --text3: #555870;
-    --font-head: 'Sora', 'DM Sans', system-ui, sans-serif;
-    --font-body: 'DM Sans', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
-    --radius: 12px;
-    --radius-lg: 18px;
-    --radius-xl: 24px;
+    --fox-bg: #070808;
+    --fox-bg-2: #0f1113;
+    --fox-panel: #151719;
+    --fox-panel-2: #1b1e21;
+    --fox-line: rgba(255, 255, 255, 0.1);
+    --fox-line-strong: rgba(255, 255, 255, 0.18);
+    --fox-orange: #ff6a00;
+    --fox-orange-2: #ff9f1c;
+    --fox-ink: #f7f3ed;
+    --fox-muted: #a8adb3;
+    --fox-soft: #6f7780;
+    --fox-green: #35d07f;
+    --fox-blue: #65a8ff;
+    --fox-danger: #ff5c5c;
+    --fox-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+    --font-head: 'Outfit', system-ui, sans-serif;
+    --font-body: 'Outfit', system-ui, sans-serif;
   }
 
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&family=JetBrains+Mono:wght@400;500&display=swap');
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
 
   body {
-    background: var(--bg);
-    color: var(--text);
+    background: var(--fox-bg);
+    color: var(--fox-ink);
     font-family: var(--font-body);
-    font-size: 16px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
   }
 
-  /* ── NAV ── */
-  .lp-nav {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 clamp(1rem, 5vw, 3rem);
-    height: 64px;
-    background: rgba(10,11,15,0.85);
-    backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .nav-logo {
-    font-family: var(--font-head);
-    font-weight: 800;
-    font-size: 1.3rem;
-    letter-spacing: -0.02em;
-    color: var(--text);
-    text-decoration: none;
-  }
-  .nav-logo span { color: var(--accent); }
-
-  .nav-links { display: flex; gap: 2rem; list-style: none; }
-  .nav-links a {
-    color: var(--text2);
-    text-decoration: none;
-    font-size: 0.875rem;
-    font-weight: 500;
-    transition: color 0.2s;
-  }
-  .nav-links a:hover { color: var(--text); }
-
-  .nav-cta { display: flex; gap: 0.75rem; align-items: center; }
-
-  .btn-ghost {
-    background: none; border: 1px solid var(--border);
-    color: var(--text2); padding: 0.4rem 1rem;
-    border-radius: 8px; font-size: 0.875rem; font-weight: 500;
-    cursor: pointer; transition: all 0.2s; font-family: var(--font-body);
-    text-decoration: none; display: inline-flex; align-items: center;
-  }
-  .btn-ghost:hover { border-color: var(--border-hover); color: var(--text); }
-
-  .btn-accent {
-    background: var(--accent); color: #fff;
-    padding: 0.4rem 1rem; border-radius: 8px;
-    font-size: 0.875rem; font-weight: 600;
-    cursor: pointer; transition: all 0.2s;
-    border: none; font-family: var(--font-body);
-    text-decoration: none; display: inline-flex; align-items: center;
-  }
-  .btn-accent:hover { background: var(--accent2); transform: translateY(-1px); }
-
-  /* ── HERO ── */
-  .hero {
+  .fox-page {
     min-height: 100vh;
-    display: grid; grid-template-columns: 1fr 1fr;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(180deg, #070808 0%, #0d0f11 44%, #080909 100%);
+    background-size: 72px 72px, 72px 72px, auto;
+    overflow-x: hidden;
+  }
+
+  .lp-nav {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 50;
+    height: 72px;
+    display: flex;
     align-items: center;
-    gap: 4rem;
-    padding: 120px clamp(1rem, 6vw, 5rem) 80px;
-    position: relative;
-    overflow: hidden;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 0 clamp(18px, 5vw, 72px);
+    background: rgba(7, 8, 8, 0.82);
+    border-bottom: 1px solid var(--fox-line);
+    backdrop-filter: blur(18px);
   }
 
-  .hero::before {
-    content: '';
-    position: absolute; top: -200px; left: -100px;
-    width: 600px; height: 600px;
-    background: radial-gradient(circle, rgba(79,110,247,0.12) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  .hero-badge {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: var(--accent-glow);
-    border: 1px solid rgba(79,110,247,0.3);
-    color: var(--accent2);
-    padding: 0.3rem 0.9rem;
-    border-radius: 100px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    margin-bottom: 1.5rem;
-  }
-
-  .hero-badge::before {
-    content: '';
-    width: 6px; height: 6px;
-    background: var(--green);
-    border-radius: 50%;
-    box-shadow: 0 0 8px var(--green);
-    animation: pulse-dot 2s infinite;
-  }
-
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-
-  .hero-title {
-    font-family: var(--font-head);
-    font-size: clamp(2.4rem, 5vw, 3.8rem);
+  .brand-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--fox-ink);
+    text-decoration: none;
     font-weight: 800;
-    line-height: 1.08;
-    letter-spacing: -0.03em;
-    color: var(--text);
-    margin-bottom: 1.25rem;
+    letter-spacing: 0;
   }
 
-  .hero-title em {
-    font-style: normal;
-    background: linear-gradient(135deg, var(--accent) 0%, #818cf8 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  .brand-mark img { width: 58px; height: 58px; object-fit: contain; object-position: left center; }
+
+  .brand-name { font-size: 1.08rem; }
+  .brand-name span { color: var(--fox-orange-2); }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    list-style: none;
   }
 
-  .hero-desc {
-    color: var(--text2);
-    font-size: 1.05rem;
-    line-height: 1.7;
-    max-width: 520px;
-    margin-bottom: 2rem;
+  .nav-links a {
+    color: var(--fox-muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  .nav-links a:hover { color: var(--fox-ink); }
+
+  .nav-actions { display: flex; align-items: center; gap: 10px; }
+
+  .btn {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 8px;
+    padding: 0 16px;
+    font-family: var(--font-body);
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1;
+    text-decoration: none;
+    transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--fox-orange), var(--fox-orange-2));
+    color: #171008;
+    border: 1px solid rgba(255, 159, 28, 0.45);
+    box-shadow: 0 14px 34px rgba(255, 106, 0, 0.22);
+  }
+
+  .btn-primary:hover { transform: translateY(-2px); }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--fox-ink);
+    border: 1px solid var(--fox-line-strong);
+  }
+
+  .btn-secondary:hover {
+    border-color: rgba(255, 159, 28, 0.55);
+    color: var(--fox-orange-2);
+  }
+
+  .hero {
+    min-height: 82vh;
+    display: grid;
+    grid-template-columns: minmax(0, 0.86fr) minmax(360px, 1.14fr);
+    align-items: center;
+    gap: clamp(28px, 5vw, 76px);
+    padding: 138px clamp(18px, 6vw, 86px) 76px;
+    border-bottom: 1px solid var(--fox-line);
+  }
+
+  .hero-copy { max-width: 790px; }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    color: var(--fox-orange-2);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .eyebrow::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--fox-green);
+    box-shadow: 0 0 18px rgba(53, 208, 127, 0.75);
+  }
+
+  .hero h1 {
+    max-width: 760px;
+    margin: 0 0 22px;
+    font-size: clamp(3rem, 7vw, 6.8rem);
+    line-height: 0.92;
+    letter-spacing: 0;
+    font-weight: 800;
+  }
+
+  .hero h1 span { color: var(--fox-orange-2); }
+
+  .hero-lead {
+    max-width: 650px;
+    margin: 0 0 30px;
+    color: var(--fox-muted);
+    font-size: clamp(1.04rem, 1.6vw, 1.24rem);
+    line-height: 1.65;
   }
 
   .hero-actions {
-    display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;
-    margin-bottom: 2rem;
-  }
-
-  .btn-hero-primary {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: var(--accent);
-    color: #fff; padding: 0.8rem 1.5rem;
-    border-radius: 10px; font-size: 0.95rem; font-weight: 600;
-    text-decoration: none; transition: all 0.2s;
-    border: none; cursor: pointer; font-family: var(--font-body);
-  }
-  .btn-hero-primary:hover {
-    background: var(--accent2);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(79,110,247,0.3);
-  }
-
-  .btn-hero-secondary {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--border-hover);
-    color: var(--text); padding: 0.8rem 1.5rem;
-    border-radius: 10px; font-size: 0.95rem; font-weight: 500;
-    text-decoration: none; transition: all 0.2s; font-family: var(--font-body);
-  }
-  .btn-hero-secondary:hover { background: rgba(255,255,255,0.08); }
-
-  .hero-trust {
-    display: flex; align-items: center; gap: 0.75rem;
-    font-size: 0.8rem; color: var(--text3);
-  }
-
-  .hero-trust-avatars {
     display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 0;
   }
-  .hero-trust-avatar {
-    width: 28px; height: 28px; border-radius: 50%;
-    background: var(--card); border: 2px solid var(--bg);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.65rem; font-weight: 700; color: var(--text2);
-    margin-left: -8px;
-  }
-  .hero-trust-avatar:first-child { margin-left: 0; }
 
-  .stars-mini { color: #f59e0b; font-size: 0.75rem; }
-
-  /* ── DASHBOARD MOCK ── */
-  .dashboard-mock {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-    box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+  .hero-art {
     position: relative;
+    min-height: 420px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 106, 0, 0.2);
+    border-radius: 8px;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(255, 106, 0, 0.18), transparent 44%),
+      rgba(255, 255, 255, 0.025);
+    box-shadow: var(--fox-shadow);
+    overflow: hidden;
   }
 
-  .dashboard-mock::before {
+  .hero-art::after {
     content: '';
-    position: absolute; top: -1px; left: 20%; right: 20%; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(79,110,247,0.5), transparent);
-  }
-
-  .mock-topbar {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 16px;
-    background: rgba(255,255,255,0.02);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .mock-dots { display: flex; gap: 5px; }
-  .mock-dot { width: 10px; height: 10px; border-radius: 50%; }
-  .mock-dot.r { background: #ff5f57; }
-  .mock-dot.y { background: #febc2e; }
-  .mock-dot.g { background: #28c840; }
-
-  .mock-title-bar {
-    flex: 1; text-align: center;
-    font-family: var(--font-mono); font-size: 0.65rem;
-    color: var(--text3); letter-spacing: 0.08em;
-  }
-
-  .mock-live {
-    display: flex; align-items: center; gap: 5px;
-    font-size: 0.65rem; color: var(--green); font-weight: 600;
-  }
-  .mock-live::before {
-    content: ''; width: 6px; height: 6px;
-    background: var(--green); border-radius: 50%;
-    animation: pulse-dot 1.5s infinite;
-  }
-
-  .mock-body { padding: 16px; }
-
-  .mock-stats-row {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-    margin-bottom: 16px;
-  }
-
-  .mock-stat-box {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid var(--border);
-    border-radius: 8px; padding: 10px;
-  }
-
-  .mock-stat-val {
-    font-family: var(--font-head);
-    font-size: 1.1rem; font-weight: 700; margin-bottom: 2px;
-  }
-  .mock-stat-val.accent { color: var(--accent2); }
-  .mock-stat-val.green { color: var(--green); }
-  .mock-stat-val.amber { color: var(--amber); }
-
-  .mock-stat-lbl {
-    font-size: 0.6rem; color: var(--text3); text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .mock-thead {
-    display: grid; grid-template-columns: 1.2fr 1.4fr 0.8fr 1fr;
-    padding: 6px 8px;
-    font-size: 0.62rem; color: var(--text3);
-    text-transform: uppercase; letter-spacing: 0.06em;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 4px;
-  }
-
-  .mock-trow {
-    display: grid; grid-template-columns: 1.2fr 1.4fr 0.8fr 1fr;
-    padding: 8px 8px;
-    border-radius: 6px; transition: background 0.15s;
-    align-items: center;
-  }
-  .mock-trow:hover { background: rgba(255,255,255,0.03); }
-
-  .mock-tag {
-    display: inline-block;
-    background: var(--accent-glow); border: 1px solid rgba(79,110,247,0.25);
-    color: var(--accent2); padding: 2px 7px;
-    border-radius: 4px; font-size: 0.65rem; font-weight: 600;
-    font-family: var(--font-mono);
-  }
-
-  .mock-condo { font-size: 0.72rem; color: var(--text2); }
-  .mock-val { font-size: 0.78rem; font-weight: 600; color: var(--text); }
-  .mock-val.danger { color: var(--danger); }
-
-  .mock-pill {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 8px; border-radius: 100px;
-    font-size: 0.62rem; font-weight: 600;
-  }
-  .pill-ok { background: var(--green-bg); color: var(--green); }
-  .pill-alert { background: var(--danger-bg); color: var(--danger); }
-
-  .mock-alert {
-    display: flex; align-items: flex-start; gap: 8px;
-    background: var(--danger-bg);
-    border: 1px solid rgba(239,68,68,0.2);
-    border-radius: 8px; padding: 10px; margin-top: 12px;
-    font-size: 0.72rem; color: var(--text2); line-height: 1.4;
-  }
-  .mock-alert-icon {
-    width: 16px; height: 16px; border-radius: 50%;
-    background: var(--danger); color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.6rem; font-weight: 800; flex-shrink: 0; margin-top: 1px;
-  }
-
-  /* ── LOGOS / TRUST BAR ── */
-  .trust-bar {
-    padding: 1.5rem clamp(1rem, 6vw, 5rem);
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    background: var(--bg2);
-    display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;
-  }
-  .trust-bar-label {
-    font-size: 0.75rem; color: var(--text3);
-    text-transform: uppercase; letter-spacing: 0.08em;
-    flex-shrink: 0;
-  }
-  .trust-bar-logos { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; }
-  .trust-logo {
-    font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600;
-    color: var(--text3); letter-spacing: 0.06em;
-    padding: 5px 12px; background: rgba(255,255,255,0.03);
-    border: 1px solid var(--border); border-radius: 6px;
-    transition: all 0.2s;
-  }
-  .trust-logo:hover { color: var(--text2); border-color: var(--border-hover); }
-
-  /* ── STATS BAR ── */
-  .stats-bar {
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    background: var(--bg3); border-bottom: 1px solid var(--border);
-  }
-  .stat-item {
-    padding: 2rem clamp(1rem, 3vw, 2.5rem);
-    border-right: 1px solid var(--border);
-    text-align: center;
-  }
-  .stat-item:last-child { border-right: none; }
-  .stat-num {
-    font-family: var(--font-head);
-    font-size: clamp(1.8rem, 3vw, 2.5rem); font-weight: 800;
-    color: var(--accent2); margin-bottom: 0.25rem;
-  }
-  .stat-label { font-size: 0.8rem; color: var(--text3); }
-
-  /* ── SECTION SHARED ── */
-  .lp-section {
-    padding: 100px clamp(1rem, 6vw, 5rem);
-  }
-
-  .section-eyebrow {
-    display: inline-block;
-    font-size: 0.72rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.1em;
-    color: var(--accent2);
-    background: var(--accent-glow);
-    border: 1px solid rgba(79,110,247,0.2);
-    padding: 4px 12px; border-radius: 100px;
-    margin-bottom: 1.25rem;
-  }
-
-  .section-title {
-    font-family: var(--font-head);
-    font-size: clamp(2rem, 4vw, 3rem);
-    font-weight: 800; line-height: 1.1;
-    letter-spacing: -0.025em;
-    color: var(--text);
-    margin-bottom: 1rem;
-  }
-  .section-title em {
-    font-style: normal;
-    background: linear-gradient(135deg, var(--accent) 0%, #818cf8 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-  }
-
-  .section-sub {
-    color: var(--text2); font-size: 1rem; line-height: 1.7;
-    max-width: 600px;
-  }
-
-  /* ── COMPARE GRID ── */
-  .compare-grid {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 1.5rem; margin-top: 3rem;
-  }
-
-  .compare-card {
-    background: var(--card);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    border: 1px solid var(--border);
-  }
-
-  .compare-card.good { border-color: rgba(34,197,94,0.2); }
-
-  .compare-head {
-    padding: 1rem 1.5rem;
-    font-family: var(--font-head); font-weight: 700; font-size: 0.85rem;
-    text-transform: uppercase; letter-spacing: 0.06em;
-  }
-  .compare-head.bad-head { background: var(--danger-bg); color: var(--danger); }
-  .compare-head.good-head { background: var(--green-bg); color: var(--green); }
-
-  .compare-list { list-style: none; padding: 1rem 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
-  .compare-list li {
-    display: flex; align-items: flex-start; gap: 12px;
-    font-size: 0.875rem; color: var(--text2); line-height: 1.5;
-  }
-
-  .ico { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; margin-top: 1px; }
-  .ico-bad { background: var(--danger-bg); color: var(--danger); }
-  .ico-good { background: var(--green-bg); color: var(--green); }
-
-  /* ── MODULES GRID ── */
-  .modules-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 3rem; }
-
-  .module-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-    transition: all 0.25s;
-    position: relative; overflow: hidden;
-  }
-  .module-card:hover {
-    border-color: var(--border-hover);
-    transform: translateY(-3px);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.2);
-  }
-  .module-card.featured {
-    border-color: rgba(79,110,247,0.3);
-    background: linear-gradient(135deg, rgba(79,110,247,0.05) 0%, var(--card) 100%);
-  }
-
-  .module-icon-wrap {
-    width: 42px; height: 42px; border-radius: 10px;
-    background: var(--accent-glow); border: 1px solid rgba(79,110,247,0.2);
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 1rem; color: var(--accent2);
-  }
-
-  .module-title {
-    font-family: var(--font-head); font-weight: 700;
-    font-size: 1rem; color: var(--text);
-    margin-bottom: 0.5rem;
-  }
-
-  .module-desc { font-size: 0.845rem; color: var(--text2); line-height: 1.6; margin-bottom: 1rem; }
-
-  .module-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .tag {
-    font-size: 0.68rem; font-weight: 600;
-    font-family: var(--font-mono);
-    color: var(--text3);
-    background: rgba(255,255,255,0.04);
-    border: 1px solid var(--border);
-    padding: 2px 8px; border-radius: 4px;
-  }
-
-  /* ── FLOW ── */
-  .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-top: 3rem; background: var(--border); border-radius: var(--radius-lg); overflow: hidden; }
-
-  .flow-step {
-    background: var(--card);
-    padding: 2rem 1.5rem; position: relative;
-  }
-
-  .flow-step:first-child { border-radius: var(--radius-lg) 0 0 var(--radius-lg); }
-  .flow-step:last-child { border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }
-
-  .flow-num {
-    font-family: var(--font-head); font-weight: 800;
-    font-size: 3rem; line-height: 1;
-    color: rgba(79,110,247,0.15);
-    margin-bottom: 1rem;
-  }
-
-  .flow-title {
-    font-family: var(--font-head); font-weight: 700;
-    font-size: 0.95rem; color: var(--text);
-    margin-bottom: 0.5rem;
-  }
-
-  .flow-desc { font-size: 0.82rem; color: var(--text2); line-height: 1.6; }
-
-  /* ── ALERTS SECTION ── */
-  .alerts-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; margin-top: 3rem; }
-
-  .alert-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1rem 1.25rem;
-    display: flex; align-items: flex-start; gap: 1rem;
-    margin-bottom: 0.75rem; transition: all 0.2s;
-  }
-  .alert-card:hover { border-color: var(--border-hover); }
-
-  .alert-icon-box {
-    width: 36px; height: 36px; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 1rem;
-  }
-
-  .alert-title { font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem; }
-  .alert-desc { font-size: 0.8rem; color: var(--text2); line-height: 1.5; }
-  .alert-time { font-size: 0.7rem; color: var(--text3); margin-top: 6px; font-family: var(--font-mono); }
-
-  .benefits-list { list-style: none; display: flex; flex-direction: column; gap: 0.85rem; margin-bottom: 2rem; }
-  .benefits-list li {
-    display: flex; align-items: flex-start; gap: 12px;
-    font-size: 0.9rem; color: var(--text2); line-height: 1.5;
-  }
-  .check-ico { color: var(--green); flex-shrink: 0; margin-top: 2px; }
-
-  /* ── TESTIMONIALS ── */
-  .testimonials-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin-top: 3rem; }
-
-  .testimonial-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-  }
-
-  .stars { color: #f59e0b; font-size: 0.875rem; margin-bottom: 1rem; letter-spacing: 2px; }
-  .testimonial-text { font-size: 0.9rem; color: var(--text2); line-height: 1.7; margin-bottom: 1.25rem; font-style: italic; }
-  .testimonial-author { display: flex; align-items: center; gap: 12px; }
-  .author-avatar {
-    width: 38px; height: 38px; border-radius: 50%;
-    background: var(--accent-glow); border: 1px solid rgba(79,110,247,0.3);
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-head); font-weight: 700;
-    font-size: 0.75rem; color: var(--accent2); flex-shrink: 0;
-  }
-  .author-name { font-weight: 600; font-size: 0.875rem; }
-  .author-role { font-size: 0.75rem; color: var(--text3); }
-
-  /* ── PRICING ── */
-  .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin-top: 3rem; }
-
-  .pricing-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 2rem 1.5rem;
-    position: relative;
-    transition: border-color 0.2s;
-  }
-  .pricing-card.featured {
-    border-color: rgba(79,110,247,0.4);
-    background: linear-gradient(160deg, rgba(79,110,247,0.08) 0%, var(--card) 60%);
-  }
-
-  .featured-badge {
-    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-    background: var(--accent); color: #fff;
-    font-size: 0.7rem; font-weight: 700;
-    padding: 4px 14px; border-radius: 100px; white-space: nowrap;
-    letter-spacing: 0.04em; text-transform: uppercase;
-  }
-
-  .plan-name {
-    font-family: var(--font-head); font-weight: 700;
-    font-size: 1rem; color: var(--text); margin-bottom: 0.5rem;
-  }
-
-  .plan-price {
-    font-family: var(--font-head); font-weight: 800;
-    font-size: 1.6rem; color: var(--text); margin-bottom: 0.5rem;
-  }
-  .plan-price-note { font-size: 0.78rem; color: var(--text3); margin-bottom: 1.25rem; }
-
-  .plan-features { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.5rem; }
-  .plan-features li {
-    display: flex; align-items: center; gap: 10px;
-    font-size: 0.855rem; color: var(--text2);
-  }
-  .plan-features li::before {
-    content: '✓'; color: var(--green);
-    font-weight: 700; font-size: 0.75rem; flex-shrink: 0;
-  }
-
-  .plan-cta {
-    display: block; text-align: center; padding: 0.7rem 1rem;
-    border-radius: 8px; font-weight: 600; font-size: 0.875rem;
-    text-decoration: none; transition: all 0.2s;
-  }
-  .plan-cta.primary {
-    background: var(--accent); color: #fff; border: none;
-  }
-  .plan-cta.primary:hover { background: var(--accent2); box-shadow: 0 4px 20px rgba(79,110,247,0.3); }
-  .plan-cta.secondary {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--border-hover); color: var(--text2);
-  }
-  .plan-cta.secondary:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-
-  /* ── FAQ ── */
-  .faq-list { max-width: 720px; margin: 3rem auto 0; display: flex; flex-direction: column; gap: 0; }
-
-  .faq-item {
-    border-bottom: 1px solid var(--border);
-  }
-
-  .faq-q {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 1.25rem 0;
-    font-weight: 600; font-size: 0.95rem; cursor: pointer;
-    color: var(--text); transition: color 0.2s; gap: 1rem;
-  }
-  .faq-q:hover { color: var(--accent2); }
-
-  .faq-toggle { flex-shrink: 0; color: var(--text3); transition: transform 0.25s; }
-  .faq-item.open .faq-toggle { transform: rotate(180deg); color: var(--accent2); }
-
-  .faq-a {
-    max-height: 0; overflow: hidden;
-    font-size: 0.875rem; color: var(--text2); line-height: 1.7;
-    transition: max-height 0.3s ease, padding 0.3s;
-  }
-  .faq-item.open .faq-a { max-height: 200px; padding-bottom: 1.25rem; }
-
-  /* ── CONTACT ── */
-  .contact-layout { display: grid; grid-template-columns: 1fr 1.2fr; gap: 4rem; align-items: start; margin-top: 3rem; }
-
-  .contact-info-list { list-style: none; display: flex; flex-direction: column; gap: 1.25rem; margin-top: 2rem; }
-  .contact-info-list li { display: flex; align-items: center; gap: 1rem; }
-  .contact-ico {
-    width: 40px; height: 40px; border-radius: 10px;
-    background: var(--accent-glow); border: 1px solid rgba(79,110,247,0.2);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1rem; flex-shrink: 0;
-  }
-  .contact-link { color: var(--text); text-decoration: none; font-weight: 500; font-size: 0.9rem; }
-  .contact-link:hover { color: var(--accent2); }
-
-  .contact-form {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    padding: 2rem;
-  }
-
-  .form-group { margin-bottom: 1rem; }
-  .form-label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text2); margin-bottom: 0.4rem; }
-  .form-input {
-    width: 100%; background: rgba(255,255,255,0.04);
-    border: 1px solid var(--border); border-radius: 8px;
-    padding: 0.65rem 0.9rem; color: var(--text);
-    font-size: 0.9rem; font-family: var(--font-body);
-    outline: none; transition: border-color 0.2s;
-  }
-  .form-input:focus { border-color: rgba(79,110,247,0.5); background: rgba(79,110,247,0.04); }
-  .form-input::placeholder { color: var(--text3); }
-
-  .form-input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-
-  .form-select {
-    width: 100%; background: rgba(255,255,255,0.04);
-    border: 1px solid var(--border); border-radius: 8px;
-    padding: 0.65rem 0.9rem; color: var(--text2);
-    font-size: 0.9rem; font-family: var(--font-body);
-    outline: none; cursor: pointer;
-    appearance: none; transition: border-color 0.2s;
-  }
-  .form-select:focus { border-color: rgba(79,110,247,0.5); }
-
-  .form-submit {
-    width: 100%; background: var(--accent);
-    color: #fff; padding: 0.85rem 1rem;
-    border-radius: 8px; font-size: 0.95rem; font-weight: 600;
-    border: none; cursor: pointer; transition: all 0.2s;
-    font-family: var(--font-body); margin-top: 0.5rem;
-  }
-  .form-submit:hover { background: var(--accent2); box-shadow: 0 4px 20px rgba(79,110,247,0.3); }
-
-  .form-privacy-note {
-    font-size: 0.72rem; color: var(--text3); text-align: center; margin-top: 0.75rem;
-  }
-
-  /* ── FOOTER ── */
-  .lp-footer {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 2rem clamp(1rem, 6vw, 5rem);
-    border-top: 1px solid var(--border);
-    background: var(--bg);
-  }
-  .footer-logo { font-family: var(--font-head); font-weight: 800; font-size: 1.1rem; color: var(--text); }
-  .footer-logo span { color: var(--accent); }
-  .footer-copy { font-size: 0.78rem; color: var(--text3); margin-top: 4px; }
-  .footer-links { display: flex; gap: 1.5rem; }
-  .footer-links a { font-size: 0.8rem; color: var(--text3); text-decoration: none; transition: color 0.2s; }
-  .footer-links a:hover { color: var(--text2); }
-
-  /* ── MODAL ── */
-  .modal-overlay {
-    position: fixed; inset: 0; z-index: 1000;
-    background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
-    display: flex; align-items: center; justify-content: center; padding: 1rem;
-  }
-  .modal-box {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    padding: 2.5rem; width: 100%; max-width: 420px;
-    position: relative;
-  }
-  .modal-close {
-    position: absolute; top: 1rem; right: 1rem;
-    background: rgba(255,255,255,0.05); border: 1px solid var(--border);
-    color: var(--text3); width: 32px; height: 32px;
-    border-radius: 8px; cursor: pointer; display: flex;
-    align-items: center; justify-content: center; transition: all 0.2s;
-  }
-  .modal-close:hover { color: var(--text); border-color: var(--border-hover); }
-
-  /* ── CTA BANNER ── */
-  .cta-banner {
-    background: linear-gradient(135deg, rgba(79,110,247,0.15) 0%, rgba(129,140,248,0.08) 100%);
-    border: 1px solid rgba(79,110,247,0.2);
-    border-radius: var(--radius-xl);
-    padding: 4rem; text-align: center;
-    position: relative; overflow: hidden;
-  }
-  .cta-banner::before {
-    content: ''; position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
-    width: 500px; height: 300px;
-    background: radial-gradient(circle, rgba(79,110,247,0.1) 0%, transparent 70%);
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(7, 8, 8, 0) 58%, rgba(7, 8, 8, 0.18));
     pointer-events: none;
   }
 
-  /* ── STICKY BAR ── */
-  .sticky-bar {
-    position: fixed; bottom: 0; left: 0; right: 0; z-index: 99;
-    background: rgba(13,15,23,0.95); backdrop-filter: blur(20px);
-    border-top: 1px solid var(--border);
-    padding: 1rem clamp(1rem, 6vw, 5rem);
-    display: flex; justify-content: space-between; align-items: center;
-    transform: translateY(100%); transition: transform 0.3s;
+  .hero-art img {
+    width: 100%;
+    height: 100%;
+    min-height: 420px;
+    object-fit: cover;
+    object-position: center;
+    filter: saturate(1.04) contrast(1.02);
   }
-  .sticky-bar.visible { transform: translateY(0); }
-  .sticky-bar-text { font-size: 0.9rem; color: var(--text2); }
-  .sticky-bar-text strong { color: var(--text); }
 
-  @media (max-width: 1024px) {
-    .hero { grid-template-columns: 1fr; text-align: center; }
-    .hero-desc { margin: 0 auto 2rem; }
-    .hero-actions { justify-content: center; }
-    .hero-trust { justify-content: center; }
-    .stats-bar { grid-template-columns: repeat(2, 1fr); }
-    .compare-grid { grid-template-columns: 1fr; }
-    .modules-grid { grid-template-columns: repeat(2, 1fr); }
-    .flow { grid-template-columns: 1fr 1fr; }
-    .flow-step:first-child, .flow-step:last-child { border-radius: 0; }
-    .alerts-layout { grid-template-columns: 1fr; }
-    .testimonials-grid { grid-template-columns: 1fr; }
-    .pricing-grid { grid-template-columns: 1fr; }
-    .contact-layout { grid-template-columns: 1fr; }
+  .product-window {
+    border: 1px solid var(--fox-line-strong);
+    border-radius: 8px;
+    background: rgba(21, 23, 25, 0.92);
+    box-shadow: var(--fox-shadow);
+    overflow: hidden;
+  }
+
+  .window-top {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--fox-line);
+    background: rgba(255, 255, 255, 0.035);
+  }
+
+  .window-dots { display: flex; gap: 6px; }
+  .window-dots span { width: 10px; height: 10px; border-radius: 999px; background: var(--fox-soft); }
+  .window-dots span:nth-child(1) { background: var(--fox-danger); }
+  .window-dots span:nth-child(2) { background: var(--fox-orange-2); }
+  .window-dots span:nth-child(3) { background: var(--fox-green); }
+
+  .window-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--fox-green);
+    font-size: 0.74rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .window-live::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: currentColor;
+  }
+
+  .window-body { padding: 16px; }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .metric {
+    border: 1px solid var(--fox-line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 13px;
+  }
+
+  .metric strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--fox-ink);
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .metric span {
+    color: var(--fox-soft);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .invoice-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .invoice-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 14px;
+    min-height: 54px;
+    padding: 10px 12px;
+    border: 1px solid var(--fox-line);
+    border-radius: 8px;
+    background: rgba(7, 8, 8, 0.36);
+  }
+
+  .invoice-row b {
+    display: block;
+    color: var(--fox-ink);
+    font-size: 0.9rem;
+  }
+
+  .invoice-row small {
+    color: var(--fox-soft);
+    font-size: 0.76rem;
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .status-ok { color: var(--fox-green); background: rgba(53, 208, 127, 0.1); }
+  .status-watch { color: var(--fox-orange-2); background: rgba(255, 159, 28, 0.11); }
+  .status-blue { color: var(--fox-blue); background: rgba(101, 168, 255, 0.12); }
+
+  .section {
+    padding: clamp(70px, 9vw, 112px) clamp(18px, 6vw, 86px);
+    border-bottom: 1px solid var(--fox-line);
+  }
+
+  .section-heading {
+    max-width: 760px;
+    margin-bottom: 34px;
+  }
+
+  .section-heading.center {
+    margin-inline: auto;
+    text-align: center;
+  }
+
+  .section-heading h2 {
+    margin: 0 0 14px;
+    font-size: clamp(2rem, 4.2vw, 4rem);
+    line-height: 1;
+    letter-spacing: 0;
+  }
+
+  .section-heading p {
+    margin: 0;
+    color: var(--fox-muted);
+    font-size: 1.04rem;
+    line-height: 1.68;
+  }
+
+  .presentation-showcase {
+    position: relative;
+    margin-top: 34px;
+    min-height: 640px;
+    display: grid;
+    align-items: end;
+    padding: clamp(24px, 5vw, 62px);
+    border: 1px solid rgba(255, 106, 0, 0.24);
+    border-radius: 8px;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+      radial-gradient(circle at 18% 18%, rgba(255, 106, 0, 0.26), transparent 34%),
+      linear-gradient(135deg, rgba(255, 106, 0, 0.1), rgba(255,255,255,0.03) 46%, rgba(0,0,0,0.38));
+    background-size: 58px 58px, 58px 58px, auto, auto;
+    box-shadow: var(--fox-shadow);
+    overflow: hidden;
+  }
+
+  .presentation-showcase::before {
+    content: '';
+    position: absolute;
+    inset: auto -12% -28% 18%;
+    height: 42%;
+    background: radial-gradient(ellipse, rgba(255, 106, 0, 0.18), transparent 68%);
+    pointer-events: none;
+  }
+
+  .device-stage {
+    position: relative;
+    width: min(980px, 100%);
+    margin: 0 auto;
+    padding: 40px 0 0;
+  }
+
+  .laptop-mock {
+    position: relative;
+    width: min(810px, 82%);
+    min-height: 440px;
+    margin: 0 auto;
+    border: 2px solid rgba(255, 255, 255, 0.34);
+    border-radius: 18px 18px 8px 8px;
+    background: #070808;
+    box-shadow: 0 34px 90px rgba(0, 0, 0, 0.55);
+    padding: 18px;
+  }
+
+  .laptop-mock::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  .laptop-base {
+    width: min(900px, 92%);
+    height: 20px;
+    margin: -1px auto 0;
+    border-radius: 0 0 34px 34px;
+    background: linear-gradient(180deg, #8b8c8d, #2a2b2d 70%, #0b0c0d);
+    box-shadow: 0 24px 34px rgba(0, 0, 0, 0.36);
+  }
+
+  .screen-ui {
+    height: 400px;
+    display: grid;
+    grid-template-columns: 138px 1fr;
+    border: 1px solid var(--fox-line);
+    border-radius: 8px;
+    background: #0c0d0f;
+    overflow: hidden;
+  }
+
+  .mock-sidebar {
+    border-right: 1px solid var(--fox-line);
+    background: rgba(255, 255, 255, 0.025);
+    padding: 18px 14px;
+  }
+
+  .mock-brand {
+    margin-bottom: 22px;
+    color: var(--fox-ink);
+    font-size: 0.9rem;
+    font-weight: 900;
+    letter-spacing: 0.16em;
+  }
+
+  .mock-brand span { color: var(--fox-orange-2); }
+
+  .mock-nav {
+    display: grid;
+    gap: 8px;
+  }
+
+  .mock-nav span {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    border-radius: 6px;
+    color: var(--fox-muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+
+  .mock-nav span:first-child {
+    background: rgba(255, 106, 0, 0.16);
+    color: var(--fox-orange-2);
+  }
+
+  .mock-content {
+    padding: 18px;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 38px 38px;
+  }
+
+  .mock-content-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .mock-content-header h3 {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+
+  .mock-search {
+    width: 150px;
+    height: 24px;
+    border: 1px solid var(--fox-line);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .mock-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .mock-kpi,
+  .mock-panel {
+    border: 1px solid var(--fox-line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.045);
+  }
+
+  .mock-kpi {
+    padding: 11px;
+  }
+
+  .mock-kpi small {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--fox-soft);
+    font-size: 0.58rem;
+    font-weight: 800;
+  }
+
+  .mock-kpi strong {
+    display: block;
+    color: var(--fox-ink);
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .mock-kpi em {
+    display: block;
+    margin-top: 7px;
+    color: var(--fox-green);
+    font-size: 0.56rem;
+    font-style: normal;
+    font-weight: 800;
+  }
+
+  .mock-dashboard-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 0.8fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .mock-panel {
+    min-height: 132px;
+    padding: 13px;
+  }
+
+  .mock-panel-title {
+    color: var(--fox-ink);
+    font-size: 0.68rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+
+  .line-chart {
+    width: 100%;
+    height: 82px;
+    position: relative;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background:
+      linear-gradient(180deg, transparent 24%, rgba(255,255,255,0.05) 25%, transparent 26%),
+      linear-gradient(180deg, transparent 49%, rgba(255,255,255,0.05) 50%, transparent 51%),
+      linear-gradient(180deg, transparent 74%, rgba(255,255,255,0.05) 75%, transparent 76%);
+  }
+
+  .line-chart svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .line-chart polyline {
+    fill: none;
+    stroke: var(--fox-orange);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 8px rgba(255, 106, 0, 0.45));
+  }
+
+  .donut-wrap {
+    display: grid;
+    place-items: center;
+    height: 92px;
+  }
+
+  .donut {
+    width: 78px;
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: conic-gradient(var(--fox-orange) 0 74%, rgba(255,255,255,0.1) 74% 100%);
+  }
+
+  .donut::before {
+    content: '74%';
+    width: 48px;
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: #101113;
+    color: var(--fox-ink);
+    font-size: 0.74rem;
+    font-weight: 900;
+  }
+
+  .mock-bottom-grid {
+    display: grid;
+    grid-template-columns: 0.85fr 1fr;
+    gap: 12px;
+  }
+
+  .mini-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .mini-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    color: var(--fox-muted);
+    font-size: 0.64rem;
+  }
+
+  .mini-row span:last-child {
+    color: var(--fox-ink);
+    font-weight: 800;
+  }
+
+  .phone-mock {
+    position: absolute;
+    right: 0;
+    bottom: 2px;
+    width: 188px;
+    min-height: 342px;
+    border: 2px solid rgba(255,255,255,0.42);
+    border-radius: 28px;
+    background: #070808;
+    padding: 11px;
+    box-shadow: 0 28px 70px rgba(0,0,0,0.5);
+  }
+
+  .phone-mock::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 48px;
+    height: 5px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.16);
+  }
+
+  .phone-screen {
+    min-height: 316px;
+    border-radius: 20px;
+    background: #0f1012;
+    padding: 28px 12px 12px;
+    overflow: hidden;
+  }
+
+  .phone-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    color: var(--fox-ink);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+  }
+
+  .phone-card {
+    border: 1px solid var(--fox-line);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.045);
+    padding: 11px;
+    margin-bottom: 10px;
+  }
+
+  .phone-card small {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--fox-soft);
+    font-size: 0.58rem;
+    font-weight: 800;
+  }
+
+  .phone-card strong {
+    color: var(--fox-ink);
+    font-size: 0.9rem;
+  }
+
+  .phone-donut {
+    width: 98px;
+    margin: 6px auto 10px;
+  }
+
+  .phone-actions {
+    display: grid;
+    gap: 7px;
+  }
+
+  .phone-action {
+    display: flex;
+    justify-content: space-between;
+    color: var(--fox-muted);
+    font-size: 0.62rem;
+  }
+
+  .phone-cta {
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--fox-orange), var(--fox-orange-2));
+    color: #171008;
+    font-size: 0.68rem;
+    font-weight: 900;
+  }
+
+  .presentation-feature-row {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1px;
+    margin-top: 34px;
+    border: 1px solid var(--fox-line);
+    border-radius: 8px;
+    background: var(--fox-line);
+    overflow: hidden;
+  }
+
+  .presentation-feature {
+    min-height: 126px;
+    padding: 17px;
+    background: rgba(7, 8, 8, 0.74);
+  }
+
+  .presentation-feature svg {
+    width: 28px;
+    height: 28px;
+    margin-bottom: 12px;
+    color: var(--fox-orange-2);
+  }
+
+  .presentation-feature strong {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--fox-ink);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+  }
+
+  .presentation-feature span {
+    color: var(--fox-muted);
+    font-size: 0.78rem;
+    line-height: 1.45;
+  }
+
+  .modules-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .module-card {
+    min-height: 225px;
+    padding: 20px;
+    border: 1px solid var(--fox-line);
+    border-radius: 8px;
+    background: rgba(21, 23, 25, 0.78);
+  }
+
+  .module-card svg {
+    width: 34px;
+    height: 34px;
+    color: var(--fox-orange-2);
+    margin-bottom: 18px;
+  }
+
+  .module-card h3 {
+    margin: 0 0 9px;
+    font-size: 1.05rem;
+  }
+
+  .module-card p {
+    margin: 0;
+    color: var(--fox-muted);
+    font-size: 0.92rem;
+    line-height: 1.58;
+  }
+
+  .flow-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    border: 1px solid var(--fox-line);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--fox-line);
+  }
+
+  .flow-step {
+    min-height: 245px;
+    padding: 24px;
+    background: var(--fox-panel);
+  }
+
+  .flow-step span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 22px;
+    border-radius: 8px;
+    background: rgba(255, 106, 0, 0.14);
+    color: var(--fox-orange-2);
+    font-weight: 900;
+  }
+
+  .flow-step h3 { margin: 0 0 10px; font-size: 1rem; }
+  .flow-step p { margin: 0; color: var(--fox-muted); font-size: 0.9rem; line-height: 1.58; }
+
+  .security-band {
+    display: grid;
+    grid-template-columns: 0.78fr 1fr;
+    gap: clamp(28px, 5vw, 70px);
+    align-items: center;
+  }
+
+  .security-panel {
+    border: 1px solid var(--fox-line-strong);
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(255, 106, 0, 0.08), rgba(255, 255, 255, 0.03));
+    padding: clamp(24px, 4vw, 44px);
+  }
+
+  .security-panel img {
+    display: block;
+    width: min(360px, 78vw);
+    height: auto;
+    margin: 0 auto 26px;
+    object-fit: contain;
+  }
+
+  .security-panel p {
+    margin: 0;
+    color: var(--fox-muted);
+    text-align: center;
+    line-height: 1.65;
+  }
+
+  .check-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .check-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    color: var(--fox-muted);
+    line-height: 1.55;
+  }
+
+  .check-item svg {
+    color: var(--fox-green);
+    flex: 0 0 auto;
+    margin-top: 2px;
+  }
+
+  .contact-section {
+    display: grid;
+    grid-template-columns: minmax(0, 0.86fr) minmax(420px, 1fr);
+    gap: clamp(28px, 5vw, 64px);
+    align-items: start;
+  }
+
+  .contact-copy {
+    max-width: 760px;
+  }
+
+  .contact-copy h2 {
+    margin: 0 0 22px;
+    font-size: clamp(2.25rem, 5.2vw, 4.8rem);
+    line-height: 1.02;
+    letter-spacing: 0;
+  }
+
+  .contact-copy h2 span {
+    color: var(--fox-orange-2);
+  }
+
+  .contact-copy p {
+    margin: 0 0 30px;
+    color: var(--fox-muted);
+    font-size: 1rem;
+    line-height: 1.72;
+  }
+
+  .contact-info-list {
+    display: grid;
+    gap: 18px;
+    margin-bottom: 34px;
+  }
+
+  .contact-info-item {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .contact-info-icon {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 106, 0, 0.22);
+    border-radius: 8px;
+    background: rgba(255, 106, 0, 0.1);
+    color: var(--fox-orange-2);
+  }
+
+  .contact-info-label {
+    color: var(--fox-soft);
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+
+  .contact-info-value,
+  .contact-info-value a {
+    color: var(--fox-ink);
+    font-size: 0.96rem;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  .contact-info-value a:hover {
+    color: var(--fox-orange-2);
+  }
+
+  .compliance-box {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 14px;
+    padding: 22px;
+    border: 1px solid var(--fox-line);
+    border-radius: 8px;
+    background: rgba(21, 23, 25, 0.78);
+  }
+
+  .compliance-box h3 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+  }
+
+  .compliance-box p {
+    margin: 0;
+    color: var(--fox-muted);
+    font-size: 0.9rem;
+    line-height: 1.62;
+  }
+
+  .contact-form-card {
+    border: 1px solid var(--fox-line-strong);
+    border-radius: 8px;
+    background: rgba(21, 23, 25, 0.82);
+    box-shadow: var(--fox-shadow);
+    padding: clamp(22px, 3.5vw, 34px);
+  }
+
+  .contact-form-card h3 {
+    margin: 0 0 24px;
+    font-size: 1.2rem;
+  }
+
+  .contact-form {
+    display: grid;
+    gap: 16px;
+  }
+
+  .contact-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .contact-form label {
+    display: grid;
+    gap: 8px;
+    color: var(--fox-muted);
+    font-size: 0.85rem;
+    font-weight: 750;
+  }
+
+  .contact-form input,
+  .contact-form select {
+    width: 100%;
+    min-height: 46px;
+    border: 1px solid var(--fox-line-strong);
+    border-radius: 8px;
+    background: rgba(7, 8, 8, 0.48);
+    color: var(--fox-ink);
+    padding: 0 14px;
+    font: inherit;
+    outline: none;
+  }
+
+  .contact-form input:focus,
+  .contact-form select:focus {
+    border-color: rgba(255, 159, 28, 0.75);
+    box-shadow: 0 0 0 3px rgba(255, 106, 0, 0.12);
+  }
+
+  .contact-form select option {
+    background: var(--fox-panel);
+    color: var(--fox-ink);
+  }
+
+  .contact-submit {
+    min-height: 50px;
+    margin-top: 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 159, 28, 0.45);
+    background: linear-gradient(135deg, var(--fox-orange), var(--fox-orange-2));
+    color: #171008;
+    font: inherit;
+    font-weight: 900;
+  }
+
+  .contact-privacy {
+    display: flex;
+    justify-content: center;
+    gap: 7px;
+    color: var(--fox-soft);
+    font-size: 0.78rem;
+  }
+
+  .contact-privacy svg {
+    color: var(--fox-orange-2);
+    flex: 0 0 auto;
+  }
+
+  .cta-section {
+    padding: clamp(70px, 9vw, 118px) clamp(18px, 6vw, 86px);
+    text-align: center;
+  }
+
+  .cta-inner {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: clamp(54px, 7vw, 82px) clamp(20px, 5vw, 64px);
+    border: 1px solid rgba(255, 106, 0, 0.24);
+    border-radius: 8px;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(255, 106, 0, 0.16), transparent 44%),
+      rgba(21, 23, 25, 0.8);
+    box-shadow: var(--fox-shadow);
+  }
+
+  .cta-inner img {
+    width: 92px;
+    height: auto;
+    margin-bottom: 24px;
+    object-fit: contain;
+  }
+
+  .cta-inner h2 {
+    margin: 0 0 16px;
+    font-size: clamp(2.2rem, 5vw, 4.8rem);
+    line-height: 0.98;
+  }
+
+  .cta-inner h2 span {
+    color: var(--fox-orange-2);
+  }
+
+  .cta-inner p {
+    max-width: 610px;
+    margin: 0 auto 28px;
+    color: var(--fox-muted);
+    font-size: 1.05rem;
+    line-height: 1.68;
+  }
+
+  .lp-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    padding: 32px clamp(18px, 6vw, 86px);
+    border-top: 1px solid var(--fox-line);
+    color: var(--fox-soft);
+    font-size: 0.86rem;
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 20px;
+  }
+
+  .footer-links a {
+    color: var(--fox-soft);
+    text-decoration: none;
+  }
+
+  .footer-links a:hover { color: var(--fox-ink); }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.74);
+    backdrop-filter: blur(12px);
+  }
+
+  .modal-box {
+    width: min(430px, 100%);
+    position: relative;
+    border: 1px solid var(--fox-line-strong);
+    border-radius: 8px;
+    background: var(--fox-panel);
+    box-shadow: var(--fox-shadow);
+    padding: 30px;
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fox-muted);
+    border: 1px solid var(--fox-line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .modal-brand {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .modal-brand img {
+    width: 70px;
+    height: auto;
+    object-fit: contain;
+    margin-bottom: 12px;
+  }
+
+  .modal-brand h3 { margin: 0 0 6px; font-size: 1.3rem; }
+  .modal-brand p { margin: 0; color: var(--fox-muted); font-size: 0.9rem; }
+
+  .login-form {
+    display: grid;
+    gap: 14px;
+  }
+
+  .form-group { display: grid; gap: 7px; }
+
+  .form-label {
+    color: var(--fox-muted);
+    font-size: 0.84rem;
+    font-weight: 700;
+  }
+
+  .form-input {
+    width: 100%;
+    min-height: 46px;
+    border: 1px solid var(--fox-line-strong);
+    border-radius: 8px;
+    background: rgba(7, 8, 8, 0.52);
+    color: var(--fox-ink);
+    padding: 0 13px;
+    font: inherit;
+    outline: none;
+  }
+
+  .form-input:focus {
+    border-color: rgba(255, 159, 28, 0.75);
+    box-shadow: 0 0 0 3px rgba(255, 106, 0, 0.12);
+  }
+
+  .password-wrap { position: relative; }
+
+  .password-toggle {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fox-muted);
+  }
+
+  .form-submit {
+    min-height: 46px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 159, 28, 0.45);
+    background: linear-gradient(135deg, var(--fox-orange), var(--fox-orange-2));
+    color: #171008;
+    font: inherit;
+    font-weight: 800;
+  }
+
+  .form-submit:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+
+  .error-box {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid rgba(255, 92, 92, 0.25);
+    border-radius: 8px;
+    background: rgba(255, 92, 92, 0.09);
+    color: #ff8c8c;
+    padding: 11px 12px;
+    font-size: 0.86rem;
+  }
+
+  .fox-page {
+    --fox-bg: #fffaf4;
+    --fox-bg-2: #fff4e8;
+    --fox-panel: #ffffff;
+    --fox-panel-2: #fff7ed;
+    --fox-line: rgba(28, 25, 23, 0.1);
+    --fox-line-strong: rgba(28, 25, 23, 0.18);
+    --fox-ink: #18181b;
+    --fox-muted: #374151;
+    --fox-soft: #4b5563;
+    --fox-green: #15803d;
+    --fox-blue: #2563eb;
+    --fox-danger: #dc2626;
+    --fox-shadow: 0 24px 70px rgba(124, 45, 18, 0.12);
+    background:
+      linear-gradient(90deg, rgba(124, 45, 18, 0.045) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(124, 45, 18, 0.045) 1px, transparent 1px),
+      linear-gradient(180deg, #fffaf4 0%, #fff7ed 48%, #ffffff 100%);
+    background-size: 72px 72px, 72px 72px, auto;
+  }
+
+  .fox-page .lp-nav {
+    background: rgba(255, 250, 244, 0.86);
+    border-bottom-color: rgba(28, 25, 23, 0.1);
+  }
+
+  .fox-page .btn-secondary {
+    background: rgba(255, 255, 255, 0.78);
+    color: #1f2937;
+    border-color: rgba(28, 25, 23, 0.14);
+  }
+
+  .fox-page .hero-art,
+  .fox-page .presentation-showcase,
+  .fox-page .module-card,
+  .fox-page .security-panel,
+  .fox-page .compliance-box,
+  .fox-page .contact-form-card,
+  .fox-page .cta-inner {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(124, 45, 18, 0.16);
+  }
+
+  .fox-page .presentation-showcase {
+    background:
+      linear-gradient(90deg, rgba(124,45,18,0.045) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(124,45,18,0.045) 1px, transparent 1px),
+      radial-gradient(circle at 18% 18%, rgba(255, 106, 0, 0.18), transparent 34%),
+      linear-gradient(135deg, rgba(255, 237, 213, 0.9), rgba(255,255,255,0.82) 50%, rgba(255,247,237,0.92));
+    background-size: 58px 58px, 58px 58px, auto, auto;
+  }
+
+  .fox-page .presentation-showcase .screen-ui,
+  .fox-page .presentation-showcase .phone-mock,
+  .fox-page .presentation-showcase .phone-screen {
+    --fox-ink: #f7f3ed;
+    --fox-muted: #a8adb3;
+    --fox-soft: #6f7780;
+    --fox-line: rgba(255, 255, 255, 0.1);
+    --fox-line-strong: rgba(255, 255, 255, 0.18);
+    --fox-green: #35d07f;
+  }
+
+  .fox-page .presentation-feature {
+    background: rgba(255, 255, 255, 0.78);
+  }
+
+  .fox-page .nav-links a,
+  .fox-page .brand-mark,
+  .fox-page .hero h1,
+  .fox-page .section-heading h2,
+  .fox-page .contact-copy h2,
+  .fox-page .cta-inner h2,
+  .fox-page .hero-lead,
+  .fox-page .section-heading p,
+  .fox-page .module-card p,
+  .fox-page .flow-step p,
+  .fox-page .security-panel p,
+  .fox-page .check-item,
+  .fox-page .contact-copy p,
+  .fox-page .contact-info-label,
+  .fox-page .compliance-box p,
+  .fox-page .contact-form label,
+  .fox-page .contact-privacy,
+  .fox-page .cta-inner p,
+  .fox-page .footer-links a {
+    color: #111827;
+  }
+
+  .fox-page .hero h1 {
+    color: #000000;
+    opacity: 1;
+    text-shadow: none;
+  }
+
+  .fox-page .contact-info-value,
+  .fox-page .contact-info-value a,
+  .fox-page .module-card h3,
+  .fox-page .flow-step h3,
+  .fox-page .compliance-box h3,
+  .fox-page .contact-form-card h3,
+  .fox-page .presentation-feature strong {
+    color: #111827;
+  }
+
+  .fox-page .presentation-feature span {
+    color: #374151;
+  }
+
+  .fox-page .flow-grid,
+  .fox-page .presentation-feature-row {
+    background: rgba(28, 25, 23, 0.1);
+  }
+
+  .fox-page .flow-step {
+    background: rgba(255, 255, 255, 0.82);
+  }
+
+  .fox-page .contact-form input,
+  .fox-page .contact-form select,
+  .fox-page .form-input {
+    background: rgba(255, 255, 255, 0.88);
+    color: var(--fox-ink);
+  }
+
+  .fox-page .contact-form select option {
+    background: #ffffff;
+    color: var(--fox-ink);
+  }
+
+  .fox-page .modal-overlay {
+    background: rgba(28, 25, 23, 0.28);
+  }
+
+  .fox-page .modal-box {
+    background: #ffffff;
+    border-color: rgba(28, 25, 23, 0.14);
+  }
+
+  @media (max-width: 1040px) {
+    .hero,
+    .contact-section,
+    .security-band {
+      grid-template-columns: 1fr;
+    }
+
+    .hero { min-height: auto; }
+    .hero-art {
+      min-height: 360px;
+      max-width: 760px;
+    }
+    .hero-art img { min-height: 360px; }
+    .modules-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .flow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .presentation-feature-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .laptop-mock { width: 100%; }
+    .phone-mock {
+      position: relative;
+      right: auto;
+      bottom: auto;
+      margin: 22px auto 0;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .lp-nav { height: 66px; }
     .nav-links { display: none; }
-    .hero-visual { order: -1; }
+    .hero { padding-top: 108px; }
+    .hero-art,
+    .hero-art img {
+      min-height: 280px;
+    }
+    .metric-grid,
+    .mock-kpis,
+    .mock-dashboard-grid,
+    .mock-bottom-grid,
+    .contact-form-row,
+    .presentation-feature-row,
+    .modules-grid,
+    .flow-grid {
+      grid-template-columns: 1fr;
+    }
+    .screen-ui { grid-template-columns: 1fr; height: auto; }
+    .mock-sidebar { display: none; }
+    .laptop-mock {
+      min-height: auto;
+      padding: 12px;
+    }
+    .presentation-showcase { min-height: auto; }
+    .lp-footer {
+      align-items: flex-start;
+      flex-direction: column;
+    }
   }
 
-  @media (max-width: 640px) {
-    .stats-bar { grid-template-columns: 1fr 1fr; }
-    .modules-grid { grid-template-columns: 1fr; }
-    .flow { grid-template-columns: 1fr; }
+  @media (max-width: 460px) {
+    .nav-actions .btn-secondary { display: none; }
+    .btn { width: 100%; }
+    .nav-actions .btn { width: auto; }
+    .hero h1 { font-size: clamp(2.7rem, 18vw, 4.2rem); }
   }
 `;
 
-/* ─── ANIMATED COUNTER ─── */
-function Counter({ end, suffix = '', prefix = '', duration = 2 }: { end: number; suffix?: string; prefix?: string; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const started = useRef(false);
+const modules = [
+  {
+    icon: Building2,
+    title: 'Condomínios',
+    text: 'Cadastro operacional com unidades, documentos, fornecedores e histórico centralizado.',
+  },
+  {
+    icon: DatabaseZap,
+    title: 'Faturas',
+    text: 'Organização por competência, status, concessionária e trilha completa de processamento.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Relatórios',
+    text: 'Visão gerencial para consumo, custos, recorrência e desvios que pedem ação.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Auditoria',
+    text: 'Rastreabilidade para saber quem alterou, quando alterou e o que mudou no sistema.',
+  },
+];
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !started.current) {
-        started.current = true;
-        const startTime = performance.now();
-        const tick = (now: number) => {
-          const progress = Math.min((now - startTime) / (duration * 1000), 1);
-          const eased = 1 - Math.pow(1 - progress, 3);
-          setCount(Math.round(eased * end));
-          if (progress < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      }
-    }, { threshold: 0.3 });
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [end, duration]);
-
-  return <span ref={ref}>{prefix}{count}{suffix}</span>;
-}
+const flow = [
+  {
+    title: 'Captura',
+    text: 'FOX acompanha os canais de recebimento e identifica novos documentos de cobrança.',
+  },
+  {
+    title: 'Processamento',
+    text: 'O sistema interpreta arquivos, cruza cadastros e organiza a informação por contrato.',
+  },
+  {
+    title: 'Validação',
+    text: 'Regras de variação, prazos e duplicidade apontam somente o que merece revisão.',
+  },
+  {
+    title: 'Gestão',
+    text: 'Dashboards, relatórios e histórico deixam a rotina financeira clara e auditável.',
+  },
+];
 
 export default function LandingPage() {
   const [isLoginView, setIsLoginView] = useState(false);
@@ -843,37 +1525,28 @@ export default function LandingPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [showSticky, setShowSticky] = useState(false);
-  const [formData, setFormData] = useState({ nome: '', email: '', empresa: '', condomínios: '' });
-
+  const [contactData, setContactData] = useState({
+    nome: '',
+    email: '',
+    administradora: '',
+    condominios: '',
+  });
   const { login } = useAuth();
-
-  useEffect(() => {
-    const handler = () => setShowSticky(window.scrollY > 500);
-    window.addEventListener('scroll', handler);
-    return () => window.removeEventListener('scroll', handler);
-  }, []);
 
   const handleLogin = async (e?: FormEvent) => {
     if (e) e.preventDefault();
     setError(null);
     setIsLoading(true);
+
     try {
       const user = await login({ email, senha: password });
-      
       let redirectPath = new URL(window.location.href).searchParams.get('redirect');
-      
+
       if (!redirectPath) {
-        // Redirecionamento baseado em cargo
-        const operacaoRoles = ['concessionarias', 'contabilidade', 'emissao', 'orçamento'];
-        if (operacaoRoles.includes(user.role)) {
-          redirectPath = '/condominios';
-        } else {
-          redirectPath = '/dashboard';
-        }
+        const operacaoRoles = ['concessionarias', 'contabilidade', 'emissao', 'orcamento', 'orçamento'];
+        redirectPath = operacaoRoles.includes(user.role) ? '/condominios' : '/dashboard';
       }
-      
+
       window.location.href = redirectPath;
     } catch (err: any) {
       setError(err.message || 'Falha na autenticação');
@@ -881,601 +1554,439 @@ export default function LandingPage() {
     }
   };
 
-  const faqs = [
-    { q: 'O Datacron funciona com qualquer provedor de e-mail?', a: 'Sim. Utilizamos protocolo IMAP/POP3, compatível com Gmail, Outlook, Yahoo e qualquer servidor corporativo. A configuração leva menos de 10 minutos.' },
-    { q: 'Quais concessionárias são suportadas atualmente?', a: 'Suportamos ENEL, SABESP, COMGÁS, CPFL, Light, Copel, Equatorial, Neoenergia e mais de 20 distribuidoras regionais. Novas integrações são adicionadas mensalmente.' },
-    { q: 'Como funciona o desbloqueio automático de faturas com senha?', a: 'O sistema utiliza o CNPJ cadastrado do condomínio para realizar o desbloqueio automático do PDF — sem intervenção humana, com 100% de rastreabilidade.' },
-    { q: 'Como o sistema avisa quando uma fatura não chega no prazo?', a: 'Você cadastra o calendário esperado de recebimento por concessionária. Se a fatura não chegar até o prazo configurado, o Datacron envia alertas por e-mail e notificação no dashboard.' },
-    { q: 'Os dados ficam seguros? Atendem à LGPD?', a: 'Sim. Utilizamos criptografia AES-256 em repouso e TLS 1.3 em trânsito. Temos DPA disponível e estamos em total conformidade com a LGPD.' },
-    { q: 'Em quanto tempo fica operacional após a contratação?', a: 'A maioria dos clientes está totalmente operacional em 48-72 horas. Nosso time de onboarding cuida de toda a configuração inicial.' },
-  ];
+  const handleContactSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    alert('Obrigado! Entraremos em contato em até 2 horas úteis.');
+    setContactData({ nome: '', email: '', administradora: '', condominios: '' });
+  };
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
-
-      <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
-
-        {/* ── NAV ── */}
-        <nav className="lp-nav">
-          <Link href="/" className="nav-logo">DATA<span>CRON</span></Link>
+      <main className="fox-page">
+        <nav className="lp-nav" aria-label="Navegacao principal">
+          <a className="brand-mark" href="#top" aria-label="FOX">
+            <Image src="/fox-logo-header.png" alt="FOX" width={150} height={150} priority />
+          </a>
           <ul className="nav-links">
-            <li><a href="#funcionalidades">Funcionalidades</a></li>
-            <li><a href="#como-funciona">Como funciona</a></li>
-            <li><a href="#planos">Planos</a></li>
-            <li><a href="#faq">FAQ</a></li>
+            <li><a href="#sistema">Sistema</a></li>
+            <li><a href="#recursos">Recursos</a></li>
+            <li><a href="#operacao">Operação</a></li>
+            <li><a href="#seguranca">Segurança</a></li> 
           </ul>
-          <div className="nav-cta">
-            <button className="btn-ghost" onClick={() => setIsLoginView(true)}>Entrar</button>
-            <a href="#contato" className="btn-accent">Solicitar Demo →</a>
+          <div className="nav-actions">
+            <a className="btn btn-secondary" href="#recursos">Conhecer</a>
+            <button className="btn btn-primary" onClick={() => setIsLoginView(true)}>
+              Entrar <ArrowRight size={16} />
+            </button>
           </div>
         </nav>
 
-        {/* ── HERO ── */}
-        <section className="hero">
-          <div className="hero-content">
-            <div className="hero-badge">RPA para Condomínios · Automação Total</div>
-            <h1 className="hero-title">
-              Faturas de concessionárias<br />
-              <em>no automático.</em><br />
-              Sem digitar nada.
-            </h1>
-            <p className="hero-desc">
-              O Datacron monitora sua caixa de entrada, extrai dados com 99,9% de precisão, detecta anomalias e exporta para o seu ERP — 24h por dia, sem intervenção humana.
+        <section className="hero" id="top">
+          <div className="hero-copy">
+            <div className="eyebrow">Sistema de gestão automatizada</div>
+            <h1>FOX para controlar faturas com mais <span>precisão</span>.</h1>
+            <p className="hero-lead">
+              Uma plataforma profissional para recebimento, leitura, validação e acompanhamento de faturas em operações condominiais e financeiras.
             </p>
             <div className="hero-actions">
-              <a href="#contato" className="btn-hero-primary">
-                <ArrowRight size={16} />
-                Ver demonstração gratuita
-              </a>
-              <a href="#como-funciona" className="btn-hero-secondary">
-                Como funciona →
-              </a>
-            </div>
-            <div className="hero-trust">
-              <div className="hero-trust-avatars">
-                {['RS', 'MC', 'FP', 'AK', 'BL'].map(i => (
-                  <div key={i} className="hero-trust-avatar">{i}</div>
-                ))}
-              </div>
-              <span className="stars-mini">★★★★★</span>
-              <span>+50 administradoras confiam no Datacron</span>
-            </div>
-          </div>
-
-          <div className="hero-visual">
-            <div className="dashboard-mock">
-              <div className="mock-topbar">
-                <div className="mock-dots">
-                  <div className="mock-dot r"></div>
-                  <div className="mock-dot y"></div>
-                  <div className="mock-dot g"></div>
-                </div>
-                <div className="mock-title-bar">DATACRON · PAINEL DE FATURAS</div>
-                <div className="mock-live">AO VIVO</div>
-              </div>
-              <div className="mock-body">
-                <div className="mock-stats-row">
-                  <div className="mock-stat-box">
-                    <div className="mock-stat-val accent">247</div>
-                    <div className="mock-stat-lbl">Faturas hoje</div>
-                  </div>
-                  <div className="mock-stat-box">
-                    <div className="mock-stat-val green">99,9%</div>
-                    <div className="mock-stat-lbl">Precisão OCR</div>
-                  </div>
-                  <div className="mock-stat-box">
-                    <div className="mock-stat-val amber">3</div>
-                    <div className="mock-stat-lbl">Alertas ativos</div>
-                  </div>
-                  <div className="mock-stat-box">
-                    <div className="mock-stat-val">5min</div>
-                    <div className="mock-stat-lbl">Ciclo varredura</div>
-                  </div>
-                </div>
-                <div className="mock-thead">
-                  <span>Concess.</span><span>Condomínio</span><span>Valor</span><span>Status</span>
-                </div>
-                {[
-                  { tag: 'ENEL-SP', condo: 'Edifício Alfa', val: 'R$ 2.840', ok: true },
-                  { tag: 'SABESP', condo: 'Cond. Primavera', val: 'R$ 1.120', ok: true },
-                  { tag: 'COMGÁS', condo: 'Torre Business', val: 'R$ 892', ok: false },
-                ].map((row, i) => (
-                  <div key={i} className="mock-trow">
-                    <span><div className="mock-tag">{row.tag}</div></span>
-                    <span className="mock-condo">{row.condo}</span>
-                    <span className={`mock-val ${row.ok ? '' : 'danger'}`}>{row.val}</span>
-                    <span>
-                      {row.ok
-                        ? <span className="mock-pill pill-ok">✓ Processada</span>
-                        : <span className="mock-pill pill-alert">⚠ Alerta</span>
-                      }
-                    </span>
-                  </div>
-                ))}
-                <div className="mock-alert">
-                  <div className="mock-alert-icon">!</div>
-                  <div>
-                    <strong style={{ color: 'var(--danger)' }}>Variação detectada:</strong>
-                    {' '}COMGÁS · Torre Business com consumo 47% acima da média dos últimos 3 meses.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── TRUST BAR (concessionárias) ── */}
-        <div className="trust-bar">
-          <div className="trust-bar-label">Integrado com</div>
-          <div className="trust-bar-logos">
-            {['ENEL-SP', 'SABESP', 'COMGÁS', 'CPFL', 'LIGHT', 'COPEL', 'EQUATORIAL', 'NEOENERGIA'].map(l => (
-              <div key={l} className="trust-logo">{l}</div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── STATS BAR ── */}
-        <div className="stats-bar">
-          <div className="stat-item">
-            <div className="stat-num"><Counter end={99} suffix=",9%" /></div>
-            <div className="stat-label">Precisão de leitura OCR</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-num"><span style={{ fontSize: '1.5rem', color: 'var(--text3)' }}>&lt;</span><Counter end={5} suffix="min" /></div>
-            <div className="stat-label">Ciclo de varredura automática</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-num">24<span style={{ color: 'var(--text3)', fontSize: '1.5rem' }}>/7</span></div>
-            <div className="stat-label">Monitoramento contínuo</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-num">0</div>
-            <div className="stat-label">Digitação manual necessária</div>
-          </div>
-        </div>
-
-        {/* ── PROBLEMA / SOLUÇÃO ── */}
-        <section className="lp-section" id="funcionalidades">
-          <div className="section-eyebrow">O Problema que Resolvemos</div>
-          <h2 className="section-title">Do caos da caixa de entrada<br />ao <em>controle absoluto</em></h2>
-          <p className="section-sub">Administradoras perdem dias todo mês fazendo manualmente o que o Datacron faz em segundos — com mais precisão e total rastreabilidade.</p>
-
-          <div className="compare-grid">
-            <div className="compare-card bad">
-              <div className="compare-head bad-head">✕ Sem o Datacron</div>
-              <ul className="compare-list">
-                <li><div className="ico ico-bad">✕</div>Varredura manual de dezenas de e-mails por dia</li>
-                <li><div className="ico ico-bad">✕</div>Digitação linha a linha no Excel — horas perdidas</li>
-                <li><div className="ico ico-bad">✕</div>Dias gastos para fechar caixas de condomínio</li>
-                <li><div className="ico ico-bad">✕</div>Risco alto de erros, multas por atraso e retrabalho</li>
-                <li><div className="ico ico-bad">✕</div>Zero visibilidade sobre variações abusivas de consumo</li>
-              </ul>
-            </div>
-            <div className="compare-card good">
-              <div className="compare-head good-head">✓ Com o Datacron</div>
-              <ul className="compare-list">
-                <li><div className="ico ico-good">✓</div>Robôs varrem centenas de inboxes automaticamente</li>
-                <li><div className="ico ico-good">✓</div>OCR extrai dados com 99,9% de precisão comprovada</li>
-                <li><div className="ico ico-good">✓</div>Exportação instantânea pronta para o seu ERP</li>
-                <li><div className="ico ico-good">✓</div>Auditoria inteligente: bloqueia faturas com variação anormal</li>
-                <li><div className="ico ico-good">✓</div>Dashboard em tempo real com alertas configuráveis</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* ── MÓDULOS ── */}
-        <section className="lp-section" style={{ background: 'var(--bg2)' }}>
-          <div className="section-eyebrow">Módulos da Plataforma</div>
-          <h2 className="section-title">Uma suíte completa para<br />administradoras de <em>condomínio</em></h2>
-
-          <div className="modules-grid">
-            {[
-              { icon: <Mail size={18} />, title: 'Varredura de Inbox', desc: 'Agente monitora sua caixa IMAP/POP3 a cada 5 minutos. Identifica faturas de ENEL, SABESP, COMGÁS, CPFL e outras automaticamente.', tags: ['IMAP/POP3', 'Multi-inbox'], featured: false },
-              { icon: <Shield size={18} />, title: 'Desbloqueio Automático', desc: 'Faturas protegidas por senha? O Datacron realiza a quebra automática via CNPJ do condomínio, sem intervenção humana.', tags: ['PDF Unlock', 'Seguro'], featured: false },
-              { icon: <Zap size={18} />, title: 'OCR de Alta Precisão', desc: 'Modelos especializados extraem valores, vencimentos e código de barras com 99,9% de acurácia — sem revisão manual.', tags: ['99,9% OCR', 'IA Dedicada'], featured: true },
-              { icon: <Bell size={18} />, title: 'Alertas Inteligentes', desc: 'Variações acima do limiar configurado disparam alertas imediatos. Também avisa faturas em falta antes do vencimento.', tags: ['Anti-fraude', 'Configurável'], featured: false },
-              { icon: <Database size={18} />, title: 'Banco de Dados Unificado', desc: 'PostgreSQL projetado para milhões de faturas. Exportações em XLSX e API REST pronta para integração com seu ERP.', tags: ['PostgreSQL', 'API REST'], featured: false },
-              { icon: <BarChart3 size={18} />, title: 'Dashboard & Relatórios', desc: 'Visibilidade total em tempo real: consumo histórico, comparativos por período e ranking de concessionárias.', tags: ['Real-time', 'Analytics'], featured: false },
-            ].map((m, i) => (
-              <div key={i} className={`module-card ${m.featured ? 'featured' : ''}`}>
-                <div className="module-icon-wrap">{m.icon}</div>
-                <div className="module-title">{m.title}</div>
-                <p className="module-desc">{m.desc}</p>
-                <div className="module-tags">{m.tags.map(t => <span key={t} className="tag">{t}</span>)}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── COMO FUNCIONA ── */}
-        <section className="lp-section" id="como-funciona">
-          <div className="section-eyebrow">Fluxo de Operação</div>
-          <h2 className="section-title">Do e-mail ao dado estruturado<br />em <em>segundos</em></h2>
-
-          <div className="flow">
-            {[
-              { n: '01', t: 'Monitoramento contínuo', d: 'O agente varre inboxes a cada 5 minutos, identificando e baixando faturas automaticamente.' },
-              { n: '02', t: 'Extração e desbloqueio', d: 'Senhas quebradas via CNPJ. OCR extrai valores, vencimentos e códigos de barras.' },
-              { n: '03', t: 'Auditoria inteligente', d: 'Motor de regras compara consumo com histórico. Desvios disparam alertas em tempo real.' },
-              { n: '04', t: 'Exportação e integração', d: 'Dados validados vão para o banco e ficam disponíveis via API REST ou XLSX para o seu ERP.' },
-            ].map((s, i) => (
-              <div key={i} className="flow-step">
-                <div className="flow-num">{s.n}</div>
-                <div className="flow-title">{s.t}</div>
-                <p className="flow-desc">{s.d}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── ALERTS ── */}
-        <section className="lp-section" style={{ background: 'var(--bg2)' }}>
-          <div className="section-eyebrow">Sistema de Alertas</div>
-          <h2 className="section-title">Nunca mais seja surpreendido<br />por uma fatura <em>fora do padrão</em></h2>
-
-          <div className="alerts-layout">
-            <div>
-              <p className="section-sub" style={{ marginBottom: '2rem' }}>
-                O Datacron monitora variações de consumo e o não recebimento de faturas, avisando você antes que o problema vire prejuízo.
-              </p>
-              <ul className="benefits-list">
-                <li><Check size={16} className="check-ico" /><span>Limiar de variação configurável por condomínio</span></li>
-                <li><Check size={16} className="check-ico" /><span>Alertas por e-mail e notificação no dashboard</span></li>
-                <li><Check size={16} className="check-ico" /><span>Aviso antecipado de faturas não recebidas</span></li>
-                <li><Check size={16} className="check-ico" /><span>Histórico completo de todas as ocorrências</span></li>
-              </ul>
-              <a href="#contato" className="btn-hero-primary" style={{ display: 'inline-flex', marginTop: '1rem' }}>
-                Quero testar os alertas →
-              </a>
-            </div>
-            <div>
-              <div className="alert-card">
-                <div className="alert-icon-box" style={{ background: 'var(--danger-bg)' }}>🚨</div>
-                <div>
-                  <div className="alert-title" style={{ color: 'var(--danger)' }}>Variação crítica detectada</div>
-                  <div className="alert-desc">COMGÁS · Torre Business · Consumo <strong style={{ color: 'var(--danger)' }}>47% acima</strong> da média dos últimos 3 meses.</div>
-                  <div className="alert-time">Detectado agora · Agente RPA</div>
-                </div>
-              </div>
-              <div className="alert-card">
-                <div className="alert-icon-box" style={{ background: 'var(--amber-bg)' }}>⏰</div>
-                <div>
-                  <div className="alert-title" style={{ color: 'var(--amber)' }}>Fatura não recebida</div>
-                  <div className="alert-desc">ENEL-SP · Residencial Laranjeiras · Previsão dia 15 <strong style={{ color: 'var(--amber)' }}>ainda não chegou</strong>.</div>
-                  <div className="alert-time">Alerta automático · 08:14</div>
-                </div>
-              </div>
-              <div className="alert-card">
-                <div className="alert-icon-box" style={{ background: 'var(--green-bg)' }}>✅</div>
-                <div>
-                  <div className="alert-title" style={{ color: 'var(--green)' }}>Lote processado com sucesso</div>
-                  <div className="alert-desc">SABESP · 32 faturas processadas · Todas dentro do padrão histórico.</div>
-                  <div className="alert-time">Concluído há 2 minutos · Ciclo automático</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── TESTIMONIALS ── */}
-        <section className="lp-section">
-          <div style={{ textAlign: 'center' }}>
-            <div className="section-eyebrow">Quem usa o Datacron</div>
-            <h2 className="section-title">Administradoras que <em>recuperaram</em><br />horas de trabalho todo mês</h2>
-          </div>
-
-          <div className="testimonials-grid">
-            <div className="testimonial-card">
-              <div className="stars">★★★★★</div>
-              <p className="testimonial-text">"Antes gastávamos 2 dias inteiros fechando as caixas dos condomínios. Com o Datacron isso é feito automaticamente. A equipe ganhou tempo para focar no que importa."</p>
-              <div className="testimonial-author">
-                <div className="author-avatar">RS</div>
-                <div>
-                  <div className="author-name">Ricardo S.</div>
-                  <div className="author-role">Diretor Operacional · Adm. Síntese</div>
-                </div>
-              </div>
-            </div>
-            <div className="testimonial-card">
-              <div className="stars">★★★★★</div>
-              <p className="testimonial-text">"O alerta de variação nos salvou de um pagamento indevido de quase R$ 4 mil. O sistema sinalizou na hora, antes mesmo de qualquer aprovação manual."</p>
-              <div className="testimonial-author">
-                <div className="author-avatar">MC</div>
-                <div>
-                  <div className="author-name">Mariana C.</div>
-                  <div className="author-role">Gestora Financeira · CondoMais</div>
-                </div>
-              </div>
-            </div>
-            <div className="testimonial-card">
-              <div className="stars">★★★★★</div>
-              <p className="testimonial-text">"A integração com nosso ERP foi surpreendentemente simples. Em uma semana já tínhamos tudo funcionando e os primeiros relatórios prontos."</p>
-              <div className="testimonial-author">
-                <div className="author-avatar">FP</div>
-                <div>
-                  <div className="author-name">Felipe P.</div>
-                  <div className="author-role">Gerente de TI · Grupo Patrimonial</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── PLANOS ── */}
-        <section className="lp-section" id="planos" style={{ background: 'var(--bg2)' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div className="section-eyebrow">Planos e Preços</div>
-            <h2 className="section-title">Escolha o plano ideal<br />para sua <em>operação</em></h2>
-            <p className="section-sub" style={{ margin: '0 auto 3rem' }}>Todos os planos incluem onboarding gratuito e suporte via e-mail.</p>
-          </div>
-
-          <div className="pricing-grid">
-            <div className="pricing-card">
-              <div className="plan-name">Starter</div>
-              <div className="plan-price">Sob consulta</div>
-              <div className="plan-price-note">Ideal para começar a automação</div>
-              <ul className="plan-features">
-                <li>Até 5 condomínios</li>
-                <li>1 caixa de e-mail monitorada</li>
-                <li>OCR + desbloqueio de PDF</li>
-                <li>Exportação XLSX</li>
-                <li>Alertas básicos de variação</li>
-              </ul>
-              <a href="#contato" className="plan-cta secondary">Solicitar Proposta</a>
-            </div>
-            <div className="pricing-card featured">
-              <div className="featured-badge">MAIS POPULAR</div>
-              <div className="plan-name">Professional</div>
-              <div className="plan-price">Sob consulta</div>
-              <div className="plan-price-note">Para operações médias a grandes</div>
-              <ul className="plan-features">
-                <li>Até 50 condomínios</li>
-                <li>Múltiplas caixas de e-mail</li>
-                <li>Alertas totalmente configuráveis</li>
-                <li>Dashboard em tempo real</li>
-                <li>API REST para integração ERP</li>
-                <li>Suporte prioritário</li>
-              </ul>
-              <a href="#contato" className="plan-cta primary">Solicitar Proposta</a>
-            </div>
-            <div className="pricing-card">
-              <div className="plan-name">Enterprise</div>
-              <div className="plan-price">Personalizado</div>
-              <div className="plan-price-note">Para grandes grupos e redes</div>
-              <ul className="plan-features">
-                <li>Condomínios ilimitados</li>
-                <li>SLA garantido em contrato</li>
-                <li>Integração dedicada</li>
-                <li>Customizações sob demanda</li>
-                <li>Gerente de conta exclusivo</li>
-              </ul>
-              <a href="#contato" className="plan-cta secondary">Falar com Especialista</a>
-            </div>
-          </div>
-        </section>
-
-        {/* ── FAQ ── */}
-        <section className="lp-section" id="faq">
-          <div style={{ textAlign: 'center' }}>
-            <div className="section-eyebrow">Perguntas Frequentes</div>
-            <h2 className="section-title">Tudo que você<br />precisa <em>saber</em></h2>
-          </div>
-
-          <div className="faq-list">
-            {faqs.map((item, i) => (
-              <div key={i} className={`faq-item ${openFaq === i ? 'open' : ''}`}>
-                <div className="faq-q" onClick={() => setOpenFaq(openFaq === i ? null : i)}>
-                  {item.q}
-                  <div className="faq-toggle"><ChevronDown size={18} /></div>
-                </div>
-                <div className="faq-a">{item.a}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── CONTATO ── */}
-        <section className="lp-section" id="contato" style={{ background: 'var(--bg2)' }}>
-          <div className="section-eyebrow">Fale com a Gente</div>
-          <h2 className="section-title">Pronto para <em>automatizar</em><br />sua operação?</h2>
-
-          <div className="contact-layout">
-            <div>
-              <p style={{ color: 'var(--text2)', marginBottom: '0.5rem', lineHeight: 1.7 }}>
-                Fale com nosso time e descubra como eliminar o trabalho manual em menos de 1 semana. Respondemos em até 2 horas úteis.
-              </p>
-              <ul className="contact-info-list">
-                <li>
-                  <div className="contact-ico">✉️</div>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text3)', marginBottom: '2px' }}>E-mail</div>
-                    <a href="mailto:contato@datacron.com.br" className="contact-link">contato@datacron.com.br</a>
-                  </div>
-                </li>
-                <li>
-                  <div className="contact-ico">💬</div>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text3)', marginBottom: '2px' }}>WhatsApp</div>
-                    <a href="https://wa.me/5511999999999" className="contact-link" target="_blank" rel="noopener noreferrer">Falar agora →</a>
-                  </div>
-                </li>
-                <li>
-                  <div className="contact-ico">⏱️</div>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text3)', marginBottom: '2px' }}>Horário</div>
-                    <span style={{ color: 'var(--text2)', fontSize: '0.9rem' }}>Seg–Sex · 9h às 18h (BRT)</span>
-                  </div>
-                </li>
-              </ul>
-
-              <div style={{
-                marginTop: '2.5rem', padding: '1.25rem 1.5rem',
-                background: 'var(--card)', border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)', display: 'flex', gap: '1rem', alignItems: 'flex-start'
-              }}>
-                <div style={{ fontSize: '1.5rem' }}>🔒</div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '4px' }}>Conformidade LGPD</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text2)', lineHeight: 1.6 }}>Todos os dados são tratados em conformidade com a Lei Geral de Proteção de Dados. DPA disponível sob solicitação.</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="contact-form">
-              <h3 style={{ fontFamily: 'var(--font-head)', fontSize: '1.15rem', fontWeight: 700, marginBottom: '1.5rem' }}>Solicitar Demonstração Gratuita</h3>
-
-              <div className="form-input-row">
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Nome completo</label>
-                  <input type="text" className="form-input" placeholder="João Silva"
-                    value={formData.nome} onChange={e => setFormData(p => ({ ...p, nome: e.target.value }))} />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">E-mail corporativo</label>
-                  <input type="email" className="form-input" placeholder="joao@empresa.com"
-                    value={formData.email} onChange={e => setFormData(p => ({ ...p, email: e.target.value }))} />
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginTop: '0.75rem' }}>
-                <label className="form-label">Nome da administradora</label>
-                <input type="text" className="form-input" placeholder="Adm. Exemplo Ltda."
-                  value={formData.empresa} onChange={e => setFormData(p => ({ ...p, empresa: e.target.value }))} />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Quantos condomínios você administra?</label>
-                <select className="form-select"
-                  value={formData.condomínios} onChange={e => setFormData(p => ({ ...p, condomínios: e.target.value }))}>
-                  <option value="">Selecione...</option>
-                  <option value="1-5">1 a 5</option>
-                  <option value="6-20">6 a 20</option>
-                  <option value="21-50">21 a 50</option>
-                  <option value="50+">Mais de 50</option>
-                </select>
-              </div>
-
-              <button className="form-submit" onClick={() => alert('Obrigado! Entraremos em contato em até 2 horas úteis.')}>
-                Quero minha demonstração gratuita →
+              <button className="btn btn-primary" onClick={() => setIsLoginView(true)}>
+                Acessar sistema <ArrowRight size={17} />
               </button>
-              <p className="form-privacy-note">🔒 Sem spam. Seus dados são protegidos pela LGPD.</p>
+              <a className="btn btn-secondary" href="#sistema">
+                Ver apresentação
+              </a>
+            </div>
+          </div>
+          <div className="hero-art">
+            <Image
+              src="/fox-hero-final.png"
+              alt="FOX com painéis de segurança, alertas, rastreabilidade e indicadores operacionais"
+              width={1672}
+              height={927}
+              sizes="(max-width: 1040px) 100vw, 52vw"
+              priority
+            />
+          </div>
+        </section>
+
+        <section className="section" id="sistema">
+          <div className="section-heading center">
+            <div className="eyebrow">Apresentação</div>
+            <h2>Automação inteligente. Controle total.</h2>
+            <p>Uma visão institucional do FOX para gestão de condomínios, concessionárias, contas e relatórios em tempo real.</p>
+          </div>
+          <div className="presentation-showcase" aria-label="Apresentação visual do sistema FOX">
+            <div className="device-stage">
+              <div className="laptop-mock">
+                <div className="screen-ui">
+                  <aside className="mock-sidebar">
+                    <div className="mock-brand">F<span>O</span>X</div>
+                    <div className="mock-nav">
+                      <span>Dashboard</span>
+                      <span>Condomínios</span>
+                      <span>Contas</span>
+                      <span>Relatórios</span>
+                      <span>Configurações</span>
+                    </div>
+                  </aside>
+                  <div className="mock-content">
+                    <div className="mock-content-header">
+                      <h3>Dashboard</h3>
+                      <div className="mock-search" />
+                    </div>
+                    <div className="mock-kpis">
+                      <div className="mock-kpi"><small>Recebido no mês</small><strong>R$ 128.750</strong><em>+12,9%</em></div>
+                      <div className="mock-kpi"><small>Pendências</small><strong>R$ 18.230</strong><em>-5,3%</em></div>
+                      <div className="mock-kpi"><small>Condomínios</small><strong>128</strong><em>ativas</em></div>
+                      <div className="mock-kpi"><small>Faturas</small><strong>R$ 45.600</strong><em>23 pendentes</em></div>
+                    </div>
+                    <div className="mock-dashboard-grid">
+                      <div className="mock-panel">
+                        <div className="mock-panel-title">Evolução de recebimento</div>
+                        <div className="line-chart">
+                          <svg viewBox="0 0 420 90" aria-hidden="true">
+                            <polyline points="0,72 34,66 68,70 102,58 136,62 170,44 204,50 238,32 272,42 306,26 340,34 374,18 420,24" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="mock-panel">
+                        <div className="mock-panel-title">Resumo financeiro</div>
+                        <div className="donut-wrap"><div className="donut" /></div>
+                      </div>
+                    </div>
+                    <div className="mock-bottom-grid">
+                      <div className="mock-panel">
+                        <div className="mock-panel-title">Status de progresso</div>
+                        <div className="donut-wrap"><div className="donut" /></div>
+                      </div>
+                      <div className="mock-panel">
+                        <div className="mock-panel-title">Próximos vencimentos</div>
+                        <div className="mini-list">
+                          <div className="mini-row"><span>Água - Bloco A</span><span>R$ 1.250</span></div>
+                          <div className="mini-row"><span>Energia - Área comum</span><span>R$ 2.350</span></div>
+                          <div className="mini-row"><span>Gás - Bloco B</span><span>R$ 980</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="laptop-base" />
+
+              <div className="phone-mock" aria-hidden="true">
+                <div className="phone-screen">
+                  <div className="phone-top"><span>FOX</span><span>Menu</span></div>
+                  <div className="phone-card">
+                    <small>Resumo geral</small>
+                    <strong>R$ 86.450</strong>
+                    <div className="donut phone-donut" />
+                  </div>
+                  <div className="phone-card">
+                    <div className="phone-actions">
+                      <div className="phone-action"><span>Contas em aberto</span><strong>128</strong></div>
+                      <div className="phone-action"><span>Vencidas</span><strong>23</strong></div>
+                      <div className="phone-action"><span>A vencer</span><strong>45</strong></div>
+                    </div>
+                  </div>
+                  <div className="phone-cta">Nova conta</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="presentation-feature-row">
+              <div className="presentation-feature">
+                <DatabaseZap />
+                <strong>Automação de contas</strong>
+                <span>Leitura automática e conciliação inteligente.</span>
+              </div>
+              <div className="presentation-feature">
+                <Building2 />
+                <strong>Concessionárias</strong>
+                <span>Água, energia, gás, internet e contratos.</span>
+              </div>
+              <div className="presentation-feature">
+                <BarChart3 />
+                <strong>Relatórios avançados</strong>
+                <span>Indicadores em tempo real para decisão.</span>
+              </div>
+              <div className="presentation-feature">
+                <Check />
+                <strong>Alertas inteligentes</strong>
+                <span>Notificações de vencimentos e pendências.</span>
+              </div>
+              <div className="presentation-feature">
+                <ShieldCheck />
+                <strong>Segurança</strong>
+                <span>Dados protegidos e operação rastreável.</span>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* ── CTA BANNER ── */}
-        <section className="lp-section">
-          <div className="cta-banner">
-            <div className="section-eyebrow" style={{ margin: '0 auto 1.25rem' }}>Comece hoje</div>
-            <h2 className="section-title" style={{ marginBottom: '1rem' }}>Elimine o trabalho manual<br />em <em>menos de 1 semana</em></h2>
-            <p style={{ color: 'var(--text2)', margin: '0 auto 2rem', maxWidth: 480, fontSize: '1rem', lineHeight: 1.7 }}>
-              Onboarding guiado, sem migração complexa. Em 48–72 horas seu time já está operando no automático.
-            </p>
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href="#contato" className="btn-hero-primary">
-                <ArrowRight size={16} />
-                Solicitar demonstração gratuita
+        <section className="section" id="recursos">
+          <div className="section-heading center">
+            <div className="eyebrow">Recursos essenciais</div>
+            <h2>O que o sistema entrega na rotina.</h2>
+            <p>Sem excesso de tela e sem promessa espalhafatosa: apenas os blocos que sustentam uma operação financeira organizada.</p>
+          </div>
+          <div className="modules-grid">
+            {modules.map((item) => (
+              <div className="module-card" key={item.title}>
+                <item.icon />
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="section" id="operacao">
+          <div className="section-heading">
+            <div className="eyebrow">Fluxo operacional</div>
+            <h2>Da chegada do documento até a decisão.</h2>
+            <p>FOX organiza o percurso da informação para que a equipe acompanhe o que está normal, o que está pendente e o que exige intervenção.</p>
+          </div>
+          <div className="flow-grid">
+            {flow.map((item, index) => (
+              <div className="flow-step" key={item.title}>
+                <span>{index + 1}</span>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="section" id="seguranca">
+          <div className="security-band">
+            <div className="security-panel">
+              <Image src="/fox-logo-security.png" alt="FOX" width={640} height={640} />
+              <p>Uma identidade simples para um sistema objetivo: controle, alerta e confiabilidade no centro da operação.</p>
+            </div>
+            <div>
+              <div className="section-heading">
+                <div className="eyebrow">Segurança e controle</div>
+                <h2>Governança para crescer sem perder visibilidade.</h2>
+                <p>As rotinas sensíveis precisam deixar evidências. Por isso o FOX combina permissão, histórico, validação e organização dos dados.</p>
+              </div>
+              <div className="check-list">
+                <div className="check-item"><Check size={19} /> Controle de acesso por credenciais e perfis operacionais.</div>
+                <div className="check-item"><Check size={19} /> Histórico de faturas, ocorrências, contratos e alterações relevantes.</div>
+                <div className="check-item"><Check size={19} /> Alertas para faturas ausentes, duplicadas ou fora do comportamento esperado.</div>
+                <div className="check-item"><Check size={19} /> Base preparada para relatórios e acompanhamento gerencial.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="section" id="contato">
+          <div className="contact-section">
+            <div className="contact-copy">
+              <div className="eyebrow">Fale com a gente</div>
+              <h2>Pronto para <span>automatizar</span> sua operação?</h2>
+              <p>
+                Fale com nosso time e descubra como eliminar o trabalho manual em menos de 1 semana.
+                Respondemos em até 2 horas úteis.
+              </p>
+
+              <div className="contact-info-list">
+                <div className="contact-info-item">
+                  <div className="contact-info-icon"><Mail size={18} /></div>
+                  <div>
+                    <div className="contact-info-label">E-mail</div>
+                    <div className="contact-info-value">
+                      <a href="mailto:contato@foxapp.com.br">contato@foxapp.com.br</a>
+                    </div>
+                  </div>
+                </div>
+                <div className="contact-info-item">
+                  <div className="contact-info-icon"><MessageCircle size={18} /></div>
+                  <div>
+                    <div className="contact-info-label">WhatsApp</div>
+                    <div className="contact-info-value">
+                      <a href="https://wa.me/5511930050306" target="_blank" rel="noopener noreferrer">Falar agora →</a>
+                    </div>
+                  </div>
+                </div>
+                <div className="contact-info-item">
+                  <div className="contact-info-icon"><Clock size={18} /></div>
+                  <div>
+                    <div className="contact-info-label">Horário</div>
+                    <div className="contact-info-value">Seg-Sex · 9h às 18h (BRT)</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="compliance-box">
+                <div className="contact-info-icon"><LockKeyhole size={18} /></div>
+                <div>
+                  <h3>Conformidade LGPD</h3>
+                  <p>Todos os dados são tratados em conformidade com a Lei Geral de Proteção de Dados. DPA disponível sob solicitação.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="contact-form-card">
+              <h3>Solicitar demonstração gratuita</h3>
+              <form className="contact-form" onSubmit={handleContactSubmit}>
+                <div className="contact-form-row">
+                  <label>
+                    Nome completo
+                    <input
+                      type="text"
+                      placeholder="João Silva"
+                      value={contactData.nome}
+                      onChange={(e) => setContactData((data) => ({ ...data, nome: e.target.value }))}
+                      required
+                    />
+                  </label>
+                  <label>
+                    E-mail corporativo
+                    <input
+                      type="email"
+                      placeholder="joao@empresa.com"
+                      value={contactData.email}
+                      onChange={(e) => setContactData((data) => ({ ...data, email: e.target.value }))}
+                      required
+                    />
+                  </label>
+                </div>
+                <label>
+                  Nome da administradora
+                  <input
+                    type="text"
+                    placeholder="Adm. Exemplo Ltda."
+                    value={contactData.administradora}
+                    onChange={(e) => setContactData((data) => ({ ...data, administradora: e.target.value }))}
+                  />
+                </label>
+                <label>
+                  Quantos condomínios você administra?
+                  <select
+                    value={contactData.condominios}
+                    onChange={(e) => setContactData((data) => ({ ...data, condominios: e.target.value }))}
+                    required
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="1-5">1 a 50</option>
+                    <option value="6-20">51 a 100</option>
+                    <option value="21-50">101 a 200</option>
+                    <option value="50+">Mais de 200</option>
+                  </select>
+                </label>
+                <button type="submit" className="contact-submit">
+                  Quero minha demonstração gratuita →
+                </button>
+                <div className="contact-privacy">
+                  <LockKeyhole size={13} />
+                  <span>Sem spam. Seus dados são protegidos pela LGPD.</span>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section className="cta-section">
+          <div className="cta-inner">
+            <div className="eyebrow">Comece hoje</div>
+            <h2>Elimine o trabalho manual em <span>menos de 1 semana</span></h2>
+            <p>Onboarding guiado, sem migração complexa. Em 48-72 horas seu time já está operando no automático.</p>
+            <div className="hero-actions" style={{ justifyContent: 'center', marginBottom: 0 }}>
+              <a className="btn btn-primary" href="#contato">
+                Solicitar demonstração gratuita <ArrowRight size={17} />
               </a>
-              <a href="https://wa.me/5511999999999" className="btn-hero-secondary" target="_blank" rel="noopener noreferrer">
-                💬 Falar no WhatsApp
+              <a className="btn btn-secondary" href="https://wa.me/5511999999999" target="_blank" rel="noopener noreferrer">
+                Falar no WhatsApp
               </a>
             </div>
           </div>
         </section>
 
-        {/* ── FOOTER ── */}
         <footer className="lp-footer">
-          <div>
-            <div className="footer-logo">DATA<span>CRON</span></div>
-            <p className="footer-copy">© 2026 Datacron RPA · Todos os direitos reservados.</p>
+          <div className="brand-mark">
+            <Image src="/fox-logo.png" alt="" width={52} height={52} />
           </div>
           <div className="footer-links">
             <Link href="/politica-de-privacidade">Privacidade</Link>
-            <Link href="/termos-de-uso">Termos de Uso</Link>
-            <a href="mailto:contato@datacron.com.br">Contato</a>
+            <Link href="/termos-de-uso">Termos de uso</Link>
           </div>
         </footer>
+      </main>
 
-        {/* ── LOGIN MODAL ── */}
-        <AnimatePresence>
-          {isLoginView && (
+      <AnimatePresence>
+        {isLoginView && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="modal-overlay"
+            onClick={() => setIsLoginView(false)}
+          >
             <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="modal-overlay"
-              onClick={() => setIsLoginView(false)}
+              initial={{ scale: 0.96, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.96, opacity: 0, y: 12 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              className="modal-box"
+              onClick={(e) => e.stopPropagation()}
             >
-              <motion.div
-                initial={{ scale: 0.92, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.92, opacity: 0, y: 20 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                className="modal-box"
-                onClick={e => e.stopPropagation()}
-              >
-                <button className="modal-close" onClick={() => setIsLoginView(false)}><X size={14} /></button>
-                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                  <div style={{ fontFamily: 'var(--font-head)', fontWeight: 800, fontSize: '1.5rem', marginBottom: '0.5rem' }}>
-                    DATA<span style={{ color: 'var(--accent)' }}>CRON</span>
-                  </div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.4rem' }}>Acesso ao Sistema</h3>
-                  <p style={{ color: 'var(--text3)', fontSize: '0.85rem' }}>Insira suas credenciais para continuar</p>
-                </div>
+              <button className="modal-close" onClick={() => setIsLoginView(false)} aria-label="Fechar">
+                <X size={16} />
+              </button>
+              <div className="modal-brand">
+                <Image src="/fox-logo.png" alt="FOX" width={120} height={120} />
+                <h3>Acesso FOX</h3>
+                <p>Insira suas credenciais para continuar.</p>
+              </div>
 
-                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {error && (
-                    <div style={{ background: 'var(--danger-bg)', color: 'var(--danger)', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.82rem', display: 'flex', gap: '8px', alignItems: 'center', border: '1px solid rgba(239,68,68,0.2)' }}>
-                      <AlertTriangle size={14} /> {error}
-                    </div>
-                  )}
-                  <div className="form-group">
-                    <label className="form-label">E-mail</label>
-                    <input type="email" className="form-input" value={email} onChange={e => setEmail(e.target.value)} placeholder="exemplo@email.com" required />
+              <form className="login-form" onSubmit={handleLogin}>
+                {error && (
+                  <div className="error-box">
+                    <AlertTriangle size={16} /> {error}
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Senha</label>
-                    <div style={{ position: 'relative' }}>
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        className="form-input"
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        style={{ paddingRight: '2.5rem' }}
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        style={{
-                          position: 'absolute',
-                          right: '0.75rem',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: 'var(--text3)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: '4px',
-                        }}
-                      >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
+                )}
+                <div className="form-group">
+                  <label className="form-label">E-mail</label>
+                  <input
+                    type="email"
+                    className="form-input"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="exemplo@email.com"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Senha</label>
+                  <div className="password-wrap">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      className="form-input"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="********"
+                      style={{ paddingRight: '46px' }}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowPassword((value) => !value)}
+                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    >
+                      {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                    </button>
                   </div>
-                  <button type="submit" className="form-submit" disabled={isLoading} style={{ marginTop: '0.5rem' }}>
-                    {isLoading ? 'Autenticando...' : 'Entrar no Sistema →'}
-                  </button>
-                </form>
-              </motion.div>
+                </div>
+                <button type="submit" className="form-submit" disabled={isLoading}>
+                  {isLoading ? 'Autenticando...' : 'Entrar'}
+                </button>
+              </form>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

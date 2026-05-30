@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3, Building2, Zap, Mail,
   AlertCircle, Download, ChevronLeft, ChevronRight,
-  Search, Layers, BarChart2, Settings, LogOut, FileSignature, TrendingUp, ClipboardCheck, FileSearch
+  Search, BarChart2, Settings, LogOut, FileSignature, TrendingUp, ClipboardCheck, FileSearch
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import '@/styles/app.css';
@@ -89,9 +90,9 @@ export default function Shell({ children, showSearch = false, searchTerm = '', o
         {/* Logo */}
         <div className="dc-sidebar-logo">
           <div className="dc-sidebar-logo-icon">
-            <Layers size={20} />
+            <Image src="/fox-logo.png" alt="FOX" width={34} height={34} priority />
           </div>
-          {!collapsed && <span className="dc-sidebar-logo-name">Datacron</span>}
+          {!collapsed && <span className="dc-sidebar-logo-name">FOX</span>}
         </div>
 
         {/* Nav */}

@@ -1,5 +1,5 @@
 /**
- * Datacron Intelligence Utils
+ * FOX Intelligence Utils
  * Regras de Senha aplicadas automaticamente por concessionária.
  */
 

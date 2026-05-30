@@ -115,7 +115,7 @@ export default function ImportacoesPage() {
           <div>
             <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>Importação de Dados</h1>
             <p style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', marginTop: 5 }}>
-              Sincronize sua base CSV com o Datacron de forma segura e validada.
+              Sincronize sua base CSV com o FOX de forma segura e validada.
             </p>
           </div>
         </div>

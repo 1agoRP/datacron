@@ -197,7 +197,7 @@ export default function RelatoriosPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `datacron_${report.key}_${dataInicio}_${dataFim}.pdf`;
+      a.download = `fox_${report.key}_${dataInicio}_${dataFim}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

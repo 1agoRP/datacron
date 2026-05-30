@@ -56,21 +56,25 @@
   padding: 0;
 }
 .dc-sidebar-logo-icon {
-  width: 36px;
-  height: 36px;
-  background: #2563eb;
+  width: 42px;
+  height: 42px;
+  background: transparent;
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
   flex-shrink: 0;
 }
+.dc-sidebar-logo-icon img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
 .dc-sidebar-logo-name {
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   font-weight: 800;
-  color: #2563eb;
-  letter-spacing: -0.04em;
+  color: #f97316;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 

@@ -1,5 +1,5 @@
 /**
- * Datacron API Client
+ * FOX API Client
  * Centralized fetch wrapper with support for JWT authentication.
  */
 
@@ -770,7 +770,7 @@ class ApiClient {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'faturas_datacron.zip';
+    a.download = 'faturas_fox.zip';
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
@@ -930,7 +930,7 @@ class ApiClient {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `contratos_datacron.${formato === 'csv' ? 'csv' : 'xlsx'}`;
+    a.download = `contratos_fox.${formato === 'csv' ? 'csv' : 'xlsx'}`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);

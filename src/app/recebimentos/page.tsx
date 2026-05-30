@@ -78,7 +78,7 @@ export default function RecebimentosPage() {
           <div>
             <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>Central de Recebimento</h1>
             <p style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.7)', marginTop: 5 }}>
-              Faturas processadas automaticamente pelo Agente Datacron e prontas para exportação.
+              Faturas processadas automaticamente pelo Agente FOX e prontas para exportação.
             </p>
           </div>
         </div>
