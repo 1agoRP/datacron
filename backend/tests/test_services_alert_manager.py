@@ -185,7 +185,7 @@ async def test_notify_alert_sends_unified_n8n_payload(db_session: AsyncSession):
     response.status_code = 200
     response.raise_for_status.return_value = None
 
-    with patch("app.services.alert_manager.settings.N8N_WEBHOOK_URL", "https://n8n.test/webhook/alerts"), \
+    with patch("app.services.alert_manager.settings.OUTBOUND_EMAIL_WEBHOOK_URL", "https://n8n.test/webhook/alerts"), \
          patch("httpx.AsyncClient") as client_cls:
         client = AsyncMock()
         client.post.return_value = response
@@ -197,8 +197,11 @@ async def test_notify_alert_sends_unified_n8n_payload(db_session: AsyncSession):
     _, kwargs = client.post.call_args
     payload = kwargs["json"]
     assert payload["event_type"] == "alert.created"
+    assert payload["webhook_destino"] == "datacron-outbound-email"
     assert payload["schema_version"] == "2026-05-30"
     assert payload["tipo_de_alerta"] == "pdf_erro"
+    assert payload["template_tipo"] == "alerta"
+    assert payload["email_template_tipo"] == 1
     assert payload["usuarios_responsaveis"] == ["admin@test.com"]
     assert payload["usuarios_responsaveis0"] == "admin@test.com"
     assert payload["usuarios_responsaveis1"] is None
@@ -280,7 +283,7 @@ async def test_notify_alert_payload_includes_flat_context_and_pdf_base64(
     response.status_code = 200
     response.raise_for_status.return_value = None
 
-    with patch("app.services.alert_manager.settings.N8N_WEBHOOK_URL", "https://n8n.test/webhook/alerts"), \
+    with patch("app.services.alert_manager.settings.OUTBOUND_EMAIL_WEBHOOK_URL", "https://n8n.test/webhook/alerts"), \
          patch("httpx.AsyncClient") as client_cls:
         client = AsyncMock()
         client.post.return_value = response
@@ -291,6 +294,11 @@ async def test_notify_alert_payload_includes_flat_context_and_pdf_base64(
     assert payload["id_alerta"] == str(alert.id)
     assert payload["tipo_de_alerta"] == "alerta_conta_alta"
     assert payload["tipo_de_alerta_origem"] == "Variacao_Valor_Mais"
+    assert payload["template_tipo"] == "alerta"
+    assert payload["email_template_tipo"] == 1
+    assert payload["categoria_alerta"] == "contas"
+    assert payload["alerta_titulo"] == "Conta com valor acima da media"
+    assert payload["alerta_gravidade_texto"] == "CRITICO"
     assert payload["contexto"]["mensagem"] == "Valor acima da media"
     assert payload["email_remetente"] == "contas@enel.test"
     assert payload["id_email_original"] == "gmail-123"
@@ -393,7 +401,11 @@ async def test_build_test_alert_payloads_use_real_context_contract(
 
     payload = next(item for item in payloads if item["tipo_de_alerta"] == "alerta_conta_alta")
     assert payload["event_type"] == "alert.created.test"
+    assert payload["webhook_destino"] == "datacron-outbound-email"
     assert payload["contexto"]["modo"] == "teste_n8n"
+    assert payload["template_tipo"] == "alerta"
+    assert payload["email_template_tipo"] == 1
+    assert payload["categoria_alerta"] == "contas"
     assert payload["condominio_nome"] == "Condominio Exemplo"
     assert payload["condominio_numero"] == "99"
     assert payload["concessionaria_cod_identificacao"] == "SAB-999"
@@ -446,3 +458,67 @@ async def test_send_test_alert_payloads_dispatches_each_type():
     assert first_call.kwargs["headers"]["X-Idempotency-Key"] == "test-alert:alerta_conta_alta:alert-1"
     assert client.post.await_args_list[0].kwargs["json"] == payloads[0]
     assert client.post.await_args_list[1].kwargs["json"] == payloads[1]
+
+
+@pytest.mark.asyncio
+async def test_notify_alert_resolution_uses_resol_pen_contract(db_session: AsyncSession):
+    from app.services.alert_manager import notify_alert_resolution
+
+    condo = Condominio(
+        id=uuid.uuid4(),
+        nome="Condominio Resolucao",
+        numero="77",
+        endereco="Rua Resolvida",
+        cnpj="33.444.555/0001-66",
+        sindico="Ana",
+        carteira=4,
+        ativo=True,
+    )
+    alert = Alerta(
+        id=uuid.uuid4(),
+        condominio_id=condo.id,
+        tipo="alerta_falta_conta",
+        gravidade="alta",
+        mensagem="Conta pendente",
+    )
+    admin = User(
+        id=uuid.uuid4(),
+        nome="Admin",
+        email="admin@test.com",
+        senha_hash="hash",
+        role="admin",
+        ativo=True,
+    )
+    db_session.add_all([condo, alert, admin])
+    await db_session.flush()
+
+    response = MagicMock()
+    response.status_code = 200
+    response.raise_for_status.return_value = None
+
+    with patch("app.services.alert_manager.settings.OUTBOUND_EMAIL_WEBHOOK_URL", "https://n8n.test/webhook/alerts"), \
+         patch("httpx.AsyncClient") as client_cls:
+        client = AsyncMock()
+        client.post.return_value = response
+        client_cls.return_value.__aenter__.return_value = client
+
+        payload = await notify_alert_resolution(
+            db_session,
+            alert,
+            resolved_by_email="gestor@test.com",
+            resolved_by_name="Gestor",
+            justificativa="Fatura cadastrada.",
+        )
+
+    assert payload["event_type"] == "alert.resolved"
+    assert payload["tipo_de_alerta"] == "resol_pen"
+    assert payload["tipo_de_alerta_origem"] == "alerta_falta_conta"
+    assert payload["template_tipo"] == "resolucao_pendencia"
+    assert payload["email_template_tipo"] == 2
+    assert payload["resolvido_por"] == "gestor@test.com"
+    assert payload["resolucao_observacao"] == "Fatura cadastrada."
+    assert payload["usuarios_responsaveis"] == ["admin@test.com", "gestor@test.com"]
+
+    first_call = client.post.await_args_list[0]
+    assert first_call.args[0] == "https://n8n.test/webhook/alerts"
+    assert first_call.kwargs["headers"]["X-Idempotency-Key"] == f"alert.resolved:{alert.id}:resol_pen"

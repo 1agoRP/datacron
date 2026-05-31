@@ -47,8 +47,8 @@ class Settings(BaseSettings):
     # ─── App ──────────────────────────────────────────────────
     ENVIRONMENT: str = "development"
     ALERT_VARIATION_THRESHOLD: float = 0.15
-    N8N_WEBHOOK_URL: str = ""
-    OUTBOUND_EMAIL_WEBHOOK_URL: str = ""
+    N8N_WEBHOOK_URL: str = "https://n8n-n8n.7vjfup.easypanel.host/webhook/datacron-outbound-email"
+    OUTBOUND_EMAIL_WEBHOOK_URL: str = "https://n8n-n8n.7vjfup.easypanel.host/webhook/datacron-outbound-email"
     OUTBOUND_EMAIL_WEBHOOK_SECRET: str = ""
     ERROR_WEBHOOK_URL: str = ""
     INBOUND_WEBHOOK_SECRET: str = ""

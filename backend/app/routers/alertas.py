@@ -15,7 +15,7 @@ from app.models.alerta import Alerta
 from app.models.alerta_audit_log import AlertaAuditLog
 from app.schemas import AlertaResponse
 from app.services.email_sender import send_notification_email, render_resolution_email, render_unidentified_sender_email
-from app.services.alert_manager import notify_alert
+from app.services.alert_manager import notify_alert, notify_alert_resolution
 from app.services.fatura_duplicates import find_duplicate_fatura
 from app.security import read_pdf_upload
 
@@ -178,19 +178,15 @@ async def resolve_alerta(
     )
     db.add(audit)
 
-    # Send emails in background to avoid "Failed to fetch" (timeouts)
-    background_tasks.add_task(
-        process_alert_resolution_emails,
-        a.tipo,
-        a.mensagem,
-        current_user.email,
-        a.condominio.nome if a.condominio else None,
-        a.email_remetente,
-        a.email_assunto,
-    )
-
     a.lido = True
     a.resolvido = True
+    await notify_alert_resolution(
+        db,
+        a,
+        resolved_by_email=current_user.email,
+        resolved_by_name=current_user.nome,
+        justificativa=audit.justificativa,
+    )
     await db.commit()
     await db.refresh(a)
     return a
@@ -490,19 +486,18 @@ async def resolver_alerta_com_pdf(
     a.lido = True
     a.resolvido = True
     a.fatura_id = nova_fatura.id
+    await db.flush()
+    await notify_alert_resolution(
+        db,
+        a,
+        resolved_by_email=current_user.email,
+        resolved_by_name=current_user.nome,
+        justificativa=audit.justificativa,
+        fatura=nova_fatura,
+        conc=conc,
+    )
 
     await db.commit()
-
-    # 12. Background emails
-    background_tasks.add_task(
-        process_alert_resolution_emails,
-        a.tipo,
-        a.mensagem,
-        current_user.email,
-        condo.nome if condo else None,
-        a.email_remetente,
-        a.email_assunto,
-    )
 
     return {"pdf_nome": pdf_nome, "fatura_id": str(nova_fatura.id)}
 

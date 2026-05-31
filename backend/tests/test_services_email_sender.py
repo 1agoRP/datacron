@@ -120,19 +120,28 @@ class TestSendNotificationEmail:
         assert kwargs["headers"]["X-Webhook-Secret"] == "secret"
         mock_response.raise_for_status.assert_called_once()
 
+    @patch("httpx.AsyncClient")
     @patch("app.services.email_sender.settings")
     @pytest.mark.asyncio
-    async def test_send_email_no_webhook_url(self, mock_settings):
-        """Should return False when the outbound webhook is missing."""
+    async def test_send_email_uses_official_webhook_fallback(self, mock_settings, mock_client_class):
+        """Should use the official outbound workflow when env URL is missing."""
         mock_settings.OUTBOUND_EMAIL_WEBHOOK_URL = ""
         mock_settings.OUTBOUND_EMAIL_WEBHOOK_SECRET = ""
+
+        mock_response = MagicMock()
+        mock_client = mock_client_class.return_value.__aenter__.return_value
+        mock_client.post = AsyncMock(return_value=mock_response)
 
         result = await send_notification_email(
             to="user@example.com",
             subject="Test",
             message_text="Test",
         )
-        assert result is False
+        assert result is True
+        mock_client.post.assert_awaited_once()
+        assert mock_client.post.call_args.args[0] == (
+            "https://n8n-n8n.7vjfup.easypanel.host/webhook/datacron-outbound-email"
+        )
 
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient")

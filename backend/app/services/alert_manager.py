@@ -10,7 +10,7 @@ Analyzes new faturas and generates alerts based on business rules:
 import logging
 import base64
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +26,10 @@ from app.security import resolve_storage_path
 from app.services.email_sender import render_alert_email
 
 logger = logging.getLogger(__name__)
+
+OFFICIAL_OUTBOUND_EMAIL_WEBHOOK_URL = (
+    "https://n8n-n8n.7vjfup.easypanel.host/webhook/datacron-outbound-email"
+)
 
 
 
@@ -266,9 +270,219 @@ N8N_ALERT_TYPE_MAP = {
     "Mandato_Vencido": "ata_mandato_vencida",
 }
 
+ACCOUNT_ALERT_TYPES = {
+    "alerta_falta_conta",
+    "alerta_conta_alta",
+    "alerta_conta_baixa",
+    "alerta_falta_conta_ndeb_aut3",
+    "alerta_falta_conta_ndeb_aut2",
+    "alerta_falta_conta_ndeb_aut1",
+    "alerta_falta_conta_ndeb_aut0",
+}
+DOCUMENT_ALERT_TYPES = {
+    "ata_mandato_a_vencer",
+    "ata_mandato_vencida",
+    "seguro_a_vencer",
+    "seguro_vencido",
+    "avcb_a_vencer",
+    "avcb_vencido",
+}
+EMAIL_ALERT_TYPES = {"email_nao_identificado", "pdf_erro"}
+RESOLUTION_ALERT_TYPE = "resol_pen"
+ALL_N8N_ALERT_TYPES = ACCOUNT_ALERT_TYPES | DOCUMENT_ALERT_TYPES | EMAIL_ALERT_TYPES | {RESOLUTION_ALERT_TYPE}
+
+ALERT_TYPE_METADATA: dict[str, dict[str, str]] = {
+    "alerta_falta_conta": {
+        "categoria": "contas",
+        "titulo": "Conta nao recebida",
+        "subtitulo": "Uma conta esperada ainda nao foi registrada no Datacron.",
+        "icone": "!",
+    },
+    "alerta_conta_alta": {
+        "categoria": "contas",
+        "titulo": "Conta com valor acima da media",
+        "subtitulo": "O valor recebido ficou acima da media historica cadastrada.",
+        "icone": "!",
+    },
+    "alerta_conta_baixa": {
+        "categoria": "contas",
+        "titulo": "Conta com valor abaixo da media",
+        "subtitulo": "O valor recebido ficou abaixo da media historica cadastrada.",
+        "icone": "i",
+    },
+    "alerta_falta_conta_ndeb_aut3": {
+        "categoria": "contas",
+        "titulo": "Conta sem debito automatico vence em 3 dias",
+        "subtitulo": "Fatura sem debito automatico exige acompanhamento antes do vencimento.",
+        "icone": "!",
+    },
+    "alerta_falta_conta_ndeb_aut2": {
+        "categoria": "contas",
+        "titulo": "Conta sem debito automatico vence em 2 dias",
+        "subtitulo": "Fatura sem debito automatico exige acompanhamento antes do vencimento.",
+        "icone": "!",
+    },
+    "alerta_falta_conta_ndeb_aut1": {
+        "categoria": "contas",
+        "titulo": "Conta sem debito automatico vence amanha",
+        "subtitulo": "Fatura sem debito automatico exige acao imediata.",
+        "icone": "!",
+    },
+    "alerta_falta_conta_ndeb_aut0": {
+        "categoria": "contas",
+        "titulo": "Conta sem debito automatico vence hoje",
+        "subtitulo": "Fatura sem debito automatico vence hoje e precisa de acao imediata.",
+        "icone": "!",
+    },
+    "ata_mandato_a_vencer": {
+        "categoria": "documentos",
+        "titulo": "Mandato a vencer",
+        "subtitulo": "O mandato cadastrado esta proximo do vencimento.",
+        "icone": "!",
+    },
+    "ata_mandato_vencida": {
+        "categoria": "documentos",
+        "titulo": "Mandato vencido",
+        "subtitulo": "O mandato cadastrado ja esta vencido.",
+        "icone": "!",
+    },
+    "seguro_a_vencer": {
+        "categoria": "documentos",
+        "titulo": "Seguro a vencer",
+        "subtitulo": "A apolice de seguro esta proxima do vencimento.",
+        "icone": "!",
+    },
+    "seguro_vencido": {
+        "categoria": "documentos",
+        "titulo": "Seguro vencido",
+        "subtitulo": "A apolice de seguro cadastrada ja esta vencida.",
+        "icone": "!",
+    },
+    "avcb_a_vencer": {
+        "categoria": "documentos",
+        "titulo": "AVCB a vencer",
+        "subtitulo": "O AVCB esta proximo do vencimento.",
+        "icone": "!",
+    },
+    "avcb_vencido": {
+        "categoria": "documentos",
+        "titulo": "AVCB vencido",
+        "subtitulo": "O AVCB cadastrado ja esta vencido.",
+        "icone": "!",
+    },
+    "email_nao_identificado": {
+        "categoria": "email_nao_identificado",
+        "titulo": "E-mail nao identificado",
+        "subtitulo": "O sistema recebeu um e-mail que nao pode ser vinculado automaticamente.",
+        "icone": "i",
+    },
+    "pdf_erro": {
+        "categoria": "email_nao_identificado",
+        "titulo": "Erro no PDF",
+        "subtitulo": "O PDF recebido nao pode ser processado automaticamente.",
+        "icone": "!",
+    },
+    "resol_pen": {
+        "categoria": "resolucao",
+        "titulo": "Pendencia resolvida",
+        "subtitulo": "Uma pendencia foi marcada como resolvida no Datacron.",
+        "icone": "ok",
+    },
+}
+
 
 def n8n_alert_type(tipo: str) -> str:
     return N8N_ALERT_TYPE_MAP.get(tipo, tipo)
+
+
+def get_alert_webhook_url() -> str:
+    return (settings.OUTBOUND_EMAIL_WEBHOOK_URL or OFFICIAL_OUTBOUND_EMAIL_WEBHOOK_URL).strip()
+
+
+def _severity_metadata(tipo: str, gravidade: str) -> dict[str, str]:
+    if tipo == RESOLUTION_ALERT_TYPE:
+        return {
+            "alerta_gravidade_texto": "RESOLVIDO",
+            "alerta_gravidade_cor": "#16a34a",
+            "alerta_gravidade_bg": "#f0fdf4",
+            "alerta_gravidade_borda": "#86efac",
+            "alerta_topbar_cor": "#16a34a",
+        }
+    if tipo in {"alerta_conta_alta", "alerta_falta_conta_ndeb_aut0", "alerta_falta_conta_ndeb_aut1", "ata_mandato_vencida", "seguro_vencido", "avcb_vencido", "pdf_erro"}:
+        return {
+            "alerta_gravidade_texto": "CRITICO",
+            "alerta_gravidade_cor": "#dc2626",
+            "alerta_gravidade_bg": "#fef2f2",
+            "alerta_gravidade_borda": "#fca5a5",
+            "alerta_topbar_cor": "#dc2626",
+        }
+    if tipo == "alerta_conta_baixa":
+        return {
+            "alerta_gravidade_texto": "ATENCAO",
+            "alerta_gravidade_cor": "#16a34a",
+            "alerta_gravidade_bg": "#f0fdf4",
+            "alerta_gravidade_borda": "#86efac",
+            "alerta_topbar_cor": "#16a34a",
+        }
+    if tipo == "email_nao_identificado":
+        return {
+            "alerta_gravidade_texto": "INFO",
+            "alerta_gravidade_cor": "#1d4ed8",
+            "alerta_gravidade_bg": "#eff6ff",
+            "alerta_gravidade_borda": "#93c5fd",
+            "alerta_topbar_cor": "#1d4ed8",
+        }
+    if tipo == "avcb_a_vencer":
+        return {
+            "alerta_gravidade_texto": "AVISO PREVENTIVO",
+            "alerta_gravidade_cor": "#c2410c",
+            "alerta_gravidade_bg": "#fff7ed",
+            "alerta_gravidade_borda": "#fdba74",
+            "alerta_topbar_cor": "#c2410c",
+        }
+    return {
+        "alerta_gravidade_texto": "AVISO" if gravidade != "alta" else "ATENCAO",
+        "alerta_gravidade_cor": "#d97706",
+        "alerta_gravidade_bg": "#fffbeb",
+        "alerta_gravidade_borda": "#fcd34d",
+        "alerta_topbar_cor": "#d97706",
+    }
+
+
+def _alert_template_metadata(tipo: str, gravidade: str) -> dict[str, Any]:
+    meta = ALERT_TYPE_METADATA.get(tipo, ALERT_TYPE_METADATA["email_nao_identificado"])
+    return {
+        "template_tipo": "resolucao_pendencia" if tipo == RESOLUTION_ALERT_TYPE else "alerta",
+        "email_template_tipo": 2 if tipo == RESOLUTION_ALERT_TYPE else 1,
+        "categoria_alerta": meta["categoria"],
+        "alerta_titulo": meta["titulo"],
+        "alerta_subtitulo": meta["subtitulo"],
+        "alerta_icone": meta["icone"],
+        "alerta_tipo_valido": tipo in ALL_N8N_ALERT_TYPES,
+        **_severity_metadata(tipo, gravidade),
+    }
+
+
+def _document_metadata(tipo: str, due_date) -> dict[str, Any]:
+    labels = {
+        "ata_mandato_a_vencer": "Ata / Mandato",
+        "ata_mandato_vencida": "Ata / Mandato",
+        "seguro_a_vencer": "Seguro",
+        "seguro_vencido": "Seguro",
+        "avcb_a_vencer": "AVCB",
+        "avcb_vencido": "AVCB",
+    }
+    days = None
+    if due_date and tipo in DOCUMENT_ALERT_TYPES:
+        try:
+            days = (due_date.date() if hasattr(due_date, "date") else due_date) - datetime.now().date()
+            days = days.days
+        except Exception:
+            days = None
+    return {
+        "documento_tipo": labels.get(tipo),
+        "documento_dias_restantes": days,
+    }
 
 
 def _format_brl(value: float | None) -> str | None:
@@ -368,16 +582,17 @@ async def _enqueue_and_send_alert_webhook(
     db: AsyncSession,
     alert: Alerta,
     payload: dict,
+    event_type: str = "alert.created",
 ) -> None:
-    if not settings.N8N_WEBHOOK_URL:
-        logger.warning(
-            f"N8N_WEBHOOK_URL not configured; alert {alert.id or alert.tipo} was saved without webhook dispatch."
-        )
-        return
+    target_url = get_alert_webhook_url()
 
     await db.flush()
     alerta_id = str(alert.id) if alert.id else "sem-id"
-    idempotency_key = f"alert:{alerta_id}:{alert.tipo}"
+    payload_tipo = payload.get("tipo_de_alerta") or alert.tipo
+    if event_type == "alert.created":
+        idempotency_key = f"alert:{alerta_id}:{payload_tipo}"
+    else:
+        idempotency_key = f"{event_type}:{alerta_id}:{payload_tipo}"
 
     result = await db.execute(
         select(AlertWebhookDelivery).where(
@@ -395,8 +610,8 @@ async def _enqueue_and_send_alert_webhook(
     if not delivery:
         delivery = AlertWebhookDelivery(
             alerta_id=alert.id,
-            event_type="alert.created",
-            target_url=settings.N8N_WEBHOOK_URL,
+            event_type=event_type,
+            target_url=target_url,
             idempotency_key=idempotency_key,
             payload=serialized_payload,
             status="pending",
@@ -406,7 +621,8 @@ async def _enqueue_and_send_alert_webhook(
         await db.flush()
     else:
         delivery.payload = serialized_payload
-        delivery.target_url = settings.N8N_WEBHOOK_URL
+        delivery.target_url = target_url
+        delivery.event_type = event_type
 
     await _attempt_alert_webhook_delivery(db, delivery)
 
@@ -623,13 +839,22 @@ async def notify_alert(
     # 6. Anexar PDF se disponível
     pdf_base64 = _read_fatura_pdf_base64(alert, fatura)
     canonical_tipo = n8n_alert_type(alert.tipo)
+    template_meta = _alert_template_metadata(canonical_tipo, alert.gravidade)
+    due_date = fatura.vencimento if fatura else None
+    if canonical_tipo in {"ata_mandato_a_vencer", "ata_mandato_vencida"} and condo:
+        due_date = condo.mandato_fim
+    variacao_percentual = getattr(fatura, "variacao_percentual", None) if fatura else None
     payload = {
         "schema_version": ALERT_WEBHOOK_SCHEMA_VERSION,
         "event_type": "alert.created",
+        "webhook_destino": "datacron-outbound-email",
         "id_alerta": str(alert.id) if alert.id else None,
         "tipo_de_alerta": canonical_tipo,
         "tipo_de_alerta_origem": alert.tipo,
         "gravidade": alert.gravidade,
+        **template_meta,
+        **_document_metadata(canonical_tipo, due_date),
+        "variacao_percentual": variacao_percentual,
         "contexto": {
             "mensagem": alert.mensagem,
             "email_assunto": getattr(alert, "email_assunto", None) or (fatura.email_assunto if fatura else None),
@@ -664,6 +889,88 @@ async def notify_alert(
     payload.update(_responsavel_fields(recipients))
 
     await _enqueue_and_send_alert_webhook(db, alert, payload)
+    return payload
+
+
+async def notify_alert_resolution(
+    db: AsyncSession,
+    alert: Alerta,
+    resolved_by_email: str,
+    resolved_by_name: str | None = None,
+    justificativa: str | None = None,
+    fatura: Optional[Fatura] = None,
+    conc: Optional[Concessionaria] = None,
+) -> dict:
+    from app.models.user import User
+
+    if not fatura and alert.fatura_id:
+        result = await db.execute(select(Fatura).where(Fatura.id == alert.fatura_id))
+        fatura = result.scalar_one_or_none()
+
+    condo = None
+    if alert.condominio_id:
+        result = await db.execute(select(Condominio).where(Condominio.id == alert.condominio_id))
+        condo = result.scalar_one_or_none()
+
+    conc = await _get_alert_concessionaria(db, fatura, conc)
+
+    recipients = {resolved_by_email}
+    admins = await db.execute(select(User).where(User.role == "admin", User.ativo == True))
+    for user in admins.scalars().all():
+        recipients.add(user.email)
+
+    original_tipo = n8n_alert_type(alert.tipo)
+    template_meta = _alert_template_metadata(RESOLUTION_ALERT_TYPE, "baixa")
+    payload = {
+        "schema_version": ALERT_WEBHOOK_SCHEMA_VERSION,
+        "event_type": "alert.resolved",
+        "webhook_destino": "datacron-outbound-email",
+        "id_alerta": str(alert.id) if alert.id else None,
+        "tipo_de_alerta": RESOLUTION_ALERT_TYPE,
+        "tipo_de_alerta_origem": original_tipo,
+        "gravidade": "baixa",
+        **template_meta,
+        **_document_metadata(original_tipo, fatura.vencimento if fatura else None),
+        "variacao_percentual": getattr(fatura, "variacao_percentual", None) if fatura else None,
+        "contexto": {
+            "mensagem": alert.mensagem,
+            "alerta_original_tipo": original_tipo,
+            "alerta_original_gravidade": alert.gravidade,
+            "resolucao_observacao": justificativa,
+            "resolvido_por": resolved_by_email,
+            "resolvido_por_nome": resolved_by_name,
+        },
+        "created_at": _iso(alert.created_at),
+        "resolved_at": _iso(datetime.now(timezone.utc)),
+        "resolvido_em": _iso(datetime.now(timezone.utc)),
+        "resolvido_por": resolved_by_email,
+        "resolvido_por_nome": resolved_by_name,
+        "resolucao_observacao": justificativa,
+        "email_remetente": getattr(alert, "email_remetente", None) or (fatura.email_remetente if fatura else None),
+        "id_email_original": fatura.gmail_message_id if fatura else None,
+        "email_data": _iso(getattr(alert, "email_data", None) or (fatura.created_at if fatura else None)),
+        "condominio_id": str(alert.condominio_id) if alert.condominio_id else None,
+        "condominio_nome": condo.nome if condo else None,
+        "condominio_numero": str(condo.numero) if condo else None,
+        "condominio_carteira": condo.carteira if condo else None,
+        "concessionaria_id": str(conc.id) if conc else None,
+        "concessionaria_tipo": conc.tipo if conc else None,
+        "concessionaria_cod_identificacao": conc.instalacao if conc else None,
+        "concessionaria_valor_medio": conc.valor_medio if conc else None,
+        "fatura_id": str(fatura.id) if fatura else None,
+        "fatura_vencimento": _iso(fatura.vencimento if fatura else None),
+        "fatura_valor": fatura.valor if fatura else None,
+        "fatura_valor_formatado": _format_brl(fatura.valor if fatura else None),
+        "fatura_debauto": bool(fatura.debito_automatico) if fatura else False,
+        "fatura_gmail_message_id": fatura.gmail_message_id if fatura else None,
+        "fatura_pdf_nome": fatura.pdf_nome_original if fatura else None,
+        "fatura_pdf_desbloqueado": bool(fatura.pdf_desbloqueado) if fatura else False,
+        "fatura_pdf_base64": _read_fatura_pdf_base64(alert, fatura),
+        "source": "datacron.backend",
+    }
+    payload.update(_responsavel_fields(recipients))
+
+    await _enqueue_and_send_alert_webhook(db, alert, payload, event_type="alert.resolved")
     return payload
 
 

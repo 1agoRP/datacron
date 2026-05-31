@@ -4,6 +4,9 @@ from typing import Optional
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+OFFICIAL_OUTBOUND_EMAIL_WEBHOOK_URL = (
+    "https://n8n-n8n.7vjfup.easypanel.host/webhook/datacron-outbound-email"
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HTML TEMPLATES
@@ -406,7 +409,7 @@ async def send_notification_email(
     import base64
     import httpx
     
-    url = settings.OUTBOUND_EMAIL_WEBHOOK_URL
+    url = settings.OUTBOUND_EMAIL_WEBHOOK_URL or OFFICIAL_OUTBOUND_EMAIL_WEBHOOK_URL
     if not url:
         logger.warning("Outbound email webhook is not configured")
         return False

@@ -12,12 +12,16 @@ from sqlalchemy.orm import selectinload
 from app.models.concessionaria import Concessionaria
 from app.models.fatura import Fatura
 from app.security import resolve_storage_path
-from app.services.alert_manager import ALERT_TYPES_WITH_PDF_CONTEXT, ALERT_WEBHOOK_SCHEMA_VERSION
+from app.services.alert_manager import (
+    ALERT_TYPES_WITH_PDF_CONTEXT,
+    ALERT_WEBHOOK_SCHEMA_VERSION,
+    _alert_template_metadata,
+    _document_metadata,
+)
 
 TEST_ALERT_RECIPIENT = "pradomansia@gmail.com"
 DEFAULT_TEST_ALERT_WEBHOOK_URL = (
-    "https://n8n-n8n.7vjfup.easypanel.host/webhook/"
-    "7313ad7c-f62d-4bdb-a68d-9a627b6b0b26"
+    "https://n8n-n8n.7vjfup.easypanel.host/webhook/datacron-outbound-email"
 )
 
 TEST_ALERT_CASES = [
@@ -95,13 +99,18 @@ def build_test_alert_payload(tipo: str, gravidade: str, mensagem: str, fatura: F
     condo = fatura.condominio
     conc: Concessionaria = fatura.concessionaria
     include_pdf = tipo in ALERT_TYPES_WITH_PDF_CONTEXT
+    template_meta = _alert_template_metadata(tipo, gravidade)
 
     return {
         "schema_version": ALERT_WEBHOOK_SCHEMA_VERSION,
         "event_type": "alert.created.test",
+        "webhook_destino": "datacron-outbound-email",
         "id_alerta": str(uuid.uuid4()),
         "tipo_de_alerta": tipo,
         "gravidade": gravidade,
+        **template_meta,
+        **_document_metadata(tipo, fatura.vencimento),
+        "variacao_percentual": getattr(fatura, "variacao_percentual", None),
         "contexto": {
             "modo": "teste_n8n",
             "mensagem": mensagem,
