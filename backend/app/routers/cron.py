@@ -13,8 +13,12 @@ from app.services.alert_manager import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/cron", tags=["CRON"])
+schedule_router = APIRouter(prefix="/schedule", tags=["CRON"])
+scheduler_router = APIRouter(prefix="/scheduler", tags=["CRON"])
 
 @router.get("/daily-checks")
+@schedule_router.get("/daily-checks")
+@scheduler_router.get("/daily-checks")
 async def run_daily_checks(
     db: AsyncSession = Depends(get_db),
     _: None = Depends(require_cron_secret),
