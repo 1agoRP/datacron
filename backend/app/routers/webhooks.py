@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, UploadFile, File, Form
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 import logging
@@ -344,6 +344,9 @@ async def n8n_email_invoice(
             "unlocked": pdf_unlocked
         }
 
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         logger.error(f"Error processing webhook invoice: {str(e)}", exc_info=True)
         await db.rollback()

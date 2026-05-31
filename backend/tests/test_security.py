@@ -6,6 +6,7 @@ input sanitization, and file upload limits.
 """
 
 import pytest
+from app.config import settings
 import uuid
 from httpx import AsyncClient
 from unittest.mock import patch, MagicMock
@@ -148,3 +149,45 @@ async def test_valid_file_accepted(tmp_path):
         path = await save_file(valid_content, "valid.pdf")
         assert path is not None
         assert "valid.pdf" in path
+
+
+@pytest.mark.asyncio
+async def test_email_invoice_requires_webhook_secret_not_cron_secret(client, monkeypatch):
+    monkeypatch.setattr(settings, "INBOUND_WEBHOOK_SECRET", "webhook-secret")
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+
+    response = await client.post(
+        "/api/webhooks/n8n/email-invoice",
+        data={
+            "sender": "faturamento@example.com",
+            "subject": "Fatura",
+            "body": "Segue fatura",
+            "msg_id": "gmail-test-secret",
+        },
+        files={"file": ("fatura.pdf", b"%PDF-1.4\nfake", "application/pdf")},
+        headers={"X-Cron-Secret": "webhook-secret"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Webhook nao autorizado. Envie o header X-Webhook-Secret."
+
+
+@pytest.mark.asyncio
+async def test_email_invoice_reports_missing_inbound_secret(client, monkeypatch):
+    monkeypatch.setattr(settings, "INBOUND_WEBHOOK_SECRET", "")
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+
+    response = await client.post(
+        "/api/webhooks/n8n/email-invoice",
+        data={
+            "sender": "faturamento@example.com",
+            "subject": "Fatura",
+            "body": "Segue fatura",
+            "msg_id": "gmail-test-missing-secret",
+        },
+        files={"file": ("fatura.pdf", b"%PDF-1.4\nfake", "application/pdf")},
+        headers={"X-Webhook-Secret": "anything"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "INBOUND_WEBHOOK_SECRET deve ser configurado em produção"

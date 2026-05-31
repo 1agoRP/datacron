@@ -19,17 +19,32 @@ def _constant_time_equals(left: str, right: str) -> bool:
 async def require_inbound_webhook_secret(
     x_webhook_secret: str | None = Header(default=None),
 ) -> None:
-    expected = settings.require_secret("INBOUND_WEBHOOK_SECRET", settings.INBOUND_WEBHOOK_SECRET)
+    try:
+        expected = settings.require_secret("INBOUND_WEBHOOK_SECRET", settings.INBOUND_WEBHOOK_SECRET)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
     if not x_webhook_secret or not _constant_time_equals(x_webhook_secret, expected):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Webhook não autorizado")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Webhook nao autorizado. Envie o header X-Webhook-Secret.",
+        )
 
 
 async def require_cron_secret(
     x_cron_secret: str | None = Header(default=None),
 ) -> None:
-    expected = settings.require_secret("CRON_SECRET", settings.CRON_SECRET)
+    try:
+        expected = settings.require_secret("CRON_SECRET", settings.CRON_SECRET)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
     if not x_cron_secret or not _constant_time_equals(x_cron_secret, expected):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="CRON não autorizado")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="CRON nao autorizado")
 
 
 def validate_pdf_bytes(content: bytes, filename: str | None = None) -> None:
