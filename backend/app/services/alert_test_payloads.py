@@ -3,6 +3,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+import httpx
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -13,6 +15,10 @@ from app.security import resolve_storage_path
 from app.services.alert_manager import ALERT_TYPES_WITH_PDF_CONTEXT, ALERT_WEBHOOK_SCHEMA_VERSION
 
 TEST_ALERT_RECIPIENT = "pradomansia@gmail.com"
+DEFAULT_TEST_ALERT_WEBHOOK_URL = (
+    "https://n8n-n8n.7vjfup.easypanel.host/webhook/"
+    "7313ad7c-f62d-4bdb-a68d-9a627b6b0b26"
+)
 
 TEST_ALERT_CASES = [
     ("Variacao_Valor_Mais", "alta", "Teste n8n: valor acima da media historica."),
@@ -132,3 +138,38 @@ async def build_test_alert_payloads(db: AsyncSession) -> list[dict]:
         build_test_alert_payload(tipo, gravidade, mensagem, fatura)
         for tipo, gravidade, mensagem in TEST_ALERT_CASES
     ]
+
+
+async def send_test_alert_payloads(
+    url: str,
+    payloads: list[dict],
+    timeout: float = 30.0,
+) -> list[dict]:
+    results = []
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for payload in payloads:
+            tipo = payload["tipo_de_alerta"]
+            try:
+                response = await client.post(
+                    url,
+                    json=jsonable_encoder(payload),
+                    headers={"X-Idempotency-Key": f"test-alert:{tipo}:{payload['id_alerta']}"},
+                )
+                results.append(
+                    {
+                        "tipo_de_alerta": tipo,
+                        "status_code": response.status_code,
+                        "ok": 200 <= response.status_code < 300,
+                        "response_preview": response.text[:500],
+                    }
+                )
+            except Exception as exc:
+                results.append(
+                    {
+                        "tipo_de_alerta": tipo,
+                        "status_code": None,
+                        "ok": False,
+                        "response_preview": str(exc)[:500],
+                    }
+                )
+    return results

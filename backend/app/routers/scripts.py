@@ -3,19 +3,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.services.alert_test_payloads import build_test_alert_payloads
-from scripts.send_n8n_alert_test_payloads import _send_payloads
+from app.services.alert_test_payloads import (
+    DEFAULT_TEST_ALERT_WEBHOOK_URL,
+    build_test_alert_payloads,
+    send_test_alert_payloads,
+)
 
 router = APIRouter(prefix="/scripts", tags=["Scripts Utilitarios"])
 
-DEFAULT_TEST_WEBHOOK = (
-    "https://n8n-n8n.7vjfup.easypanel.host/webhook-test/"
-    "7313ad7c-f62d-4bdb-a68d-9a627b6b0b26"
-)
-
-
 async def run_alert_payload_test(db: AsyncSession, url: str | None = None) -> dict:
-    webhook_url = url or DEFAULT_TEST_WEBHOOK or settings.N8N_WEBHOOK_URL
+    webhook_url = url or DEFAULT_TEST_ALERT_WEBHOOK_URL or settings.N8N_WEBHOOK_URL
     if not webhook_url:
         raise HTTPException(
             status_code=400,
@@ -31,7 +28,7 @@ async def run_alert_payload_test(db: AsyncSession, url: str | None = None) -> di
         ) from exc
 
     try:
-        results = await _send_payloads(webhook_url, payloads, timeout=30.0)
+        results = await send_test_alert_payloads(webhook_url, payloads, timeout=30.0)
         return {
             "status": "success",
             "message": f"Enviado com sucesso {len(payloads)} payloads de teste para o n8n.",

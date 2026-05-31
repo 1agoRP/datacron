@@ -9,7 +9,11 @@ from app.services.alert_manager import (
     check_mandate_expirations,
     check_document_expirations_and_clean
 )
-from app.services.alert_test_payloads import build_test_alert_payloads
+from app.services.alert_test_payloads import (
+    DEFAULT_TEST_ALERT_WEBHOOK_URL,
+    build_test_alert_payloads,
+    send_test_alert_payloads,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +31,14 @@ async def run_daily_checks(
         False,
         description="Gera payloads ficticios de todos os alertas com dados reais do banco para testar o n8n.",
     ),
+    send_test_alerts: bool = Query(
+        False,
+        description="Quando usado com test_alerts=true, envia os payloads ficticios ao webhook de teste do n8n.",
+    ),
+    test_webhook_url: str = Query(
+        DEFAULT_TEST_ALERT_WEBHOOK_URL,
+        description="Webhook n8n que recebe os alertas ficticios quando send_test_alerts=true.",
+    ),
 ):
     """
     Endpoint triggered by an external scheduler (like n8n) daily 
@@ -37,12 +49,21 @@ async def run_daily_checks(
     try:
         if test_alerts:
             alert_payloads = await build_test_alert_payloads(db)
+            dispatch_results = []
+            if send_test_alerts:
+                dispatch_results = await send_test_alert_payloads(test_webhook_url, alert_payloads)
             logger.info("Daily CRON test payloads generated successfully.")
             return {
                 "status": "success",
                 "mode": "test_alerts",
-                "message": "Synthetic alert payloads generated from real database data.",
+                "message": (
+                    "Synthetic alert payloads generated and dispatched."
+                    if send_test_alerts
+                    else "Synthetic alert payloads generated from real database data."
+                ),
                 "total_alertas": len(alert_payloads),
+                "webhook_url": test_webhook_url if send_test_alerts else None,
+                "dispatch_results": dispatch_results,
                 "alertas": alert_payloads,
             }
 

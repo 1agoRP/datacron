@@ -19,8 +19,6 @@ import json
 import sys
 from pathlib import Path
 
-import httpx
-from fastapi.encoders import jsonable_encoder
 from sqlalchemy.exc import SQLAlchemyError
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,29 +27,7 @@ if str(ROOT) not in sys.path:
 
 from app.config import settings
 from app.database import AsyncSessionLocal
-from app.services.alert_test_payloads import build_test_alert_payloads
-
-
-async def _send_payloads(url: str, payloads: list[dict], timeout: float) -> list[dict]:
-    results = []
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        for payload in payloads:
-            tipo = payload["tipo_de_alerta"]
-            response = await client.post(
-                url,
-                json=jsonable_encoder(payload),
-                headers={"X-Idempotency-Key": f"test-alert:{tipo}:{payload['id_alerta']}"},
-            )
-            results.append(
-                {
-                    "tipo_de_alerta": tipo,
-                    "status_code": response.status_code,
-                    "ok": 200 <= response.status_code < 300,
-                    "response_preview": response.text[:500],
-                }
-            )
-            response.raise_for_status()
-    return results
+from app.services.alert_test_payloads import build_test_alert_payloads, send_test_alert_payloads
 
 
 def _is_database_connection_error(exc: BaseException) -> bool:
@@ -100,7 +76,7 @@ async def main() -> int:
         print("Dry-run concluido. Use --send para enviar ao n8n.")
         return 0
 
-    results = await _send_payloads(args.url, payloads, args.timeout)
+    results = await send_test_alert_payloads(args.url, payloads, args.timeout)
     print(json.dumps(results, ensure_ascii=False, indent=2))
     return 0
 

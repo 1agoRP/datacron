@@ -388,3 +388,42 @@ async def test_build_test_alert_payloads_use_real_context_contract(
 
     no_pdf_payload = next(item for item in payloads if item["tipo_de_alerta"] == "Nao_Recebida")
     assert no_pdf_payload["fatura_pdf_base64"] is None
+
+
+@pytest.mark.asyncio
+async def test_send_test_alert_payloads_dispatches_each_type():
+    from app.services.alert_test_payloads import send_test_alert_payloads
+
+    payloads = [
+        {"tipo_de_alerta": "Variacao_Valor_Mais", "id_alerta": "alert-1"},
+        {"tipo_de_alerta": "pdf_erro", "id_alerta": "alert-2"},
+    ]
+    response = MagicMock()
+    response.status_code = 200
+    response.text = "ok"
+
+    with patch("httpx.AsyncClient") as client_cls:
+        client = AsyncMock()
+        client.post.return_value = response
+        client_cls.return_value.__aenter__.return_value = client
+
+        results = await send_test_alert_payloads("https://n8n.test/webhook", payloads)
+
+    assert results == [
+        {
+            "tipo_de_alerta": "Variacao_Valor_Mais",
+            "status_code": 200,
+            "ok": True,
+            "response_preview": "ok",
+        },
+        {
+            "tipo_de_alerta": "pdf_erro",
+            "status_code": 200,
+            "ok": True,
+            "response_preview": "ok",
+        },
+    ]
+    assert client.post.await_count == 2
+    first_call = client.post.await_args_list[0]
+    assert first_call.args[0] == "https://n8n.test/webhook"
+    assert first_call.kwargs["headers"]["X-Idempotency-Key"] == "test-alert:Variacao_Valor_Mais:alert-1"
