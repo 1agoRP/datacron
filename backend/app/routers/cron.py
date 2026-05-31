@@ -53,19 +53,22 @@ async def run_daily_checks(
             if send_test_alerts:
                 dispatch_results = await send_test_alert_payloads(test_webhook_url, alert_payloads)
             logger.info("Daily CRON test payloads generated successfully.")
-            return {
+            response = {
                 "status": "success",
                 "mode": "test_alerts",
+                "dispatch_mode": "individual_webhook_requests" if send_test_alerts else "preview_only",
                 "message": (
-                    "Synthetic alert payloads generated and dispatched."
+                    "Synthetic alert payloads generated and dispatched as individual webhook requests."
                     if send_test_alerts
                     else "Synthetic alert payloads generated from real database data."
                 ),
                 "total_alertas": len(alert_payloads),
                 "webhook_url": test_webhook_url if send_test_alerts else None,
                 "dispatch_results": dispatch_results,
-                "alertas": alert_payloads,
             }
+            if not send_test_alerts:
+                response["alertas"] = alert_payloads
+            return response
 
         alert_payloads = []
         alert_payloads.extend(await check_missing_bills(db))

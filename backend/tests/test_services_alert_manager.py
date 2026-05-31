@@ -427,3 +427,5 @@ async def test_send_test_alert_payloads_dispatches_each_type():
     first_call = client.post.await_args_list[0]
     assert first_call.args[0] == "https://n8n.test/webhook"
     assert first_call.kwargs["headers"]["X-Idempotency-Key"] == "test-alert:Variacao_Valor_Mais:alert-1"
+    assert client.post.await_args_list[0].kwargs["json"] == payloads[0]
+    assert client.post.await_args_list[1].kwargs["json"] == payloads[1]
