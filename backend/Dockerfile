@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-por \
     gcc \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Python dependencie
@@ -20,14 +21,14 @@ RUN pip install --no-cache-dir uv && \
 # App code
 COPY . .
 
-# Create storage dir
-RUN mkdir -p pdfs_storage
 RUN addgroup --system datacron && adduser --system --ingroup datacron datacron \
+    && mkdir -p pdfs_storage \
     && chown -R datacron:datacron /app
-
-USER datacron
+RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 8000
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
 # Usamos um shell script ou passamos como argumento do bash para poder usar a variável de ambiente $PORT fornecida pelo Render
 CMD bash -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"
