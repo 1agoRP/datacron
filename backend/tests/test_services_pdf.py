@@ -13,6 +13,7 @@ from app.services.pdf_processor import (
     unlock_pdf,
     extract_data,
     save_pdf,
+    sanitize_filename,
     _parse_fields,
     _run_ocr,
     generate_standard_filename,
@@ -175,6 +176,24 @@ def test_save_pdf(simple_pdf_bytes, tmp_path):
 
 # ─── generate_standard_filename ──────────────────────────────
 
+def test_save_pdf_falls_back_when_storage_is_not_writable(simple_pdf_bytes, tmp_path):
+    storage_dir = tmp_path / "blocked"
+    fallback_dir = tmp_path / "fallback"
+
+    with patch("app.services.pdf_processor.settings") as mock_settings, \
+         patch("app.services.pdf_processor.FALLBACK_PDF_STORAGE_PATH", fallback_dir), \
+         patch("pathlib.Path.write_bytes", side_effect=[PermissionError("denied"), len(simple_pdf_bytes)]):
+        mock_settings.PDF_STORAGE_PATH = str(storage_dir)
+        path = save_pdf(simple_pdf_bytes, "fatura.pdf")
+
+    assert path == str(fallback_dir / "fatura.pdf")
+
+
+def test_sanitize_filename_removes_nbsp_and_control_chars():
+    filename = sanitize_filename("0019 - COND. ED. PLANALTO\xa0PLAZA\n - Vivo?.pdf")
+    assert filename == "0019 - COND. ED. PLANALTO PLAZA - Vivo.pdf"
+
+
 def test_generate_standard_filename():
     from datetime import date
     # Test normal formatting
@@ -205,3 +224,14 @@ def test_generate_standard_filename():
     assert "sem-vencimento" in filename2
     assert "R$ 0,00" in filename2
     assert filename2 == "A-1 - CondoWithInvalidChars - Sabesp - ND12 - sem-vencimento - R$ 0,00.pdf"
+
+    filename3 = generate_standard_filename(
+        condo_numero=19,
+        condo_nome="COND. ED. PLANALTO\xa0PLAZA",
+        conc_tipo="Desconhecida",
+        conc_codigo="ND",
+        vencimento=date(2026, 6, 1),
+        valor=204.54
+    )
+    assert "\xa0" not in filename3
+    assert filename3 == "0019 - COND. ED. PLANALTO PLAZA - Desconhecida - ND - 01-06-2026 - R$ 204,54.pdf"

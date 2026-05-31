@@ -2,6 +2,8 @@ import re
 import io
 import os
 import logging
+import tempfile
+import unicodedata
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -14,6 +16,7 @@ from pdf2image import convert_from_bytes
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+FALLBACK_PDF_STORAGE_PATH = Path(tempfile.gettempdir()) / "datacron_pdfs"
 
 
 def test_pdf_password(pdf_bytes: bytes, password: str) -> bool:
@@ -46,11 +49,34 @@ def unlock_pdf(pdf_bytes: bytes, password: str) -> Optional[bytes]:
 
 def save_pdf(pdf_bytes: bytes, filename: str) -> str:
     """Saves PDF bytes to storage and returns the full path."""
+    safe_filename = sanitize_filename(filename)
     storage_dir = Path(settings.PDF_STORAGE_PATH)
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    filepath = storage_dir / filename
-    filepath.write_bytes(pdf_bytes)
-    return str(filepath)
+    try:
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        filepath = storage_dir / safe_filename
+        filepath.write_bytes(pdf_bytes)
+        return str(filepath)
+    except PermissionError as exc:
+        logger.error(
+            "PDF storage path is not writable (%s). Falling back to %s. "
+            "Fix PDF_STORAGE_PATH volume permissions for persistent storage.",
+            storage_dir,
+            FALLBACK_PDF_STORAGE_PATH,
+        )
+        FALLBACK_PDF_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
+        fallback_path = FALLBACK_PDF_STORAGE_PATH / safe_filename
+        fallback_path.write_bytes(pdf_bytes)
+        return str(fallback_path)
+
+
+def sanitize_filename(value: Any) -> str:
+    if not value:
+        return "arquivo.pdf"
+    text = unicodedata.normalize("NFKC", str(value)).replace("\xa0", " ")
+    text = "".join(ch for ch in text if ch.isprintable())
+    text = re.sub(r'[\\/*?:"<>|]', "", text)
+    text = re.sub(r"\s+", " ", text).strip(" .")
+    return text or "arquivo.pdf"
 
 
 def generate_standard_filename(
@@ -80,9 +106,9 @@ def generate_standard_filename(
     
     # Remove characters that are invalid in filenames across different OS
     def clean(text):
-        if not text: return "ND"
-        # Remove common invalid chars and extra whitespace
-        return re.sub(r'[\\/*?:"<>|]', "", str(text)).strip()
+        if not text:
+            return "ND"
+        return sanitize_filename(text)
         
     clean_nome = clean(condo_nome)
     clean_tipo = clean(conc_tipo)
@@ -99,7 +125,7 @@ def generate_standard_filename(
     
     # Format: numero - Nome - concessionária - código - vencimento - valor
     filename = f"{condo_num_str} - {clean_nome} - {clean_tipo} - {clean_codigo} - {venc_str} - R$ {valor_str}.pdf"
-    return filename
+    return sanitize_filename(filename)
 
 
 def extract_data(pdf_bytes: bytes) -> Dict[str, Any]:
