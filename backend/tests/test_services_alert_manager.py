@@ -289,7 +289,8 @@ async def test_notify_alert_payload_includes_flat_context_and_pdf_base64(
         payload = await notify_alert(db_session, alert, fatura=fatura, conc=conc)
 
     assert payload["id_alerta"] == str(alert.id)
-    assert payload["tipo_de_alerta"] == "Variacao_Valor_Mais"
+    assert payload["tipo_de_alerta"] == "alerta_conta_alta"
+    assert payload["tipo_de_alerta_origem"] == "Variacao_Valor_Mais"
     assert payload["contexto"]["mensagem"] == "Valor acima da media"
     assert payload["email_remetente"] == "contas@enel.test"
     assert payload["id_email_original"] == "gmail-123"
@@ -369,12 +370,28 @@ async def test_build_test_alert_payloads_use_real_context_contract(
 
     payloads = await build_test_alert_payloads(db_session)
 
-    assert len(payloads) == 7
+    assert len(payloads) == 15
     tipos = {payload["tipo_de_alerta"] for payload in payloads}
-    assert "Variacao_Valor_Mais" in tipos
+    assert tipos == {
+        "alerta_falta_conta",
+        "alerta_conta_alta",
+        "alerta_conta_baixa",
+        "alerta_falta_conta_ndeb_aut3",
+        "alerta_falta_conta_ndeb_aut2",
+        "alerta_falta_conta_ndeb_aut1",
+        "alerta_falta_conta_ndeb_aut0",
+        "ata_mandato_a_vencer",
+        "ata_mandato_vencida",
+        "seguro_a_vencer",
+        "seguro_vencido",
+        "avcb_a_vencer",
+        "avcb_vencido",
+        "email_nao_identificado",
+        "pdf_erro",
+    }
     assert "email_nao_identificado" in tipos
 
-    payload = next(item for item in payloads if item["tipo_de_alerta"] == "Variacao_Valor_Mais")
+    payload = next(item for item in payloads if item["tipo_de_alerta"] == "alerta_conta_alta")
     assert payload["event_type"] == "alert.created.test"
     assert payload["contexto"]["modo"] == "teste_n8n"
     assert payload["condominio_nome"] == "Condominio Exemplo"
@@ -386,7 +403,7 @@ async def test_build_test_alert_payloads_use_real_context_contract(
     assert "condomínio_nome" not in payload
     assert payload["fatura_pdf_base64"] == "JVBERi0xLjQKcmVhbCB0ZXN0IHBkZg=="
 
-    no_pdf_payload = next(item for item in payloads if item["tipo_de_alerta"] == "Nao_Recebida")
+    no_pdf_payload = next(item for item in payloads if item["tipo_de_alerta"] == "alerta_falta_conta")
     assert no_pdf_payload["fatura_pdf_base64"] is None
 
 
@@ -395,7 +412,7 @@ async def test_send_test_alert_payloads_dispatches_each_type():
     from app.services.alert_test_payloads import send_test_alert_payloads
 
     payloads = [
-        {"tipo_de_alerta": "Variacao_Valor_Mais", "id_alerta": "alert-1"},
+        {"tipo_de_alerta": "alerta_conta_alta", "id_alerta": "alert-1"},
         {"tipo_de_alerta": "pdf_erro", "id_alerta": "alert-2"},
     ]
     response = MagicMock()
@@ -411,7 +428,7 @@ async def test_send_test_alert_payloads_dispatches_each_type():
 
     assert results == [
         {
-            "tipo_de_alerta": "Variacao_Valor_Mais",
+            "tipo_de_alerta": "alerta_conta_alta",
             "status_code": 200,
             "ok": True,
             "response_preview": "ok",
@@ -426,6 +443,6 @@ async def test_send_test_alert_payloads_dispatches_each_type():
     assert client.post.await_count == 2
     first_call = client.post.await_args_list[0]
     assert first_call.args[0] == "https://n8n.test/webhook"
-    assert first_call.kwargs["headers"]["X-Idempotency-Key"] == "test-alert:Variacao_Valor_Mais:alert-1"
+    assert first_call.kwargs["headers"]["X-Idempotency-Key"] == "test-alert:alerta_conta_alta:alert-1"
     assert client.post.await_args_list[0].kwargs["json"] == payloads[0]
     assert client.post.await_args_list[1].kwargs["json"] == payloads[1]

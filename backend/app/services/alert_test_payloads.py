@@ -21,13 +21,21 @@ DEFAULT_TEST_ALERT_WEBHOOK_URL = (
 )
 
 TEST_ALERT_CASES = [
-    ("Variacao_Valor_Mais", "alta", "Teste n8n: valor acima da media historica."),
-    ("Variacao_Valor_Menos", "media", "Teste n8n: valor abaixo da media historica."),
-    ("Fatura_Sem_Debito_Automatico", "alta", "Teste n8n: fatura sem debito automatico."),
-    ("Nao_Recebida", "alta", "Teste n8n: conta esperada ainda nao recebida."),
-    ("Mandato_a_Vencer", "media", "Teste n8n: mandato do sindico a vencer."),
-    ("pdf_erro", "alta", "Teste n8n: falha no desbloqueio do PDF."),
+    ("alerta_falta_conta", "alta", "Teste n8n: conta esperada ainda nao recebida."),
+    ("alerta_conta_alta", "alta", "Teste n8n: valor acima da media historica."),
+    ("alerta_conta_baixa", "media", "Teste n8n: valor abaixo da media historica."),
+    ("alerta_falta_conta_ndeb_aut3", "media", "Teste n8n: fatura sem debito automatico faltando 3 dias."),
+    ("alerta_falta_conta_ndeb_aut2", "media", "Teste n8n: fatura sem debito automatico faltando 2 dias."),
+    ("alerta_falta_conta_ndeb_aut1", "alta", "Teste n8n: fatura sem debito automatico faltando 1 dia."),
+    ("alerta_falta_conta_ndeb_aut0", "alta", "Teste n8n: fatura sem debito automatico vence hoje."),
+    ("ata_mandato_a_vencer", "media", "Teste n8n: mandato do sindico a vencer."),
+    ("ata_mandato_vencida", "alta", "Teste n8n: mandato do sindico vencido."),
+    ("seguro_a_vencer", "media", "Teste n8n: seguro a vencer."),
+    ("seguro_vencido", "alta", "Teste n8n: seguro vencido."),
+    ("avcb_a_vencer", "media", "Teste n8n: AVCB a vencer."),
+    ("avcb_vencido", "alta", "Teste n8n: AVCB vencido."),
     ("email_nao_identificado", "media", "Teste n8n: email recebido nao identificado."),
+    ("pdf_erro", "alta", "Teste n8n: falha no desbloqueio do PDF."),
 ]
 
 

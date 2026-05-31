@@ -184,10 +184,10 @@ async def check_missing_bills(db: AsyncSession) -> list[dict]:
         
         # Rule 3: Contas não é débito automático (3, 2, 1, 0 days before)
         if not conc.debito_automatico and days_until_due in [3, 2, 1, 0]:
-            tipo_alerta = "Fatura_Sem_Debito_Automatico"
+            tipo_alerta = f"alerta_falta_conta_ndeb_aut{days_until_due}"
         # Rule 1: Conta não recebida (on the exact day, if auto debit)
         elif days_until_due == 0:
-            tipo_alerta = "Nao_Recebida"
+            tipo_alerta = "alerta_falta_conta"
             
         if not tipo_alerta:
             continue
@@ -250,7 +250,25 @@ ALERT_TYPES_WITH_PDF_CONTEXT = {
     "Variacao_Valor_Mais",
     "Variacao_Valor_Menos",
     "Fatura_Sem_Debito_Automatico",
+    "alerta_conta_alta",
+    "alerta_conta_baixa",
+    "alerta_falta_conta_ndeb_aut3",
+    "alerta_falta_conta_ndeb_aut2",
+    "alerta_falta_conta_ndeb_aut1",
+    "alerta_falta_conta_ndeb_aut0",
 }
+N8N_ALERT_TYPE_MAP = {
+    "Nao_Recebida": "alerta_falta_conta",
+    "Variacao_Valor_Mais": "alerta_conta_alta",
+    "Variacao_Valor_Menos": "alerta_conta_baixa",
+    "Fatura_Sem_Debito_Automatico": "alerta_falta_conta_ndeb_aut0",
+    "Mandato_a_Vencer": "ata_mandato_a_vencer",
+    "Mandato_Vencido": "ata_mandato_vencida",
+}
+
+
+def n8n_alert_type(tipo: str) -> str:
+    return N8N_ALERT_TYPE_MAP.get(tipo, tipo)
 
 
 def _format_brl(value: float | None) -> str | None:
@@ -268,7 +286,8 @@ def _iso(value) -> str | None:
 
 
 def _read_fatura_pdf_base64(alert: Alerta, fatura: Fatura | None) -> str | None:
-    if not fatura or alert.tipo not in ALERT_TYPES_WITH_PDF_CONTEXT:
+    canonical_tipo = n8n_alert_type(alert.tipo)
+    if not fatura or (alert.tipo not in ALERT_TYPES_WITH_PDF_CONTEXT and canonical_tipo not in ALERT_TYPES_WITH_PDF_CONTEXT):
         return None
     if fatura.pdf_base64:
         return fatura.pdf_base64
@@ -603,11 +622,13 @@ async def notify_alert(
 
     # 6. Anexar PDF se disponível
     pdf_base64 = _read_fatura_pdf_base64(alert, fatura)
+    canonical_tipo = n8n_alert_type(alert.tipo)
     payload = {
         "schema_version": ALERT_WEBHOOK_SCHEMA_VERSION,
         "event_type": "alert.created",
         "id_alerta": str(alert.id) if alert.id else None,
-        "tipo_de_alerta": alert.tipo,
+        "tipo_de_alerta": canonical_tipo,
+        "tipo_de_alerta_origem": alert.tipo,
         "gravidade": alert.gravidade,
         "contexto": {
             "mensagem": alert.mensagem,
