@@ -314,3 +314,77 @@ async def test_notify_alert_payload_includes_flat_context_and_pdf_base64(
 
     _, kwargs = client.post.call_args
     assert kwargs["json"]["fatura_pdf_base64"] == payload["fatura_pdf_base64"]
+
+
+@pytest.mark.asyncio
+async def test_build_test_alert_payloads_use_real_context_contract(
+    db_session: AsyncSession,
+    tmp_path,
+    monkeypatch,
+):
+    from app.services.alert_test_payloads import build_test_alert_payloads
+
+    pdf_path = tmp_path / "real-fatura.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\nreal test pdf")
+    monkeypatch.setenv("PDF_STORAGE_PATH", str(tmp_path))
+
+    condo = Condominio(
+        id=uuid.uuid4(),
+        nome="Condominio Exemplo",
+        numero="99",
+        endereco="Rua Real",
+        cnpj="22.333.444/0001-55",
+        sindico="Joao",
+        carteira=12,
+        ativo=True,
+    )
+    conc = Concessionaria(
+        id=uuid.uuid4(),
+        condominio_id=condo.id,
+        tipo="Sabesp",
+        instalacao="SAB-999",
+        dia_vencimento=20,
+        valor_medio=321.0,
+        ativo=True,
+    )
+    fatura = Fatura(
+        id=uuid.uuid4(),
+        condominio_id=condo.id,
+        concessionaria_id=conc.id,
+        referencia="Maio/2026",
+        valor=444.12,
+        vencimento=date(2026, 5, 20),
+        status="processada",
+        email_remetente="contas@sabesp.test",
+        email_assunto="Fatura Sabesp",
+        gmail_message_id="gmail-real-999",
+        pdf_path=str(pdf_path),
+        pdf_desbloqueado=True,
+        pdf_nome_original="sabesp.pdf",
+        debito_automatico=False,
+        created_at=datetime(2026, 5, 30, tzinfo=timezone.utc),
+    )
+    db_session.add_all([condo, conc, fatura])
+    await db_session.flush()
+
+    payloads = await build_test_alert_payloads(db_session)
+
+    assert len(payloads) == 7
+    tipos = {payload["tipo_de_alerta"] for payload in payloads}
+    assert "Variacao_Valor_Mais" in tipos
+    assert "email_nao_identificado" in tipos
+
+    payload = next(item for item in payloads if item["tipo_de_alerta"] == "Variacao_Valor_Mais")
+    assert payload["event_type"] == "alert.created.test"
+    assert payload["contexto"]["modo"] == "teste_n8n"
+    assert payload["condominio_nome"] == "Condominio Exemplo"
+    assert payload["condominio_numero"] == "99"
+    assert payload["concessionaria_cod_identificacao"] == "SAB-999"
+    assert payload["fatura_valor_formatado"] == "R$ 444,12"
+    assert payload["fatura_debauto"] is False
+    assert payload["usuarios_responsaveis0"] == "pradomansia@gmail.com"
+    assert "condomínio_nome" not in payload
+    assert payload["fatura_pdf_base64"] == "JVBERi0xLjQKcmVhbCB0ZXN0IHBkZg=="
+
+    no_pdf_payload = next(item for item in payloads if item["tipo_de_alerta"] == "Nao_Recebida")
+    assert no_pdf_payload["fatura_pdf_base64"] is None
