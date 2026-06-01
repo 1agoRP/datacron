@@ -268,6 +268,15 @@ async def test_notify_alert_payload_includes_flat_context_and_pdf_base64(
         gravidade="alta",
         mensagem="Valor acima da media",
     )
+    manager = User(
+        id=uuid.uuid4(),
+        nome="Gerente",
+        email="gerente@test.com",
+        senha_hash="hash",
+        role="gerencia",
+        ativo=True,
+        codigo_condominio="42",
+    )
     admin = User(
         id=uuid.uuid4(),
         nome="Admin",
@@ -275,8 +284,9 @@ async def test_notify_alert_payload_includes_flat_context_and_pdf_base64(
         senha_hash="hash",
         role="admin",
         ativo=True,
+        codigo_condominio="todos",
     )
-    db_session.add_all([condo, conc, fatura, alert, admin])
+    db_session.add_all([condo, conc, fatura, alert, manager, admin])
     await db_session.flush()
 
     response = MagicMock()
@@ -319,7 +329,8 @@ async def test_notify_alert_payload_includes_flat_context_and_pdf_base64(
     assert payload["fatura_pdf_nome"] == "enel.pdf"
     assert payload["fatura_pdf_desbloqueado"] is True
     assert payload["fatura_pdf_base64"] == "JVBERi0xLjQKZmFrZSB0ZXN0IHBkZg=="
-    assert payload["usuarios_responsaveis0"] == "admin@test.com"
+    assert payload["usuarios_responsaveis0"] == "gerente@test.com"
+    assert "admin@test.com" not in payload["usuarios_responsaveis"]
 
     _, kwargs = client.post.call_args
     assert kwargs["json"]["fatura_pdf_base64"] == payload["fatura_pdf_base64"]
@@ -481,15 +492,25 @@ async def test_notify_alert_resolution_uses_resol_pen_contract(db_session: Async
         gravidade="alta",
         mensagem="Conta pendente",
     )
-    admin = User(
+    manager = User(
         id=uuid.uuid4(),
-        nome="Admin",
-        email="admin@test.com",
+        nome="Gerente",
+        email="gerente@test.com",
         senha_hash="hash",
-        role="admin",
+        role="gerencia",
         ativo=True,
+        codigo_condominio="77",
     )
-    db_session.add_all([condo, alert, admin])
+    assistant = User(
+        id=uuid.uuid4(),
+        nome="Assistente",
+        email="assistente@test.com",
+        senha_hash="hash",
+        role="assistente",
+        ativo=True,
+        codigo_condominio="77",
+    )
+    db_session.add_all([condo, alert, manager, assistant])
     await db_session.flush()
 
     response = MagicMock()
@@ -517,7 +538,7 @@ async def test_notify_alert_resolution_uses_resol_pen_contract(db_session: Async
     assert payload["email_template_tipo"] == 2
     assert payload["resolvido_por"] == "gestor@test.com"
     assert payload["resolucao_observacao"] == "Fatura cadastrada."
-    assert payload["usuarios_responsaveis"] == ["admin@test.com", "gestor@test.com"]
+    assert payload["usuarios_responsaveis"] == ["assistente@test.com", "gerente@test.com"]
 
     first_call = client.post.await_args_list[0]
     assert first_call.args[0] == "https://n8n.test/webhook/alerts"

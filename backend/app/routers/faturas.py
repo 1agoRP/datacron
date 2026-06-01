@@ -21,6 +21,7 @@ from app.schemas import FaturaResponse
 from app.security import read_pdf_upload
 from app.services.fatura_duplicates import find_duplicate_fatura
 from app.services.pdf_processor import generate_standard_filename
+from app.services.alert_manager import check_and_create_alerts
 
 
 router = APIRouter(prefix="/faturas", tags=["Faturas"])
@@ -178,7 +179,7 @@ async def create_fatura_manual(
         valor=valor,
         vencimento=vencimento,
         referencia=referencia,
-        status="pendente",
+        status="processada",
         email_remetente=f"Manual - {user.email}",
         email_assunto=f"Entrada manual por {user.nome}",
         pdf_base64=pdf_base64,
@@ -207,7 +208,10 @@ async def create_fatura_manual(
         }
     )
     db.add(log)
-    
+
+    await db.flush()
+    await check_and_create_alerts(nova_fatura, conc, db)
+
     await db.commit()
     await db.refresh(nova_fatura)
 

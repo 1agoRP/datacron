@@ -99,7 +99,7 @@ async def _check_value_variation(
     variation = abs(fatura.valor - avg_valor) / avg_valor
     fatura.variacao_percentual = round(variation * 100, 2)
 
-    if variation > settings.ALERT_VARIATION_THRESHOLD:
+    if variation > VALUE_VARIATION_ALERT_THRESHOLD:
         direction = "a maior" if fatura.valor > avg_valor else "a menor"
         pct = round(variation * 100, 1)
         gravidade = "alta" if variation > 0.35 else "media"
@@ -245,10 +245,13 @@ async def check_missing_bills(db: AsyncSession) -> list[dict]:
     return payloads
 
 
-# Roles authorized to receive alert email notifications
-ALERT_NOTIFICATION_ROLES = {"admin", "assistente", "supervisor", "gerencia"}
+# Roles authorized to receive alert email notifications.
+# The product role "gerente" is stored as "gerencia" in the current user table.
+MANAGER_NOTIFICATION_ROLES = {"gerencia", "gerente"}
+ALERT_NOTIFICATION_ROLES = {"admin", "assistente", "supervisor", *MANAGER_NOTIFICATION_ROLES}
 ALERT_WEBHOOK_SCHEMA_VERSION = "2026-05-30"
 MAX_ALERT_WEBHOOK_ATTEMPTS = 5
+VALUE_VARIATION_ALERT_THRESHOLD = 0.15
 ALERT_TYPES_WITH_PDF_CONTEXT = {
     "pdf_erro",
     "Variacao_Valor_Mais",
@@ -290,6 +293,25 @@ DOCUMENT_ALERT_TYPES = {
 EMAIL_ALERT_TYPES = {"email_nao_identificado", "pdf_erro"}
 RESOLUTION_ALERT_TYPE = "resol_pen"
 ALL_N8N_ALERT_TYPES = ACCOUNT_ALERT_TYPES | DOCUMENT_ALERT_TYPES | EMAIL_ALERT_TYPES | {RESOLUTION_ALERT_TYPE}
+
+ALERT_RECIPIENT_ROLES_BY_TYPE: dict[str, set[str]] = {
+    "alerta_falta_conta": MANAGER_NOTIFICATION_ROLES | {"assistente"},
+    "alerta_conta_alta": MANAGER_NOTIFICATION_ROLES | {"assistente", "supervisor"},
+    "alerta_conta_baixa": MANAGER_NOTIFICATION_ROLES | {"assistente", "supervisor"},
+    "alerta_falta_conta_ndeb_aut3": MANAGER_NOTIFICATION_ROLES | {"assistente"},
+    "alerta_falta_conta_ndeb_aut2": MANAGER_NOTIFICATION_ROLES | {"assistente"},
+    "alerta_falta_conta_ndeb_aut1": MANAGER_NOTIFICATION_ROLES | {"assistente"},
+    "alerta_falta_conta_ndeb_aut0": MANAGER_NOTIFICATION_ROLES | {"assistente"},
+    "ata_mandato_a_vencer": MANAGER_NOTIFICATION_ROLES | {"assistente", "supervisor"},
+    "ata_mandato_vencida": MANAGER_NOTIFICATION_ROLES | {"assistente", "supervisor"},
+    "seguro_a_vencer": MANAGER_NOTIFICATION_ROLES | {"assistente", "supervisor"},
+    "seguro_vencido": MANAGER_NOTIFICATION_ROLES | {"assistente", "supervisor"},
+    "avcb_a_vencer": MANAGER_NOTIFICATION_ROLES | {"assistente", "supervisor"},
+    "avcb_vencido": MANAGER_NOTIFICATION_ROLES | {"assistente", "supervisor"},
+    "email_nao_identificado": {"admin"},
+    "pdf_erro": {"admin"},
+    "resol_pen": MANAGER_NOTIFICATION_ROLES | {"assistente"},
+}
 
 ALERT_TYPE_METADATA: dict[str, dict[str, str]] = {
     "alerta_falta_conta": {
@@ -393,6 +415,11 @@ ALERT_TYPE_METADATA: dict[str, dict[str, str]] = {
 
 def n8n_alert_type(tipo: str) -> str:
     return N8N_ALERT_TYPE_MAP.get(tipo, tipo)
+
+
+def _recipient_roles_for_alert(tipo: str) -> set[str]:
+    canonical_tipo = n8n_alert_type(tipo)
+    return ALERT_RECIPIENT_ROLES_BY_TYPE.get(canonical_tipo, ALERT_NOTIFICATION_ROLES)
 
 
 def get_alert_webhook_url() -> str:
@@ -515,6 +542,45 @@ def _read_fatura_pdf_base64(alert: Alerta, fatura: Fatura | None) -> str | None:
     except Exception as exc:
         logger.error(f"Failed to read PDF for alert payload: {exc}")
         return None
+
+
+def _read_stored_pdf_base64(file_ref: str | None) -> str | None:
+    if not file_ref:
+        return None
+    try:
+        data = file_ref.split(",", 1)[1] if "," in file_ref else file_ref
+        if len(data) > 100 and not any(sep in data for sep in ("\\", "/")):
+            return data
+
+        pdf_path = resolve_storage_path(file_ref)
+        if not pdf_path.exists():
+            return None
+        return base64.b64encode(pdf_path.read_bytes()).decode("utf-8")
+    except Exception as exc:
+        logger.error(f"Failed to read stored PDF for alert payload: {exc}")
+        return None
+
+
+def _document_pdf_context(tipo: str, condo: Condominio | None) -> dict[str, Any]:
+    if not condo or tipo not in DOCUMENT_ALERT_TYPES:
+        return {"documento_pdf_nome": None, "documento_pdf_base64": None}
+
+    if tipo in {"ata_mandato_a_vencer", "ata_mandato_vencida"}:
+        return {
+            "documento_pdf_nome": condo.ata_eleicao_nome or "ata_eleicao.pdf",
+            "documento_pdf_base64": _read_stored_pdf_base64(condo.ata_eleicao_url),
+        }
+    if tipo in {"seguro_a_vencer", "seguro_vencido"}:
+        return {
+            "documento_pdf_nome": "apolice_seguro.pdf",
+            "documento_pdf_base64": _read_stored_pdf_base64(condo.apolice_seguro_url),
+        }
+    if tipo in {"avcb_a_vencer", "avcb_vencido"}:
+        return {
+            "documento_pdf_nome": "avcb.pdf",
+            "documento_pdf_base64": _read_stored_pdf_base64(condo.avcb_url),
+        }
+    return {"documento_pdf_nome": None, "documento_pdf_base64": None}
 
 
 async def _get_alert_concessionaria(
@@ -661,7 +727,7 @@ async def notify_alert(
 ) -> dict | None:
     """
     Sends alert notification emails to authorized users.
-    Only sends to users with roles: admin, assistente, concessionarias, gerencia.
+    Sends only to the roles configured for each alert type.
     For non-admin roles, only sends to users who have access to the condomínio.
     """
     from sqlalchemy import select, or_
@@ -670,13 +736,18 @@ async def notify_alert(
     from app.models.user_condominio import UserCondominio
 
     # 1. Buscar todos os admins ativos (eles sempre recebem alertas, mesmo sem condomínio identificado)
-    res_admins = await db.execute(
-        select(User).where(
-            User.role == "admin",
-            User.ativo == True,
+    canonical_tipo = n8n_alert_type(alert.tipo)
+    recipient_roles = _recipient_roles_for_alert(canonical_tipo)
+
+    admin_users = []
+    if "admin" in recipient_roles:
+        res_admins = await db.execute(
+            select(User).where(
+                User.role == "admin",
+                User.ativo == True,
+            )
         )
-    )
-    admin_users = res_admins.scalars().all()
+        admin_users = res_admins.scalars().all()
 
     # Se não tem condomínio, apenas admins recebem
     condo = None
@@ -688,7 +759,7 @@ async def notify_alert(
     else:
         # 2. Buscar usuários com roles autorizados (exceto admin, já buscados)
         #    que tenham acesso a este condomínio via user_condominios OU via codigo_condominio
-        non_admin_roles = ALERT_NOTIFICATION_ROLES - {"admin"}
+        non_admin_roles = recipient_roles - {"admin"}
         
         # 2a. Via tabela user_condominios
         res_linked = await db.execute(
@@ -753,13 +824,6 @@ async def notify_alert(
         recipients.add(u.email)
     for u in carteira_users:
         recipients.add(u.email)
-
-    # NOVO: Se for erro de PDF ou e-mail não identificado, encaminhar de volta para o remetente original
-    if alert.tipo in ["pdf_erro", "email_nao_identificado"]:
-        if fatura and fatura.email_remetente:
-            recipients.add(fatura.email_remetente)
-        elif getattr(alert, "email_remetente", None):
-            recipients.add(alert.email_remetente)
 
     if not recipients:
         logger.warning(f"No recipients found for alert {alert.id or 'NEW'} on condo {alert.condominio_id}")
@@ -838,11 +902,13 @@ async def notify_alert(
 
     # 6. Anexar PDF se disponível
     pdf_base64 = _read_fatura_pdf_base64(alert, fatura)
-    canonical_tipo = n8n_alert_type(alert.tipo)
     template_meta = _alert_template_metadata(canonical_tipo, alert.gravidade)
     due_date = fatura.vencimento if fatura else None
     if canonical_tipo in {"ata_mandato_a_vencer", "ata_mandato_vencida"} and condo:
         due_date = condo.mandato_fim
+    document_pdf = _document_pdf_context(canonical_tipo, condo)
+    attachment_pdf_base64 = pdf_base64 or document_pdf["documento_pdf_base64"]
+    attachment_pdf_name = (fatura.pdf_nome_original if fatura else None) or document_pdf["documento_pdf_nome"]
     variacao_percentual = getattr(fatura, "variacao_percentual", None) if fatura else None
     payload = {
         "schema_version": ALERT_WEBHOOK_SCHEMA_VERSION,
@@ -883,7 +949,11 @@ async def notify_alert(
         "fatura_gmail_message_id": fatura.gmail_message_id if fatura else None,
         "fatura_pdf_nome": fatura.pdf_nome_original if fatura else None,
         "fatura_pdf_desbloqueado": bool(fatura.pdf_desbloqueado) if fatura else False,
-        "fatura_pdf_base64": pdf_base64,
+        "fatura_pdf_base64": attachment_pdf_base64,
+        "documento_pdf_nome": document_pdf["documento_pdf_nome"],
+        "documento_pdf_base64": document_pdf["documento_pdf_base64"],
+        "anexo_pdf_nome": attachment_pdf_name,
+        "anexo_pdf_base64": attachment_pdf_base64,
         "source": "datacron.backend",
     }
     payload.update(_responsavel_fields(recipients))
@@ -902,6 +972,7 @@ async def notify_alert_resolution(
     conc: Optional[Concessionaria] = None,
 ) -> dict:
     from app.models.user import User
+    from app.models.user_condominio import UserCondominio
 
     if not fatura and alert.fatura_id:
         result = await db.execute(select(Fatura).where(Fatura.id == alert.fatura_id))
@@ -914,10 +985,44 @@ async def notify_alert_resolution(
 
     conc = await _get_alert_concessionaria(db, fatura, conc)
 
-    recipients = {resolved_by_email}
-    admins = await db.execute(select(User).where(User.role == "admin", User.ativo == True))
-    for user in admins.scalars().all():
-        recipients.add(user.email)
+    recipients = set()
+    recipient_roles = _recipient_roles_for_alert(RESOLUTION_ALERT_TYPE)
+    if alert.condominio_id:
+        linked = await db.execute(
+            select(User)
+            .join(UserCondominio, UserCondominio.user_id == User.id)
+            .where(
+                UserCondominio.condominio_id == alert.condominio_id,
+                User.role.in_(recipient_roles),
+                User.ativo == True,
+            )
+        )
+        for user in linked.scalars().all():
+            recipients.add(user.email)
+
+    if condo:
+        all_role_users = await db.execute(
+            select(User).where(
+                User.role.in_(recipient_roles),
+                User.ativo == True,
+                User.codigo_condominio.is_not(None),
+            )
+        )
+        condo_num = str(condo.numero).strip()
+        for user in all_role_users.scalars().all():
+            codigo_str = user.codigo_condominio or ""
+            if "todos" in codigo_str.lower():
+                recipients.add(user.email)
+                continue
+            codes = [c.strip() for c in codigo_str.split(",") if c.strip()]
+            all_codes = set(codes)
+            for code in codes:
+                if code.isdigit():
+                    all_codes.add(code.zfill(2))
+                    all_codes.add(code.zfill(3))
+                    all_codes.add(code.zfill(4))
+            if condo_num in all_codes:
+                recipients.add(user.email)
 
     original_tipo = n8n_alert_type(alert.tipo)
     template_meta = _alert_template_metadata(RESOLUTION_ALERT_TYPE, "baixa")
