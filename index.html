@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datacron | Automações Inteligentes, Sites e Sistemas Sob Medida</title>
+    <meta name="description"
+        content="Desenvolvimento profissional de sites, landing pages de alta conversão e automações inteligentes. Eleve o nível tecnológico do seu negócio com a Datacron.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <!-- MOBILE MENU -->
+    <div class="mobile-menu" id="mobile-menu">
+        <button class="mobile-close" id="mobile-close">✕</button>
+        <a href="#servicos" onclick="closeMobile()">Serviços</a>
+        <a href="#simulador" onclick="closeMobile()">Simulador</a>
+        <a href="#sobre" onclick="closeMobile()">Sobre</a>
+        <a href="#contato" onclick="closeMobile()">Contato</a>
+        <a href="https://wa.me/5500000000000" class="btn-primary" style="font-size:16px;">Falar no WhatsApp</a>
+    </div>
+
+    <!-- NAVBAR -->
+    <header class="navbar" id="navbar">
+        <div class="container nav-inner">
+            <a href="#" class="logo">
+                <img src="img/LogoOficialFundoBranco.png" alt="Datacron" />
+            </a>
+            <ul class="nav-links">
+                <li><a href="#servicos">Serviços</a></li>
+                <li><a href="#simulador">Simulador</a></li>
+                <li><a href="#sobre">Sobre</a></li>
+                <li><a href="#contato">Contato</a></li>
+            </ul>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <button class="menu-toggle" id="menu-toggle" aria-label="Menu">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="6" x2="21" y2="6" />
+                        <line x1="3" y1="12" x2="21" y2="12" />
+                        <line x1="3" y1="18" x2="21" y2="18" />
+                    </svg>
+                </button>
+                <a href="https://wa.me/5500000000000" class="btn-nav">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5">
+                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                    </svg>
+                    Falar Agora
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero" id="home">
+        <div class="hero-bg">
+            <div class="dots-pattern"></div>
+            <div class="gradient-orb orb-1"></div>
+            <div class="gradient-orb orb-2"></div>
+            <div class="gradient-orb orb-3"></div>
+            <svg class="hex-grid" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <pattern id="hex" x="0" y="0" width="60" height="52" patternUnits="userSpaceOnUse">
+                        <polygon points="30,2 58,17 58,47 30,62 2,47 2,17" fill="none" stroke="#0d1b3e"
+                            stroke-width="0.8" />
+                    </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#hex)" />
+            </svg>
+        </div>
+
+        <div class="container hero-grid">
+            <div class="hero-content">
+                <div class="hero-eyebrow">
+                    <div class="eyebrow-dot"></div>
+                    Automação &amp; Sistemas Web
+                </div>
+                <h1 class="hero-title">
+                    Tecnologia que<br>
+                    <em>transforma negócios</em><br>
+                    em máquinas de resultado.
+                </h1>
+                <p class="hero-sub">
+                    Sites profissionais, landing pages de altíssima conversão e automações inteligentes. Código sob
+                    medida por um programador web formado e especialista no mercado.
+                </p>
+                <div class="hero-cta">
+                    <a href="#contato" class="btn-primary">
+                        Iniciar Projeto
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </a>
+                    <a href="#servicos" class="btn-ghost">
+                        Ver Serviços
+                    </a>
+                </div>
+                <div class="hero-checks">
+                    <div class="check-item">
+                        <div class="check-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="3">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg></div>
+                        Performance máxima
+                    </div>
+                    <div class="check-item">
+                        <div class="check-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="3">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg></div>
+                        Código nativo &amp; limpo
+                    </div>
+                    <div class="check-item">
+                        <div class="check-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="3">
+                                <path d="M20 6L9 17l-5-5" />
+                            </svg></div>
+                        SEO técnico otimizado
+                    </div>
+                </div>
+            </div>
+
+            <div class="hero-visual">
+                <div style="position:relative;">
+                    <div class="device-mockup">
+                        <div class="device-bar">
+                            <span class="d-dot r"></span>
+                            <span class="d-dot y"></span>
+                            <span class="d-dot g"></span>
+                            <div class="d-addr">datacron.com.br</div>
+                        </div>
+                        <div class="device-body">
+                            <div class="d-header-bar">
+                                <div class="d-brand">
+                                    <div class="d-brand-dot"></div>
+                                    DATACRON
+                                </div>
+                                <div class="d-nav-items">
+                                    <span class="d-nav-item">Serviços</span>
+                                    <span class="d-nav-item">Portfólio</span>
+                                    <span class="d-nav-item">Contato</span>
+                                </div>
+                            </div>
+                            <div class="d-hero-section">
+                                <div class="d-hero-tag">Automação Inteligente</div>
+                                <div class="d-hero-title">Resultados que<br><span>transformam</span></div>
+                                <div class="d-hero-sub">Sistemas sob medida para o seu negócio crescer de forma
+                                    escalável.</div>
+                                <div class="d-btn">Começar Agora →</div>
+                            </div>
+                            <div class="d-metrics">
+                                <div class="d-metric">
+                                    <div class="d-metric-val">50+</div>
+                                    <div class="d-metric-lbl">Projetos</div>
+                                </div>
+                                <div class="d-metric">
+                                    <div class="d-metric-val">100%</div>
+                                    <div class="d-metric-lbl">Custom</div>
+                                </div>
+                                <div class="d-metric">
+                                    <div class="d-metric-val">99</div>
+                                    <div class="d-metric-lbl">Score</div>
+                                </div>
+                            </div>
+                            <div class="d-cards">
+                                <div class="d-card">
+                                    <div class="d-card-icon c">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00bcd4"
+                                            stroke-width="2.5">
+                                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                                        </svg>
+                                    </div>
+                                    <div class="d-card-title">Automações</div>
+                                    <div class="d-card-sub">Flows inteligentes sem intervenção manual</div>
+                                </div>
+                                <div class="d-card">
+                                    <div class="d-card-icon g">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#00c97a"
+                                            stroke-width="2.5">
+                                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                                        </svg>
+                                    </div>
+                                    <div class="d-card-title">Analytics</div>
+                                    <div class="d-card-sub">Dados em tempo real para decisões</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="float-chip chip-a">
+                        <div class="chip-ico cyan">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#00bcd4" stroke-width="2">
+                                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="chip-txt-main">WhatsApp Automático</div>
+                            <div class="chip-txt-sub">100% sem intervenção</div>
+                        </div>
+                    </div>
+
+                    <div class="float-chip chip-b">
+                        <div class="chip-ico green">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#00c97a" stroke-width="2">
+                                <ellipse cx="12" cy="5" rx="9" ry="3" />
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="chip-txt-main">CRM Integrado</div>
+                            <div class="chip-txt-sub">Dados sincronizados</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TRUST STRIP -->
+    <section class="trust">
+        <div class="container">
+            <div class="trust-inner">
+                <div class="trust-item reveal">
+                    <div class="trust-num" data-target="50">0+</div>
+                    <div class="trust-lbl">Projetos Concluídos</div>
+                </div>
+                <div class="trust-item reveal">
+                    <div class="trust-num">100%</div>
+                    <div class="trust-lbl">Código Personalizado</div>
+                </div>
+                <div class="trust-item reveal">
+                    <div class="trust-num">10x</div>
+                    <div class="trust-lbl">Mais Produtividade</div>
+                </div>
+                <div class="trust-item reveal">
+                    <div class="trust-num">99</div>
+                    <div class="trust-lbl">Score de Performance</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SERVICES -->
+    <section class="services" id="servicos">
+        <div class="container">
+            <div class="section-header reveal">
+                <div class="section-tag">Serviços</div>
+                <h2 class="section-title">O que fazemos de <span>melhor</span></h2>
+                <p class="section-sub">Soluções tecnológicas sob medida focadas em performance, conversão e automação
+                    real para o seu negócio.</p>
+            </div>
+
+            <div class="bento">
+                <!-- Card 1 -->
+                <div class="card card-1 reveal">
+                    <div class="card-inner">
+                        <div>
+                            <div class="card-badge badge-cyan">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="3">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                                    <path d="M3 9h18M9 21V9" />
+                                </svg>
+                                Sites &amp; Sistemas
+                            </div>
+                            <div class="card-title" style="margin-top:14px;">Desenvolvimento Web<br>Sob Medida</div>
+                            <p class="card-desc" style="margin-top:10px;">Plataformas completas, painéis
+                                administrativos, CRMs e e-commerces. Sistemas rápidos, seguros e focados em UX.</p>
+                            <ul class="card-list" style="margin-top:16px;">
+                                <li>
+                                    <div class="li-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="3">
+                                            <path d="M20 6L9 17l-5-5" />
+                                        </svg></div>Dashboards customizados
+                                </li>
+                                <li>
+                                    <div class="li-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="3">
+                                            <path d="M20 6L9 17l-5-5" />
+                                        </svg></div>E-commerce integrado
+                                </li>
+                                <li>
+                                    <div class="li-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="3">
+                                            <path d="M20 6L9 17l-5-5" />
+                                        </svg></div>100% responsivo
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="card-visual">
+                            <div class="dash">
+                                <div class="dash-bars">
+                                    <div class="dash-bar"></div>
+                                    <div class="dash-bar"></div>
+                                    <div class="dash-bar"></div>
+                                    <div class="dash-bar"></div>
+                                    <div class="dash-bar"></div>
+                                    <div class="dash-bar"></div>
+                                </div>
+                                <div class="dash-rows">
+                                    <div class="dash-row" style="width:80%"></div>
+                                    <div class="dash-row" style="width:60%"></div>
+                                    <div class="dash-row" style="width:45%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="card card-2 reveal">
+                    <div class="card-inner">
+                        <div>
+                            <div class="card-badge badge-green">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="3">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                                </svg>
+                                Automações
+                            </div>
+                            <div class="card-title" style="margin-top:14px;">Automações de Processos</div>
+                            <p class="card-desc" style="margin-top:10px;">Leads capturados, qualificados e respondidos
+                                automaticamente — 24/7, sem esforço manual.</p>
+                            <ul class="card-list" style="margin-top:16px;">
+                                <li>
+                                    <div class="li-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="3">
+                                            <path d="M20 6L9 17l-5-5" />
+                                        </svg></div>Integração Make / N8N
+                                </li>
+                                <li>
+                                    <div class="li-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="3">
+                                            <path d="M20 6L9 17l-5-5" />
+                                        </svg></div>WhatsApp + CRM
+                                </li>
+                                <li>
+                                    <div class="li-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="3">
+                                            <path d="M20 6L9 17l-5-5" />
+                                        </svg></div>Notificações em tempo real
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="card-visual">
+                            <div class="flow">
+                                <div class="fnode active">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                                    </svg>
+                                </div>
+                                <div class="fline"></div>
+                                <div class="fnode">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="3" />
+                                        <path
+                                            d="M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41M2 12h2M20 12h2M6.34 6.34l-1.41-1.41M19.07 19.07l-1.41-1.41M12 2v2M12 20v2" />
+                                    </svg>
+                                </div>
+                                <div class="fline" style="animation-delay:.5s"></div>
+                                <div class="fnode">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="card card-3 reveal">
+                    <div class="card-inner">
+                        <div>
+                            <div class="card-badge badge-navy">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="3">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <path d="M21 21l-4.35-4.35" />
+                                </svg>
+                                SEO &amp; Performance
+                            </div>
+                            <div class="card-title" style="margin-top:14px;">Otimização &amp; Velocidade</div>
+                            <p class="card-desc" style="margin-top:10px;">Sites com nota máxima no Lighthouse, código
+                                limpo e técnicas avançadas de SEO para ranquear no Google.</p>
+                        </div>
+                        <div class="card-visual">
+                            <div class="score-wrap">
+                                <svg style="position:absolute;width:0;height:0">
+                                    <defs>
+                                        <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stop-color="#00bcd4" />
+                                            <stop offset="100%" stop-color="#00c97a" />
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                                <div class="score-ring">
+                                    <svg width="90" height="90" viewBox="0 0 100 100">
+                                        <circle class="ring-bg" cx="50" cy="50" r="45" />
+                                        <circle class="ring-fg" cx="50" cy="50" r="45" />
+                                    </svg>
+                                    <div class="ring-val">99</div>
+                                </div>
+                                <div class="score-labels">
+                                    <div><strong>Performance</strong> · 99</div>
+                                    <div><strong>SEO</strong> · 100</div>
+                                    <div><strong>Acessib.</strong> · 98</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="card card-4 reveal">
+                    <div class="card-inner">
+                        <div>
+                            <div class="card-badge badge-cyan">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="3">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                                    <path d="M7 11V7a5 5 0 0110 0v4" />
+                                </svg>
+                                Landing Pages
+                            </div>
+                            <div class="card-title" style="margin-top:14px;">Landing Pages de Alta Conversão</div>
+                            <p class="card-desc" style="margin-top:10px;">Páginas estratégicas desenhadas para converter
+                                visitantes em clientes com copy, UX e velocidade máxima.</p>
+                            <ul class="card-list" style="margin-top:16px;">
+                                <li>
+                                    <div class="li-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="3">
+                                            <path d="M20 6L9 17l-5-5" />
+                                        </svg></div>A/B Testing integrado
+                                </li>
+                                <li>
+                                    <div class="li-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="3">
+                                            <path d="M20 6L9 17l-5-5" />
+                                        </svg></div>Pixels de rastreamento
+                                </li>
+                                <li>
+                                    <div class="li-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="3">
+                                            <path d="M20 6L9 17l-5-5" />
+                                        </svg></div>Formulários + CRM automático
+                                </li>
+                                <li>
+                                    <div class="li-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="3">
+                                            <path d="M20 6L9 17l-5-5" />
+                                        </svg></div>Entrega em até 5 dias
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="card-visual" style="align-items:stretch;">
+                            <div style="padding:20px;width:100%;display:flex;flex-direction:column;gap:10px;">
+                                <div
+                                    style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 16px;">
+                                    <div style="display:flex;align-items:center;gap:10px;">
+                                        <div
+                                            style="width:32px;height:32px;background:rgba(0,188,212,.1);border-radius:8px;display:grid;place-items:center;">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00bcd4"
+                                                stroke-width="2">
+                                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                                                <circle cx="9" cy="7" r="4" />
+                                            </svg></div>
+                                        <div>
+                                            <div style="font-size:12px;font-weight:600;color:var(--navy)">Conversão
+                                            </div>
+                                            <div style="font-size:10px;color:var(--text-muted)">Visitantes → Leads</div>
+                                        </div>
+                                    </div>
+                                    <div
+                                        style="font-size:18px;font-weight:800;background:linear-gradient(135deg,var(--cyan),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+                                        +340%</div>
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                                    <div
+                                        style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;">
+                                        <div style="font-size:16px;font-weight:800;color:var(--navy)">4.9s</div>
+                                        <div style="font-size:10px;color:var(--text-muted)">→ 0.8s LCP</div>
+                                    </div>
+                                    <div
+                                        style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;">
+                                        <div style="font-size:16px;font-weight:800;color:var(--green)">Top 3</div>
+                                        <div style="font-size:10px;color:var(--text-muted)">Google Orgânico</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="process" id="processo">
+        <div class="container">
+            <div class="section-header reveal" style="text-align:center;max-width:560px;margin:0 auto 64px;">
+                <div class="section-tag">Como Funciona</div>
+                <h2 class="section-title">Do briefing ao <span>resultado</span></h2>
+                <p class="section-sub" style="margin:0 auto;">Processo claro, entregas pontuais e comunicação direta em
+                    todas as etapas.</p>
+            </div>
+
+            <div class="process-steps">
+                <div class="p-step reveal">
+                    <div class="p-step-num">01</div>
+                    <div class="p-step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                        </svg>
+                    </div>
+                    <div class="p-step-title">Briefing &amp; Escopo</div>
+                    <p class="p-step-desc">Entendemos seus objetivos, público-alvo e necessidades técnicas em uma
+                        conversa detalhada.</p>
+                </div>
+                <div class="p-step reveal">
+                    <div class="p-step-num">02</div>
+                    <div class="p-step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                        </svg>
+                    </div>
+                    <div class="p-step-title">Planejamento</div>
+                    <p class="p-step-desc">Arquitetura técnica, wireframes e cronograma definidos antes de escrever uma
+                        linha de código.</p>
+                </div>
+                <div class="p-step reveal">
+                    <div class="p-step-num">03</div>
+                    <div class="p-step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="16 18 22 12 16 6" />
+                            <polyline points="8 6 2 12 8 18" />
+                        </svg>
+                    </div>
+                    <div class="p-step-title">Desenvolvimento</div>
+                    <p class="p-step-desc">Código limpo e performático com atualizações constantes e revisões
+                        colaborativas.</p>
+                </div>
+                <div class="p-step reveal">
+                    <div class="p-step-num">04</div>
+                    <div class="p-step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                    </div>
+                    <div class="p-step-title">Entrega &amp; Suporte</div>
+                    <p class="p-step-desc">Deploy, testes finais e suporte pós-entrega para garantir tudo funcionando
+                        perfeitamente.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SIMULATOR -->
+    <section class="simulator" id="simulador">
+        <div class="container">
+            <div class="section-header reveal">
+                <div class="section-tag">Automação ao Vivo</div>
+                <h2 class="section-title">Veja a <span>automação</span> em ação</h2>
+                <p class="section-sub">Clique em disparar e assista o pipeline processar um lead em tempo real —
+                    exatamente como funciona no seu negócio.</p>
+            </div>
+
+            <div class="sim-card reveal">
+                <div class="sim-header">
+                    <div class="sim-header-left">
+                        <div class="sim-header-title">Pipeline de Automação · Datacron</div>
+                        <div class="sim-header-sub">Esteira de processamento de leads em tempo real</div>
+                    </div>
+                    <div class="sim-live">
+                        <div class="sim-live-dot"></div>
+                        <div class="sim-live-text">Sistema Online</div>
+                    </div>
+                </div>
+                <div class="sim-body">
+                    <div class="sim-trigger">
+                        <div class="sim-trigger-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                            </svg>
+                            Novo Lead Capturado
+                        </div>
+                        <div class="sim-trigger-sub">Formulário de contato disparado</div>
+                        <div class="lead-card">
+                            <div class="lead-row">
+                                <div class="lead-label">Nome</div>
+                                <div class="lead-val">Roberto Silva</div>
+                            </div>
+                            <div class="lead-row">
+                                <div class="lead-label">Empresa</div>
+                                <div class="lead-val">RS Comércio Ltda</div>
+                            </div>
+                            <div class="lead-row">
+                                <div class="lead-label">WhatsApp</div>
+                                <div class="lead-val">+55 11 99999-0000</div>
+                            </div>
+                            <div>
+                                <div class="lead-label">Interesse</div>
+                                <div class="lead-val">Sistema Web</div>
+                            </div>
+                        </div>
+                        <button class="btn-sim" id="btn-sim">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5">
+                                <polygon points="5 3 19 12 5 21 5 3" />
+                            </svg>
+                            <span id="btn-sim-text">Disparar Pipeline</span>
+                        </button>
+                    </div>
+
+                    <div class="sim-main">
+                        <div class="sim-pipeline">
+                            <div class="p-step-card" id="step-1">
+                                <div class="ps-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                                    </svg></div>
+                                <div class="ps-num">Etapa 01</div>
+                                <div class="ps-name">WhatsApp</div>
+                                <div class="ps-desc">Mensagem automática enviada</div>
+                                <span class="ps-badge" id="badge-1">Aguardando</span>
+                            </div>
+                            <div class="p-step-card" id="step-2">
+                                <div class="ps-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <ellipse cx="12" cy="5" rx="9" ry="3" />
+                                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                                    </svg></div>
+                                <div class="ps-num">Etapa 02</div>
+                                <div class="ps-name">CRM</div>
+                                <div class="ps-desc">Lead registrado no Google Sheets</div>
+                                <span class="ps-badge" id="badge-2">Aguardando</span>
+                            </div>
+                            <div class="p-step-card" id="step-3">
+                                <div class="ps-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path
+                                            d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                                        <polyline points="22,6 12,13 2,6" />
+                                    </svg></div>
+                                <div class="ps-num">Etapa 03</div>
+                                <div class="ps-name">E-mail</div>
+                                <div class="ps-desc">Proposta enviada automaticamente</div>
+                                <span class="ps-badge" id="badge-3">Aguardando</span>
+                            </div>
+                        </div>
+                        <div class="console">
+                            <div class="console-head">
+                                <div class="c-live"></div>
+                                datacron-pipeline · live output
+                            </div>
+                            <div class="console-body" id="console">
+                                <div class="log-line"><span class="t">[--:--:--]</span> <span class="msg"
+                                        style="color:rgba(255,255,255,0.3)">Sistema Datacron pronto. Aguardando
+                                        disparo...</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SOBRE -->
+    <section class="sobre" id="sobre">
+        <div class="container">
+            <div class="sobre-grid">
+                <div class="sobre-visual reveal">
+                    <div class="sobre-card">
+                        <div class="sobre-card-content">
+                            <div class="sobre-avatar">DC</div>
+                            <div class="sobre-name">Datacron</div>
+                            <div class="sobre-role">Desenvolvimento Web &amp; Automações</div>
+                            <div class="sobre-bio">Especialistas em criar soluções digitais que realmente geram
+                                resultado — desde o primeiro clique até a conversão.</div>
+                            <div class="skill-bars">
+                                <div>
+                                    <div class="skill-row-top"><span class="skill-name">Desenvolvimento Web</span><span
+                                            class="skill-pct">98%</span></div>
+                                    <div class="skill-track">
+                                        <div class="skill-fill" style="width:98%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="skill-row-top"><span class="skill-name">Automações &amp;
+                                            Integrações</span><span class="skill-pct">95%</span></div>
+                                    <div class="skill-track">
+                                        <div class="skill-fill" style="width:95%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="skill-row-top"><span class="skill-name">Performance &amp;
+                                            SEO</span><span class="skill-pct">99%</span></div>
+                                    <div class="skill-track">
+                                        <div class="skill-fill" style="width:99%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="sobre-stats">
+                                <div class="sobre-stat">
+                                    <div class="sobre-stat-val">50+</div>
+                                    <div class="sobre-stat-lbl">Projetos</div>
+                                </div>
+                                <div class="sobre-stat">
+                                    <div class="sobre-stat-val">100%</div>
+                                    <div class="sobre-stat-lbl">Satisfação</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sobre-content reveal">
+                    <div class="section-tag">Sobre Nós</div>
+                    <h2 class="section-title">Mais que código —<br><span>parceiros de crescimento</span></h2>
+                    <p class="sobre-p">A <strong>Datacron</strong> nasceu da crença de que tecnologia bem feita
+                        transforma negócios. Não entregamos apenas sites ou automações — entregamos <strong>sistemas que
+                            funcionam enquanto você dorme</strong>.</p>
+                    <p class="sobre-p">Com domínio completo do stack moderno e profundo entendimento de negócios, cada
+                        projeto é pensado para gerar <strong>resultado mensurável</strong> — mais leads, mais
+                        conversões, mais eficiência operacional.</p>
+                    <p class="sobre-p">Nosso diferencial é a <strong>atenção obsessiva à qualidade</strong>: código
+                        limpo, performance máxima, SEO técnico e automações que realmente escalam.</p>
+                    <div class="sobre-tags">
+                        <span class="tag">HTML / CSS</span>
+                        <span class="tag">JavaScript</span>
+                        <span class="tag">Node.js</span>
+                        <span class="tag">Make / N8N</span>
+                        <span class="tag">WhatsApp API</span>
+                        <span class="tag">Google Ads</span>
+                        <span class="tag">SEO Técnico</span>
+                        <span class="tag">Next.js</span>
+                        <span class="tag">WordPress</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section class="contato" id="contato">
+        <div class="container">
+            <div class="contato-grid">
+                <div class="reveal">
+                    <div class="section-tag">Contato</div>
+                    <h2 class="contato-title">Vamos construir<br>algo incrível<br><span
+                            style="background:linear-gradient(135deg,var(--cyan),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">juntos?</span>
+                    </h2>
+                    <p class="contato-sub">Descreva seu projeto e receba uma proposta personalizada. Resposta em até
+                        24h.</p>
+
+                    <div class="channel-cards">
+                        <a href="https://wa.me/5500000000000" class="channel-card">
+                            <div class="ch-icon g">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path
+                                        d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="ch-label">WhatsApp</div>
+                                <div class="ch-val">+55 (00) 00000-0000</div>
+                            </div>
+                        </a>
+                        <a href="mailto:contato@datacron.com.br" class="channel-card">
+                            <div class="ch-icon c">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path
+                                        d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                                    <polyline points="22,6 12,13 2,6" />
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="ch-label">E-mail</div>
+                                <div class="ch-val">contato@datacron.com.br</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="reveal">
+                    <div class="form-card">
+                        <div class="form-title">Solicitar Proposta</div>
+                        <form id="contact-form">
+                            <div class="form-2col">
+                                <div class="form-row">
+                                    <label class="form-label">Nome</label>
+                                    <input type="text" class="form-input" placeholder="Seu nome" required>
+                                </div>
+                                <div class="form-row">
+                                    <label class="form-label">WhatsApp</label>
+                                    <input type="tel" class="form-input" placeholder="(00) 00000-0000" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">E-mail</label>
+                                <input type="email" class="form-input" placeholder="seu@email.com" required>
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">Serviço de Interesse</label>
+                                <select class="form-input">
+                                    <option value="">Selecione uma opção</option>
+                                    <option>Site / Landing Page</option>
+                                    <option>Sistema Sob Medida</option>
+                                    <option>Automação de Processos</option>
+                                    <option>Integração de APIs</option>
+                                    <option>Consultoria Técnica</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">Descreva seu Projeto</label>
+                                <textarea class="form-input"
+                                    placeholder="Conte mais sobre o que você precisa..."></textarea>
+                            </div>
+                            <button type="submit" class="btn-submit">
+                                Enviar Solicitação
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.5">
+                                    <line x1="22" y1="2" x2="11" y2="13" />
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                </svg>
+                            </button>
+                        </form>
+                        <div class="form-success" id="form-success">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                                <polyline points="22 4 12 14.01 9 11.01" />
+                            </svg>
+                            <div>
+                                <div style="font-weight:600;margin-bottom:2px;">Mensagem enviada!</div>
+                                <div style="font-size:12px;opacity:0.8;">Nossa equipe entrará em contato em breve pelo
+                                    WhatsApp.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div>
+                    <img src="img/LogoOficial.png" alt="Datacron" class="footer-logo">
+                    <p class="footer-tagline">Tecnologia, desenvolvimento web nativo e integrações inteligentes para
+                        acelerar negócios.</p>
+                    <div class="footer-socials">
+                        <a href="#" class="social-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" width="15" height="15">
+                                <rect x="2" y="2" width="20" height="20" rx="5" />
+                                <path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z" />
+                                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                            </svg></a>
+                        <a href="#" class="social-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" width="15" height="15">
+                                <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z" />
+                                <rect x="2" y="9" width="4" height="12" />
+                                <circle cx="4" cy="4" r="2" />
+                            </svg></a>
+                        <a href="#" class="social-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" width="15" height="15">
+                                <path
+                                    d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" />
+                            </svg></a>
+                    </div>
+                </div>
+                <div>
+                    <div class="footer-col-title">Menu</div>
+                    <div class="footer-links">
+                        <a href="#servicos">Nossos Serviços</a>
+                        <a href="#simulador">Simulador</a>
+                        <a href="#sobre">Sobre Nós</a>
+                        <a href="#contato">Fale Conosco</a>
+                    </div>
+                </div>
+                <div>
+                    <div class="footer-col-title">Soluções</div>
+                    <div class="footer-links">
+                        <a href="#servicos">Sistemas Sob Medida</a>
+                        <a href="#servicos">Landing Pages</a>
+                        <a href="#servicos">Automações</a>
+                        <a href="#servicos">Integrações de API</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2026 Datacron — Todos os direitos reservados.</p>
+                <p><a href="#">Termos</a> &bull; <a href="#">Privacidade</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="app.js" defer></script>
+</body>
+
+</html>

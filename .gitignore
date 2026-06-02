@@ -1,0 +1,9 @@
+# Dependências / ferramentas internas
+ui-ux-pro-max-skill-main/
+design-system/
+assets/
+
+# Sistema
+*.log
+.DS_Store
+Thumbs.db
