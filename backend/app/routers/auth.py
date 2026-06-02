@@ -1,10 +1,11 @@
 ﻿import secrets
 from datetime import timedelta, datetime, timezone
+from html import escape
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -18,6 +19,7 @@ from app.config import settings
 from app.limiter import limiter
 from app.models.user_condominio import UserCondominio
 from app.models.refresh_token import RefreshToken
+from app.services.email_sender import send_notification_email
 
 router = APIRouter(prefix="/auth", tags=["AutenticaÃ§Ã£o"])
 
@@ -88,12 +90,39 @@ class UserUpdate(BaseModel):
     whatsapp: Optional[int] = None
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
 def _validate_password(senha: str) -> None:
     if len(senha) < MIN_PASSWORD_LENGTH:
         raise HTTPException(
             status_code=422,
             detail=f"A senha deve ter pelo menos {MIN_PASSWORD_LENGTH} caracteres",
         )
+
+
+def _generate_temporary_password(length: int = 12) -> str:
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+    return "Fox" + "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _password_reset_email_html(nome: str, temporary_password: str) -> str:
+    safe_nome = escape(nome)
+    safe_password = escape(temporary_password)
+    return f"""
+    <div style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.6;">
+      <h2 style="margin:0 0 12px 0;">Nova senha FOX</h2>
+      <p>Ola, {safe_nome}.</p>
+      <p>Recebemos uma solicitacao de recuperacao de senha para o seu acesso FOX.</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px 18px;margin:18px 0;">
+        <div style="font-size:12px;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:6px;">Senha temporaria</div>
+        <div style="font-size:22px;font-weight:800;letter-spacing:0.04em;color:#0f172a;">{safe_password}</div>
+      </div>
+      <p>Use esta senha para entrar no sistema e altere-a em Configuracoes assim que possivel.</p>
+      <p style="color:#64748b;font-size:13px;">Se voce nao solicitou esta alteracao, avise a administracao imediatamente.</p>
+    </div>
+    """
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -156,6 +185,40 @@ async def login(request: Request, response: Response, body: LoginRequest, db: As
             codigo_condominio=user.codigo_condominio,
         ),
     )
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/hour")
+async def forgot_password(request: Request, body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Generates a temporary password and sends it to the registered user email."""
+    success_message = "Se o e-mail estiver cadastrado, uma nova senha sera enviada em instantes."
+
+    result = await db.execute(select(User).where(User.email == body.email))
+    user: User | None = result.scalar_one_or_none()
+    if not user or not user.ativo:
+        return {"message": success_message}
+
+    temporary_password = _generate_temporary_password()
+    user.senha_hash = await hash_password(temporary_password)
+    db.add(user)
+    await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
+
+    sent = await send_notification_email(
+        to=user.email,
+        subject="FOX - nova senha de acesso",
+        message_text=f"Sua nova senha temporaria FOX e: {temporary_password}",
+        html_body=_password_reset_email_html(user.nome, temporary_password),
+        tipo="transacional",
+    )
+    if not sent:
+        await db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail="Nao foi possivel enviar a nova senha. Tente novamente em alguns minutos.",
+        )
+
+    await db.commit()
+    return {"message": success_message}
 
 
 @router.post("/refresh", response_model=TokenResponse)

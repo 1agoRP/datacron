@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { api } from '@/lib/api';
 
 const globalStyles = `
   :root {
@@ -1273,6 +1274,30 @@ const globalStyles = `
     font-size: 0.86rem;
   }
 
+  .success-box {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid rgba(53, 208, 127, 0.28);
+    border-radius: 8px;
+    background: rgba(53, 208, 127, 0.1);
+    color: #16a34a;
+    padding: 11px 12px;
+    font-size: 0.86rem;
+  }
+
+  .forgot-password-link {
+    justify-self: center;
+    border: 0;
+    background: transparent;
+    color: var(--fox-orange);
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 800;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
   .fox-page {
     --fox-bg: #fffaf4;
     --fox-bg-2: #fff4e8;
@@ -1524,6 +1549,9 @@ export default function LandingPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isForgotPasswordView, setIsForgotPasswordView] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [contactData, setContactData] = useState({
     nome: '',
@@ -1550,6 +1578,22 @@ export default function LandingPage() {
       window.location.href = redirectPath;
     } catch (err: any) {
       setError(err.message || 'Falha na autenticação');
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
+    setError(null);
+    setForgotSuccess(null);
+    setIsLoading(true);
+
+    try {
+      const result = await api.forgotPassword(forgotEmail || email);
+      setForgotSuccess(result.message || 'Se o e-mail estiver cadastrado, uma nova senha sera enviada em instantes.');
+    } catch (err: any) {
+      setError(err.message || 'Falha ao solicitar nova senha');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -1921,7 +1965,12 @@ export default function LandingPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="modal-overlay"
-            onClick={() => setIsLoginView(false)}
+            onClick={() => {
+              setIsLoginView(false);
+              setIsForgotPasswordView(false);
+              setForgotSuccess(null);
+              setError(null);
+            }}
           >
             <motion.div
               initial={{ scale: 0.96, opacity: 0, y: 12 }}
@@ -1931,19 +1980,33 @@ export default function LandingPage() {
               className="modal-box"
               onClick={(e) => e.stopPropagation()}
             >
-              <button className="modal-close" onClick={() => setIsLoginView(false)} aria-label="Fechar">
+              <button
+                className="modal-close"
+                onClick={() => {
+                  setIsLoginView(false);
+                  setIsForgotPasswordView(false);
+                  setForgotSuccess(null);
+                  setError(null);
+                }}
+                aria-label="Fechar"
+              >
                 <X size={16} />
               </button>
               <div className="modal-brand">
                 <Image src="/fox-logo.png" alt="FOX" width={120} height={120} />
-                <h3>Acesso FOX</h3>
-                <p>Insira suas credenciais para continuar.</p>
+                <h3>{isForgotPasswordView ? 'Recuperar senha' : 'Acesso FOX'}</h3>
+                <p>{isForgotPasswordView ? 'Informe seu e-mail cadastrado para receber uma nova senha.' : 'Insira suas credenciais para continuar.'}</p>
               </div>
 
-              <form className="login-form" onSubmit={handleLogin}>
+              <form className="login-form" onSubmit={isForgotPasswordView ? handleForgotPassword : handleLogin}>
                 {error && (
                   <div className="error-box">
                     <AlertTriangle size={16} /> {error}
+                  </div>
+                )}
+                {forgotSuccess && (
+                  <div className="success-box">
+                    <Check size={16} /> {forgotSuccess}
                   </div>
                 )}
                 <div className="form-group">
@@ -1951,36 +2014,61 @@ export default function LandingPage() {
                   <input
                     type="email"
                     className="form-input"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={isForgotPasswordView ? forgotEmail : email}
+                    onChange={(e) => {
+                      if (isForgotPasswordView) {
+                        setForgotEmail(e.target.value);
+                      } else {
+                        setEmail(e.target.value);
+                      }
+                    }}
                     placeholder="exemplo@email.com"
                     required
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Senha</label>
-                  <div className="password-wrap">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      className="form-input"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="********"
-                      style={{ paddingRight: '46px' }}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="password-toggle"
-                      onClick={() => setShowPassword((value) => !value)}
-                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                    >
-                      {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                    </button>
+                {!isForgotPasswordView && (
+                  <div className="form-group">
+                    <label className="form-label">Senha</label>
+                    <div className="password-wrap">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        className="form-input"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="********"
+                        style={{ paddingRight: '46px' }}
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() => setShowPassword((value) => !value)}
+                        aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      >
+                        {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
                 <button type="submit" className="form-submit" disabled={isLoading}>
-                  {isLoading ? 'Autenticando...' : 'Entrar'}
+                  {isForgotPasswordView
+                    ? (isLoading ? 'Enviando...' : 'Enviar nova senha')
+                    : (isLoading ? 'Autenticando...' : 'Entrar')}
+                </button>
+                <button
+                  type="button"
+                  className="forgot-password-link"
+                  onClick={() => {
+                    setIsForgotPasswordView((value) => {
+                      const next = !value;
+                      setError(null);
+                      setForgotSuccess(null);
+                      setForgotEmail(email);
+                      return next;
+                    });
+                  }}
+                >
+                  {isForgotPasswordView ? 'Voltar ao login' : 'Esqueci minha senha'}
                 </button>
               </form>
             </motion.div>
