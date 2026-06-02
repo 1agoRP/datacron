@@ -1,13 +1,73 @@
 /* =============================================================
    DATACRON — APP.JS
-   Correções aplicadas:
-   1. Contador ativado por IntersectionObserver (não na carga)
-   2. Menu mobile fecha ao clicar em qualquer link
-   3. Efeito Bento Glow (rastreamento do cursor nas cards)
-   4. Formulário com loader + fade-in suave no sucesso
+   1. Navbar glassmorphic ao rolar
+   2. Menu mobile (abre/fecha/links)
+   3. Reveal on scroll
+   4. Contador animado (IntersectionObserver)
+   5. Bento Glow (cursor nas cards)
+   6. Simulador de automação
+   7. Formulário com loader + fade-in
+   8. Modais legais (Termos & Privacidade)
+   9. Banner de consentimento de cookies (LGPD)
    ============================================================= */
 
 document.addEventListener('DOMContentLoaded', () => {
+
+    /* ── 8. MODAIS LEGAIS ──────────────────────────────── */
+    window.openModal = function (id) {
+        const overlay = document.getElementById(id);
+        if (!overlay) return;
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        // Foco acessível
+        const closeBtn = overlay.querySelector('.modal-close');
+        if (closeBtn) setTimeout(() => closeBtn.focus(), 100);
+    };
+
+    window.closeModal = function (id) {
+        const overlay = document.getElementById(id);
+        if (!overlay) return;
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+    };
+
+    // Fechar ao clicar no backdrop
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) window.closeModal(overlay.id);
+        });
+    });
+
+    // Fechar com Esc
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal-overlay.open').forEach(o => {
+                window.closeModal(o.id);
+            });
+        }
+    });
+
+    /* ── 9. BANNER DE COOKIES (LGPD) ────────────────────── */
+    const cookieBanner = document.getElementById('cookie-banner');
+    const cookieAccept = document.getElementById('cookie-accept');
+    const cookieReject = document.getElementById('cookie-reject');
+    const COOKIE_KEY   = 'datacron_cookie_consent';
+
+    function dismissCookieBanner(choice) {
+        localStorage.setItem(COOKIE_KEY, choice);      // 'accepted' | 'rejected'
+        if (cookieBanner) {
+            cookieBanner.classList.remove('show');
+            cookieBanner.classList.add('hide');
+        }
+    }
+
+    if (cookieBanner && !localStorage.getItem(COOKIE_KEY)) {
+        // Exibe após 1.2s para não bloquear a experiência inicial
+        setTimeout(() => cookieBanner.classList.add('show'), 1200);
+    }
+
+    if (cookieAccept) cookieAccept.addEventListener('click', () => dismissCookieBanner('accepted'));
+    if (cookieReject) cookieReject.addEventListener('click', () => dismissCookieBanner('rejected'));
 
     /* ── 1. NAVBAR GLASSMORPHIC AO ROLAR ─────────────────── */
     const navbar = document.getElementById('navbar');
