@@ -83,7 +83,7 @@ class ApiClient {
       headers,
     });
 
-    if (response.status === 401 && typeof window !== 'undefined' && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh')) {
+    if (response.status === 401 && typeof window !== 'undefined' && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh') && !endpoint.includes('/auth/forgot-password')) {
       try {
         await this.attemptRefresh();
         response = await fetchWithRetry(finalUrl, {
@@ -141,7 +141,7 @@ class ApiClient {
       body: formData,
     });
 
-    if (response.status === 401 && typeof window !== 'undefined' && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh')) {
+    if (response.status === 401 && typeof window !== 'undefined' && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh') && !endpoint.includes('/auth/forgot-password')) {
       try {
         await this.attemptRefresh();
         response = await fetch(finalUrl, {

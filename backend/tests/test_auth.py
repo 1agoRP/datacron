@@ -67,3 +67,20 @@ async def test_forgot_password_unknown_email_is_generic(client: AsyncClient):
     assert resp.status_code == 200
     assert "nova senha" in resp.json()["message"]
     send_email.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_forgot_password_database_unavailable_returns_503(
+    client: AsyncClient,
+    db_session: AsyncSession,
+):
+    with patch.object(
+        db_session,
+        "execute",
+        new_callable=AsyncMock,
+        side_effect=OSError("database unavailable"),
+    ):
+        resp = await client.post("/api/auth/forgot-password", json={"email": "reset@test.com"})
+
+    assert resp.status_code == 503
+    assert "temporariamente indisponivel" in resp.json()["detail"]

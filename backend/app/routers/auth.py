@@ -1,11 +1,13 @@
 ﻿import secrets
 from datetime import timedelta, datetime, timezone
 from html import escape
+import logging
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import delete, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -22,6 +24,7 @@ from app.models.refresh_token import RefreshToken
 from app.services.email_sender import send_notification_email
 
 router = APIRouter(prefix="/auth", tags=["AutenticaÃ§Ã£o"])
+logger = logging.getLogger(__name__)
 
 MIN_PASSWORD_LENGTH = 8
 ACCESS_COOKIE_NAME = "datacron_token"
@@ -193,7 +196,15 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest, db: Asy
     """Generates a temporary password and sends it to the registered user email."""
     success_message = "Se o e-mail estiver cadastrado, uma nova senha sera enviada em instantes."
 
-    result = await db.execute(select(User).where(User.email == body.email))
+    try:
+        result = await db.execute(select(User).where(User.email == body.email))
+    except (SQLAlchemyError, OSError) as exc:
+        logger.error("Password recovery database lookup failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="O servico de recuperacao de senha esta temporariamente indisponivel. Tente novamente em alguns minutos.",
+        ) from exc
+
     user: User | None = result.scalar_one_or_none()
     if not user or not user.ativo:
         return {"message": success_message}
