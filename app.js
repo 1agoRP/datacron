@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cookieBanner = document.getElementById('cookie-banner');
     const cookieAccept = document.getElementById('cookie-accept');
     const cookieReject = document.getElementById('cookie-reject');
-    const COOKIE_KEY   = 'datacron_cookie_consent';
+    const COOKIE_KEY = 'datacron_cookie_consent';
 
     function dismissCookieBanner(choice) {
         localStorage.setItem(COOKIE_KEY, choice);      // 'accepted' | 'rejected'
@@ -152,30 +152,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     /* ── 6. SIMULADOR DE AUTOMAÇÃO ───────────────────────── */
-    const btnSim   = document.getElementById('btn-sim');
-    const btnText  = document.getElementById('btn-sim-text');
+    const btnSim = document.getElementById('btn-sim');
+    const btnText = document.getElementById('btn-sim-text');
     const consoleEl = document.getElementById('console');
 
     const steps = [
         {
             id: 'step-1', badge: 'badge-1', label: 'WhatsApp enviado', logs: [
-                { type: 'info',    msg: 'Lead capturado: Roberto Silva — RS Comércio Ltda' },
-                { type: 'info',    msg: 'Iniciando pipeline de automação...' },
-                { type: 'success', msg: '✓ WhatsApp enviado para Roberto Silva (+55 11 99999-0000)' },
+                { type: 'info', msg: 'Lead capturado: João Silva — Empresa Ltda' },
+                { type: 'info', msg: 'Iniciando pipeline de automação...' },
+                { type: 'success', msg: '✓ WhatsApp enviado para João Silva (+55 11 91234-5678)' },
             ]
         },
         {
             id: 'step-2', badge: 'badge-2', label: 'CRM registrado', logs: [
-                { type: 'info',    msg: 'Conectando ao Google Sheets API...' },
+                { type: 'info', msg: 'Conectando ao Google Sheets API...' },
                 { type: 'success', msg: '✓ Lead registrado na planilha (linha 142)' },
                 { type: 'success', msg: '✓ CRM atualizado — status: Novo Lead' },
             ]
         },
         {
             id: 'step-3', badge: 'badge-3', label: 'E-mail enviado', logs: [
-                { type: 'info',    msg: 'Preparando e-mail de proposta...' },
-                { type: 'success', msg: '✓ E-mail enviado para roberto@rscomercio.com.br' },
-                { type: 'warn',    msg: '→ Pipeline completo em 0.84s. Esteira encerrada.' },
+                { type: 'info', msg: 'Preparando e-mail de proposta...' },
+                { type: 'success', msg: '✓ E-mail enviado para joao@empresa.com.br' },
+                { type: 'warn', msg: '→ Pipeline completo em 0.84s. Esteira encerrada.' },
             ]
         },
     ];
