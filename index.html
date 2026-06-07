@@ -9,13 +9,14 @@
         content="Desenvolvimento profissional de sites, landing pages de alta conversão e automações inteligentes. Eleve o nível tecnológico do seu negócio com a Datacron.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
-        rel="stylesheet">
+    <!-- Fontes pré-carregadas de forma não-bloqueante para otimizar FCP/LCP -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"></noscript>
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
+<a class="sr-only" href="#conteudo-principal">Pular para o conteúdo principal</a>
 
     <!-- MOBILE MENU -->
     <div class="mobile-menu" id="mobile-menu">
@@ -30,8 +31,8 @@
     <!-- NAVBAR -->
     <header class="navbar" id="navbar">
         <div class="container nav-inner">
-            <a href="#" class="logo">
-                <img src="img/LogoOficialFundoBranco.png" alt="Datacron" />
+            <a href="#" class="logo" aria-label="Datacron — Ir para o início">
+                <img src="img/LogoOficial.webp" alt="Datacron" width="41" height="40" fetchpriority="high" />
             </a>
             <ul class="nav-links">
                 <li><a href="#servicos">Serviços</a></li>
@@ -57,6 +58,9 @@
             </div>
         </div>
     </header>
+
+    <!-- MAIN (landmark de acessibilidade) -->
+    <main id="conteudo-principal">
 
     <!-- HERO -->
     <section class="hero" id="home">
@@ -458,7 +462,7 @@
                                     <div class="li-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                             stroke-width="3">
                                             <path d="M20 6L9 17l-5-5" />
-                                        </svg></div>Entrega em até 5 dias
+                                        </svg></div>Entrega em até 15 dias
                                 </li>
                             </ul>
                         </div>
@@ -599,15 +603,15 @@
                         <div class="lead-card">
                             <div class="lead-row">
                                 <div class="lead-label">Nome</div>
-                                <div class="lead-val">Roberto Silva</div>
+                                <div class="lead-val">João Silva</div>
                             </div>
                             <div class="lead-row">
                                 <div class="lead-label">Empresa</div>
-                                <div class="lead-val">RS Comércio Ltda</div>
+                                <div class="lead-val">Empresa Ltda</div>
                             </div>
                             <div class="lead-row">
                                 <div class="lead-label">WhatsApp</div>
-                                <div class="lead-val">+55 11 99999-0000</div>
+                                <div class="lead-val">+55 11 91234-5678</div>
                             </div>
                             <div>
                                 <div class="lead-label">Interesse</div>
@@ -800,32 +804,32 @@
                         <form id="contact-form">
                             <div class="form-2col">
                                 <div class="form-row">
-                                    <label class="form-label">Nome</label>
-                                    <input type="text" class="form-input" placeholder="Seu nome" required>
+                                    <label class="form-label" for="form-nome">Nome</label>
+                                    <input type="text" id="form-nome" class="form-input" placeholder="Seu nome" required>
                                 </div>
                                 <div class="form-row">
-                                    <label class="form-label">WhatsApp</label>
-                                    <input type="tel" class="form-input" placeholder="(00) 00000-0000" required>
+                                    <label class="form-label" for="form-whatsapp">WhatsApp</label>
+                                    <input type="tel" id="form-whatsapp" class="form-input" placeholder="(00) 00000-0000" required>
                                 </div>
                             </div>
                             <div class="form-row">
-                                <label class="form-label">E-mail</label>
-                                <input type="email" class="form-input" placeholder="seu@email.com" required>
+                                <label class="form-label" for="form-email">E-mail</label>
+                                <input type="email" id="form-email" class="form-input" placeholder="seu@email.com" required>
                             </div>
                             <div class="form-row">
-                                <label class="form-label">Serviço de Interesse</label>
-                                <select class="form-input">
+                                <label class="form-label" for="servico-interesse">Serviço de Interesse</label>
+                                <select class="form-input" id="servico-interesse" name="servico">
                                     <option value="">Selecione uma opção</option>
-                                    <option>Site / Landing Page</option>
-                                    <option>Sistema Sob Medida</option>
-                                    <option>Automação de Processos</option>
-                                    <option>Integração de APIs</option>
-                                    <option>Consultoria Técnica</option>
+                                    <option value="site-landing">Site / Landing Page</option>
+                                    <option value="sistema">Sistema Sob Medida</option>
+                                    <option value="automacao">Automação de Processos</option>
+                                    <option value="integracao">Integração de APIs</option>
+                                    <option value="consultoria">Consultoria Técnica</option>
                                 </select>
                             </div>
                             <div class="form-row">
-                                <label class="form-label">Descreva seu Projeto</label>
-                                <textarea class="form-input"
+                                <label class="form-label" for="form-descricao">Descreva seu Projeto</label>
+                                <textarea id="form-descricao" class="form-input"
                                     placeholder="Conte mais sobre o que você precisa..."></textarea>
                             </div>
                             <button type="submit" class="btn-submit">
@@ -854,29 +858,31 @@
         </div>
     </section>
 
+    </main><!-- /main -->
+
     <!-- FOOTER -->
     <footer class="footer">
         <div class="container">
             <div class="footer-grid">
                 <div>
-                    <img src="img/LogoOficial.png" alt="Datacron" class="footer-logo">
+                    <img src="img/LogoOficial.webp" alt="Datacron" class="footer-logo" width="37" height="36" loading="lazy">
                     <p class="footer-tagline">Tecnologia, desenvolvimento web nativo e integrações inteligentes para
                         acelerar negócios.</p>
                     <div class="footer-socials">
-                        <a href="#" class="social-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" width="15" height="15">
+                        <a href="#" class="social-btn" aria-label="Instagram da Datacron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" width="15" height="15" aria-hidden="true">
                                 <rect x="2" y="2" width="20" height="20" rx="5" />
                                 <path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z" />
                                 <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
                             </svg></a>
-                        <a href="#" class="social-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" width="15" height="15">
+                        <a href="#" class="social-btn" aria-label="LinkedIn da Datacron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" width="15" height="15" aria-hidden="true">
                                 <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6z" />
                                 <rect x="2" y="9" width="4" height="12" />
                                 <circle cx="4" cy="4" r="2" />
                             </svg></a>
-                        <a href="#" class="social-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" width="15" height="15">
+                        <a href="#" class="social-btn" aria-label="GitHub da Datacron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" width="15" height="15" aria-hidden="true">
                                 <path
                                     d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22" />
                             </svg></a>
@@ -977,7 +983,8 @@
                     <p>Todo o conteúdo deste site — incluindo textos, imagens, logotipo, layout, código-fonte e marca
                         <strong>Datacron</strong> — é de propriedade exclusiva da empresa e protegido pela <strong>Lei
                             nº 9.610/1998 (Lei de Direitos Autorais)</strong> e pela <strong>Lei nº 9.279/1996 (Lei de
-                            Propriedade Industrial)</strong>.</p>
+                            Propriedade Industrial)</strong>.
+                    </p>
                     <p>A utilização não autorizada pode caracterizar infração civil e criminal.</p>
                 </div>
 
